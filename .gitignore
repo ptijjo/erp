@@ -1,0 +1,33 @@
+.env
+
+
+
+front/node_modules/
+
+
+# Dossiers de build et binaires
+bin/
+obj/
+
+# Fichiers de configuration de Visual Studio
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+
+# Fichiers de l'IDE VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Fichiers de Next.js / Node
+node_modules/
+.next/
+out/
+build/
+.env*.local
+
+# Divers
+.DS_Store

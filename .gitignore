@@ -3,6 +3,7 @@
 
 
 front/node_modules/
+front/.env
 
 
 # Dossiers de build et binaires

@@ -7,10 +7,14 @@ import { AuthController } from './auth.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './jwt.strategy/jwt.strategy';
 import { ConfigService } from '@nestjs/config';
+import { RedisModule } from '../redis/redis.module';
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   providers: [AuthService, LocalStrategy, JwtStrategy],
   imports: [
+    PrismaModule,
+    RedisModule,
     UserModule,
     PassportModule,
     JwtModule.registerAsync({

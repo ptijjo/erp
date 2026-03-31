@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-local';
 import { AuthService } from '../auth.service';
 import { User } from '../../generated/prisma/client';
+import type { Request } from 'express';
 
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
@@ -10,18 +11,24 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     super({
       usernameField: 'email',
       passwordField: 'password',
+      passReqToCallback: true,
     });
   }
 
   async validate(
+    req: Request,
     email: string,
     password: string,
   ): Promise<Omit<User, 'password'>> {
-    const user = await this.authService.validateUser(email, password);
+    const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
+    const userAgent = req.get('user-agent') ?? '';
+    const user = await this.authService.validateLogin(email, password, {
+      ip,
+      userAgent,
+    });
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    const { password: _password, ...result } = user;
-    return result;
+    return user;
   }
 }

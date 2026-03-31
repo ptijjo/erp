@@ -37,20 +37,22 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
-    "dotenv": "^16.4.7",
+    "dotenv": "^17.3.1",
     "helmet": "^8.1.0",
+    "ioredis": "^5.10.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "slugify": "^1.6.8"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@eslint/js": "^10.0.1",
-    "@nestjs/cli": "^11.0.9",
-    "@nestjs/schematics": "^11.0.9",
+    "@nestjs/cli": "^11.0.17",
+    "@nestjs/schematics": "^11.0.10",
     "@nestjs/testing": "^11.1.17",
     "@prisma/config": "^7.6.0",
     "@types/bcrypt": "^6.0.0",
@@ -74,8 +76,8 @@
     "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "~5.7.3",
-    "typescript-eslint": "^8.57.2"
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.58.0"
   },
   "jest": {
     "moduleFileExtensions": [

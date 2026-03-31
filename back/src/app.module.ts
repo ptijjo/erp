@@ -8,9 +8,14 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
+import { RedisModule } from './redis/redis.module';
+import { SeederModule } from './seeder/seeder.module';
+import { RoleModule } from './role/role.module';
+import { OrganisationModule } from './organisation/organisation.module';
 
 @Module({
   imports: [
+    SeederModule,
     PrismaModule,
     ConfigModule.forRoot({
       isGlobal: true,
@@ -26,6 +31,10 @@ import { UserModule } from './user/user.module';
     HealthModule,
     AuthModule,
     UserModule,
+    RedisModule,
+    SeederModule,
+    RoleModule,
+    OrganisationModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local.strategy/local-auth.guard';
 import { Request, Response, UseGuards } from '@nestjs/common';
@@ -18,6 +18,7 @@ export class AuthController {
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(LocalAuthGuard)
+  @HttpCode(200)
   login(
     @Request() req: RequestExpress,
     @Response({ passthrough: true }) res: ResponseExpress,
@@ -33,7 +34,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('profile')
+  @Get('me')
   getProfile(@Request() req: RequestExpress) {
     return req.user;
   }

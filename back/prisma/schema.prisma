@@ -13,11 +13,91 @@ datasource db {
   provider = "postgresql"
 }
 
+enum OrganizationType {
+  MAIN
+  SUBSIDIARY
+}
+
 model User {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   email     String   @unique
-  name      String?
   password  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  loginAttempts LoginAttempt[]
+
+  userRoles UserRole[]
+}
+
+model Role {
+  id              String           @id @default(uuid())
+  name            String           @unique
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  userRoles       UserRole[]
+  permissionRoles PermissionRole[]
+
+}
+
+model UserRole {
+  id     String @id @default(uuid())
+  userId String
+  roleId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, roleId])
+}
+
+model Organization {
+  id               String           @id @default(uuid())
+  name             String
+  slug             String           @unique
+  organizationType OrganizationType
+  description      String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  //Relations
+  users User[]
+
+  
+  @@index([organizationType])
+}
+
+model Permission {
+  id              String           @id @default(uuid())
+  name            String           @unique
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  permissionRoles PermissionRole[]
+}
+
+model PermissionRole {
+  id           String     @id @default(uuid())
+  permissionId String
+  roleId       String
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([permissionId, roleId])
+}
+
+model LoginAttempt {
+  id        String   @id @default(uuid())
+  ipAddress String
+  userAgent String
+  userId    String?
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([ipAddress, userAgent])
+  @@index([userId])
 }

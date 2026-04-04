@@ -5,6 +5,7 @@ export type UserWithRole = {
   id: string;
   email: string;
   password: string;
+  firstLogin: boolean;
   createdAt: Date;
   updatedAt: Date;
   organizationId: string;

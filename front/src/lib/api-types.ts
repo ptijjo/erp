@@ -13,6 +13,13 @@ export type OrganizationDto = {
   updatedAt?: string;
 };
 
+export type RoleDto = {
+  id: string;
+  name: string;
+  description: string | null;
+  organizationScopeId: string | null;
+};
+
 export type UserListItemDto = {
   id: string;
   email: string;
@@ -90,4 +97,20 @@ export type StockDto = {
   productId: string;
   product: { id: string; name: string; price: string | number };
   organization: { id: string; name: string; slug: string };
+};
+
+export type SessionCaisseDto = {
+  id: string;
+  statut: string;
+  openedAt: string;
+  closedAt: string | null;
+  fondOuverture: string | number;
+  fondCloture: string | number | null;
+  commentaireCloture: string | null;
+  organizationId: string;
+  userId: string;
+  closedByUserId: string | null;
+  organization?: { id: string; name: string; slug: string };
+  user?: { id: string; email: string };
+  closedByUser?: { id: string; email: string } | null;
 };

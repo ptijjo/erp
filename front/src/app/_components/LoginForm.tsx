@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { useRouter } from "next/navigation";
 import { Button } from "~/components/ui/button";
-import { meQueryKey } from "~/hooks/use-me";
+import { fetchMe, meQueryKey } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 
 const schema = z.object({
@@ -48,7 +48,13 @@ const LoginForm = () => {
         password: data.password,
       });
       await queryClient.invalidateQueries({ queryKey: meQueryKey });
-      router.push("/dashboard");
+      const profile = await queryClient.fetchQuery({
+        queryKey: meQueryKey,
+        queryFn: fetchMe,
+      });
+      router.push(
+        profile?.firstLogin ? "/dashboard/first-login" : "/dashboard",
+      );
     } catch (error) {
       alert(loginErrorMessage(error));
     }

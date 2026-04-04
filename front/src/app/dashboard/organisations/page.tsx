@@ -49,12 +49,11 @@ export default function OrganisationsPage() {
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[480px] text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="px-4 py-3 font-semibold text-gray-900">Nom</th>
                 <th className="px-4 py-3 font-semibold text-gray-900">Slug</th>
-                <th className="px-4 py-3 font-semibold text-gray-900">Type</th>
                 <th className="px-4 py-3 font-semibold text-gray-900">Actions</th>
               </tr>
             </thead>
@@ -69,9 +68,6 @@ export default function OrganisationsPage() {
                   </td>
                   <td className="px-4 py-3 font-mono text-gray-600">
                     {org.slug}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700">
-                    {org.organizationType}
                   </td>
                   <td className="px-4 py-3">
                     <Link

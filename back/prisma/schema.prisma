@@ -94,6 +94,8 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
+  /// Tant que `true`, l’utilisateur doit définir son mot de passe (première connexion).
+  firstLogin Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

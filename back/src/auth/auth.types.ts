@@ -5,11 +5,12 @@ export type JwtRoleClaims = {
   description: string | null;
 };
 
-/** Contenu signé dans le JWT après login. */
+/** Contenu signé dans le JWT après login (`firstLogin` absent sur les anciens jetons). */
 export type AccessTokenPayload = {
   email: string;
   sub: string;
   organisationId: string;
+  firstLogin?: boolean;
   role: JwtRoleClaims;
 };
 
@@ -18,6 +19,7 @@ export type AuthenticatedUser = {
   email: string;
   sub: string;
   organisationId: string;
+  firstLogin: boolean;
   role: JwtRoleClaims;
 };
 

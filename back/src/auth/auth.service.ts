@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -110,6 +111,7 @@ export class AuthService {
       email: user.email,
       sub: user.id,
       organisationId: user.organizationId,
+      firstLogin: user.firstLogin,
       role: {
         id: user.role.id,
         name: user.role.name,
@@ -119,11 +121,42 @@ export class AuthService {
     return { access_token: this.jwtService.sign(payload) };
   }
 
+  /** Première connexion : nouveau mot de passe + `firstLogin` à false + cookie JWT à jour. */
+  async completeFirstLogin(
+    userId: string,
+    password: string,
+  ): Promise<{ access_token: string }> {
+    const row = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+    if (!row) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+    if (!row.firstLogin) {
+      throw new BadRequestException(
+        'Votre mot de passe est déjà défini. Utilisez la connexion habituelle.',
+      );
+    }
+    const hashed = await bcrypt.hash(
+      password,
+      Number(process.env.PASSWORD_ROUNDS),
+    );
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashed, firstLogin: false },
+      include: { role: true },
+    });
+    const { password: _p, ...safe } = updated;
+    return this.login(safe satisfies SafeUserWithRole);
+  }
+
   /** Profil pour /auth/me : claims JWT + nom de l’organisation (lookup Prisma). */
   async getMeProfile(jwtUser: AuthenticatedUser): Promise<MeResponse> {
     const row = await this.prisma.user.findUnique({
       where: { id: jwtUser.sub },
       select: {
+        firstLogin: true,
         organization: { select: { name: true } },
       },
     });
@@ -133,6 +166,7 @@ export class AuthService {
     return {
       ...jwtUser,
       organisationName: row.organization.name,
+      firstLogin: row.firstLogin,
     };
   }
 }

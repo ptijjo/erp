@@ -18,11 +18,12 @@ export type Me = {
   organisationId: string;
   role: MeRole;
   organisationName: string;
+  firstLogin: boolean;
 };
 
 export const meQueryKey = ["auth", "me"] as const;
 
-async function fetchMe(): Promise<Me | null> {
+export async function fetchMe(): Promise<Me | null> {
   try {
     const { data } = await api.get<Me>("/auth/me");
     return data;

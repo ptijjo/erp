@@ -84,11 +84,16 @@ export class SeederService implements OnModuleInit {
             password: await bcrypt.hash(adminPassword, passwordRounds),
             organizationId: organization.id,
             roleId: adminRole.id,
+            firstLogin: false,
           },
         });
         Logger.log('Utilisateur admin créé avec succès');
       } else {
-        Logger.log('Utilisateur admin déjà présent');
+        await this.prisma.user.update({
+          where: { id: adminUser.id },
+          data: { firstLogin: false },
+        });
+        Logger.log('Utilisateur admin déjà présent (firstLogin = false)');
       }
     } catch (error) {
       Logger.error(error);

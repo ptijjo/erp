@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { useMe } from "~/hooks/use-me";
 import Header from "./_components/header/Header";
 import NavBar from "./_components/NavBar";
+
+const FIRST_LOGIN_PATH = "/dashboard/first-login";
 
 export default function DashboardLayout({
   children,
@@ -13,14 +15,23 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { data: me, isPending, isError } = useMe();
 
   useEffect(() => {
     if (isPending) return;
     if (me === null || isError) {
       router.replace("/");
+      return;
     }
-  }, [isPending, me, isError, router]);
+    if (me.firstLogin && pathname !== FIRST_LOGIN_PATH) {
+      router.replace(FIRST_LOGIN_PATH);
+      return;
+    }
+    if (!me.firstLogin && pathname === FIRST_LOGIN_PATH) {
+      router.replace("/dashboard");
+    }
+  }, [isPending, me, isError, pathname, router]);
 
   if (isPending) {
     return (
@@ -42,9 +53,10 @@ export default function DashboardLayout({
         nom={displayName}
         imageUrl="https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png"
         organization={me.organisationName}
+        displayName={me.email}
       />
       <div className="flex h-full min-h-0 w-full flex-1">
-        <NavBar />
+        {pathname !== FIRST_LOGIN_PATH && <NavBar />}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
           {children}
         </div>

@@ -35,8 +35,8 @@ export class UserController {
   @Post('')
   @UseGuards(JwtAuthGuard, PoliciesGuard)
   @CheckPolicies({ action: 'create', subject: 'User' })
-  createUser(@Body() user: CreateUserDto, organizationId: string) {
-    return this.userService.create(user, organizationId);
+  createUser(@Body() user: CreateUserDto) {
+    return this.userService.create(user, user.organizationId);
   }
 
   @Patch(':id')

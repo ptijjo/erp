@@ -44,6 +44,21 @@ export class UserService {
     }
   }
 
+  /** Le rôle ADMIN est réservé au seeder / provisionnement, pas à l’API métier. */
+  private async assertRoleNotAdminViaApi(roleId: string): Promise<void> {
+    const role = await this.prisma.role.findUnique({
+      where: { id: roleId },
+    });
+    if (!role) {
+      throw new NotFoundException('Rôle non trouvé');
+    }
+    if (role.name === 'ADMIN') {
+      throw new BadRequestException(
+        'Le rôle ADMIN ne peut être attribué que via le provisionnement initial (seeder).',
+      );
+    }
+  }
+
   async findUser(email: string): Promise<UserWithRole | null> {
     return this.prisma.user.findUnique({
       where: {
@@ -75,15 +90,8 @@ export class UserService {
     if (!user) {
       throw new NotFoundException('Utilisateur non trouvé');
     }
-    return {
-      id: user.id,
-      email: user.email,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      organizationId: user.organizationId,
-      roleId: user.roleId,
-      role: user.role,
-    };
+    const { password: _p, ...rest } = user;
+    return rest;
   };
 
   public create = async (
@@ -99,6 +107,7 @@ export class UserService {
       throw new ConflictException('Utilisateur déjà existant');
     }
     await this.assertRoleAllowedForOrganization(user.roleId, organizationId);
+    await this.assertRoleNotAdminViaApi(user.roleId);
     const newUser = await this.prisma.user.create({
       data: {
         email: user.email,
@@ -111,15 +120,8 @@ export class UserService {
       },
       include: { role: true },
     });
-    return {
-      id: newUser.id,
-      email: newUser.email,
-      createdAt: newUser.createdAt,
-      updatedAt: newUser.updatedAt,
-      organizationId: newUser.organizationId,
-      roleId: newUser.roleId,
-      role: newUser.role,
-    };
+    const { password: _p, ...rest } = newUser;
+    return rest;
   };
 
   public update = async (
@@ -135,6 +137,9 @@ export class UserService {
     const nextOrganizationId =
       user.organizationId ?? existingUser.organizationId;
     const nextRoleId = user.roleId ?? existingUser.roleId;
+    if (user.roleId !== undefined) {
+      await this.assertRoleNotAdminViaApi(user.roleId);
+    }
     await this.assertRoleAllowedForOrganization(nextRoleId, nextOrganizationId);
     const updatedUser = await this.prisma.user.update({
       where: { id },
@@ -152,15 +157,8 @@ export class UserService {
       },
       include: { role: true },
     });
-    return {
-      id: updatedUser.id,
-      email: updatedUser.email,
-      createdAt: updatedUser.createdAt,
-      updatedAt: updatedUser.updatedAt,
-      organizationId: updatedUser.organizationId,
-      roleId: updatedUser.roleId,
-      role: updatedUser.role,
-    };
+    const { password: _p, ...rest } = updatedUser;
+    return rest;
   };
 
   public delete = async (

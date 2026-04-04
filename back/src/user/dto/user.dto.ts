@@ -33,6 +33,11 @@ export class CreateUserDto {
   @IsNotEmpty({ message: 'ID du rôle est requis' })
   @IsUUID('4', { message: 'ID du rôle doit être un UUID valide' })
   public roleId!: string;
+
+  @IsString({ message: "ID de l'organisation est requis" })
+  @IsNotEmpty({ message: "ID de l'organisation est requis" })
+  @IsUUID('4', { message: "ID de l'organisation doit être un UUID valide" })
+  public organizationId!: string;
 }
 
 export class UpdateUserDto {

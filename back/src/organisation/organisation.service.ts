@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Organization } from '../generated/prisma/client';
+import { Organization, OrganizationType } from '../generated/prisma/client';
 import {
   CreateOrganizationDto,
   UpdateOrganizationDto,
@@ -32,16 +32,25 @@ export class OrganisationService {
   public createOrganisation = async (
     data: CreateOrganizationDto,
   ): Promise<Organization> => {
+    const slug = slugify(data.slug);
     const existingOrganization = await this.prisma.organization.findUnique({
-      where: { slug: data.slug },
+      where: { slug },
     });
     if (existingOrganization) {
-      throw new BadRequestException('Organization already exists');
+      throw new BadRequestException(
+        'Une organisation avec ce slug existe déjà.',
+      );
     }
+    const description =
+      data.description !== undefined && String(data.description).trim() !== ''
+        ? String(data.description).trim()
+        : undefined;
     return await this.prisma.organization.create({
       data: {
-        ...data,
-        slug: slugify(data.slug),
+        name: data.name,
+        slug,
+        organizationType: OrganizationType.SUBSIDIARY,
+        ...(description !== undefined ? { description } : {}),
       },
     });
   };

@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
+import type { AccessTokenPayload } from '../auth.types';
 
 /** Doit correspondre au nom utilisé dans AuthController (res.cookie / clearCookie). */
 const JWT_COOKIE_NAME = 'token';
@@ -25,7 +26,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: { email: string; sub: string }) {
-    return { email: payload.email, sub: payload.sub };
+  /** Attache l’utilisateur sur `req.user` (ex. GET /auth/me). */
+  validate(payload: AccessTokenPayload) {
+    return {
+      email: payload.email,
+      sub: payload.sub,
+      organisationId: payload.organisationId,
+      role: payload.role,
+    };
   }
 }

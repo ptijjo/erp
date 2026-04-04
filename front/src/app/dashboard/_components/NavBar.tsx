@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-    Home,
+    LayoutDashboard,
     Users,
     Package,
+    FolderTree,
     ShoppingCart,
     ShoppingBag,
     Layers,
@@ -17,10 +18,11 @@ import {
 } from "lucide-react";
 
 const navItems = [
-    { label: "Accueil", href: "/dashboard", icon: Home },
+    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Utilisateurs", href: "/dashboard/utilisateurs", icon: Users },
     { label: "Organisations", href: "/dashboard/organisations", icon: Building2 },
     { label: "Produits", href: "/dashboard/produits", icon: Package },
+    { label: "Catégories", href: "/dashboard/categories", icon: FolderTree },
     { label: "Commandes", href: "/dashboard/commandes", icon: ShoppingCart },
     { label: "Ventes", href: "/dashboard/ventes", icon: ShoppingBag },
     { label: "Stocks", href: "/dashboard/stocks", icon: Layers },

@@ -12,7 +12,9 @@ const AddOrganizationPage = () => {
                         Retour
                     </Link>
                 </div>
-                <h1 className="text-4xl font-extrabold text-orange-500 shrink-0">Ajouter une organisation</h1>
+                <h1 className="text-4xl font-extrabold text-orange-500 shrink-0 text-center">
+                  Nouvelle filiale
+                </h1>
                 <div className="flex-1" />
             </div>
 

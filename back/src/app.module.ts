@@ -12,14 +12,46 @@ import { RedisModule } from './redis/redis.module';
 import { SeederModule } from './seeder/seeder.module';
 import { RoleModule } from './role/role.module';
 import { OrganisationModule } from './organisation/organisation.module';
+import { CaslModule } from './casl/casl.module';
+import { AuditModule } from './audit/audit.module';
+import { PermissionModule } from './permission/permission.module';
+import { LoginAttemptModule } from './login-attempt/login-attempt.module';
+import { CategoryModule } from './category/category.module';
+import { ProductModule } from './product/product.module';
+import { StockModule } from './stock/stock.module';
+import { VenteModule } from './vente/vente.module';
+import { SessionCaisseModule } from './session-caisse/session-caisse.module';
+import { ContratModule } from './contrat/contrat.module';
+import { PlanningShiftModule } from './planning-shift/planning-shift.module';
+import { PointageModule } from './pointage/pointage.module';
+import { AbsenceModule } from './absence/absence.module';
+import { BulletinPaieModule } from './bulletin-paie/bulletin-paie.module';
 
 @Module({
   imports: [
-    SeederModule,
-    PrismaModule,
+    AbsenceModule,
+    AuditModule,
+    AuthModule,
+    BulletinPaieModule,
+    CaslModule,
+    CategoryModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ContratModule,
+    HealthModule,
+    LoginAttemptModule,
+    OrganisationModule,
+    PermissionModule,
+    PlanningShiftModule,
+    PointageModule,
+    PrismaModule,
+    ProductModule,
+    RedisModule,
+    RoleModule,
+    SeederModule,
+    SessionCaisseModule,
+    StockModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {
@@ -28,13 +60,8 @@ import { OrganisationModule } from './organisation/organisation.module';
         },
       ],
     }),
-    HealthModule,
-    AuthModule,
     UserModule,
-    RedisModule,
-    SeederModule,
-    RoleModule,
-    OrganisationModule,
+    VenteModule,
   ],
   controllers: [AppController],
   providers: [

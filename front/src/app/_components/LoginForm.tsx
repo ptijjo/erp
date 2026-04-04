@@ -4,11 +4,11 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
+import { isAxiosError } from "axios";
 import { useRouter } from "next/navigation";
 import { Button } from "~/components/ui/button";
-import { apiClient } from "~/lib/api-client";
 import { meQueryKey } from "~/hooks/use-me";
+import { api } from "~/lib/api";
 
 const schema = z.object({
   email: z.string().email({ message: "Email invalide" }),
@@ -18,7 +18,7 @@ const schema = z.object({
 type Schema = z.infer<typeof schema>;
 
 function loginErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error) && error.response) {
+  if (isAxiosError(error) && error.response) {
     const data = error.response.data;
     if (typeof data === "string" && data.trim()) return data;
     if (data && typeof data === "object" && "message" in data) {
@@ -43,7 +43,7 @@ const LoginForm = () => {
 
   const onSubmit = async (data: Schema) => {
     try {
-      await apiClient.post("/api/Auth/login", {
+      await api.post("/auth/login", {
         email: data.email,
         password: data.password,
       });

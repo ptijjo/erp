@@ -6,7 +6,8 @@ import type {
   Request as RequestExpress,
   Response as ResponseExpress,
 } from 'express';
-import type { User } from '../generated/prisma/client';
+import type { SafeUserWithRole } from '../user/user.types';
+import type { AuthenticatedUser } from './auth.types';
 import { JwtAuthGuard } from './jwt.strategy/jwt-auth.guard';
 import { Throttle } from '@nestjs/throttler';
 import { LoginDto } from './dto/auth.dto';
@@ -24,7 +25,7 @@ export class AuthController {
     @Response({ passthrough: true }) res: ResponseExpress,
     @Body() _body: LoginDto,
   ) {
-    const token = this.authService.login(req.user as User);
+    const token = this.authService.login(req.user as SafeUserWithRole);
     res.cookie('token', token.access_token, {
       httpOnly: true,
       secure: true,
@@ -36,7 +37,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   getProfile(@Request() req: RequestExpress) {
-    return req.user;
+    return this.authService.getMeProfile(req.user as AuthenticatedUser);
   }
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })

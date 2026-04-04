@@ -41,10 +41,7 @@ export default function DashboardLayout({
       <Header
         nom={displayName}
         imageUrl="https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png"
-        organization={
-          me.organisationName ??
-          (me.organisationId == null ? "Maison mère" : "Organisation")
-        }
+        organization={me.organisationName}
       />
       <div className="flex h-full min-h-0 w-full flex-1">
         <NavBar />

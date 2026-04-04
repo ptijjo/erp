@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { slugify } from '../lib/Slugify';
 import * as bcrypt from 'bcrypt';
+import { MAISON_MERE_DIRECTOR_ROLES } from './maison-mere-roles';
 
 @Injectable()
 export class SeederService implements OnModuleInit {
@@ -15,7 +16,9 @@ export class SeederService implements OnModuleInit {
     try {
       const orgName = this.config.getOrThrow<string>('SEED_ORGANIZATION_NAME');
       const adminEmail = this.config.getOrThrow<string>('SEED_ADMIN_EMAIL');
-      const adminPassword = this.config.getOrThrow<string>('SEED_ADMIN_PASSWORD');
+      const adminPassword = this.config.getOrThrow<string>(
+        'SEED_ADMIN_PASSWORD',
+      );
       const passwordRounds = Number(
         this.config.getOrThrow<string>('PASSWORD_ROUNDS'),
       );
@@ -40,21 +43,33 @@ export class SeederService implements OnModuleInit {
         Logger.log('Organisation mère déjà présente');
       }
 
-      let adminRole = await this.prisma.role.findUnique({
-        where: {
+      const adminRole = await this.prisma.role.upsert({
+        where: { name: 'ADMIN' },
+        create: {
           name: 'ADMIN',
+          description: 'Rôle administrateur (global)',
+        },
+        update: {
+          description: 'Rôle administrateur (global)',
+          organizationScopeId: null,
         },
       });
-      if (!adminRole) {
-        adminRole = await this.prisma.role.create({
-          data: {
-            name: 'ADMIN',
-            description: 'Role administrateur',
+      Logger.log('Rôle ADMIN assuré (sans périmètre organisation)');
+
+      for (const def of MAISON_MERE_DIRECTOR_ROLES) {
+        await this.prisma.role.upsert({
+          where: { name: def.name },
+          create: {
+            name: def.name,
+            description: def.description,
+            organizationScopeId: organization.id,
+          },
+          update: {
+            description: def.description,
+            organizationScopeId: organization.id,
           },
         });
-        Logger.log('Rôle admin créé avec succès');
-      } else {
-        Logger.log('Rôle admin déjà présent');
+        Logger.log(`Rôle direction maison mère assuré : ${def.name}`);
       }
 
       let adminUser = await this.prisma.user.findUnique({
@@ -68,12 +83,6 @@ export class SeederService implements OnModuleInit {
             email: adminEmail,
             password: await bcrypt.hash(adminPassword, passwordRounds),
             organizationId: organization.id,
-          },
-        });
-
-        await this.prisma.userRole.create({
-          data: {
-            userId: adminUser.id,
             roleId: adminRole.id,
           },
         });

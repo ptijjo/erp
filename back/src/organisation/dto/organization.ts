@@ -1,5 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { OrganizationType } from '../../generated/prisma/client';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CreateOrganizationDto {
@@ -27,12 +26,6 @@ export class CreateOrganizationDto {
   })
   @IsOptional({ message: "La description de l'organisation est facultative" })
   public description?: string;
-
-  @IsEnum(OrganizationType, {
-    message: "Le type d'organisation doit être une chaîne de caractères",
-  })
-  @IsNotEmpty({ message: "Le type d'organisation est requis" })
-  public organizationType!: OrganizationType;
 }
 
 export class UpdateOrganizationDto {

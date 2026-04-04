@@ -28,6 +28,11 @@ export class CreateUserDto {
     },
   )
   public password!: string;
+
+  @IsString({ message: 'ID du rôle est requis' })
+  @IsNotEmpty({ message: 'ID du rôle est requis' })
+  @IsUUID('4', { message: 'ID du rôle doit être un UUID valide' })
+  public roleId!: string;
 }
 
 export class UpdateUserDto {
@@ -54,4 +59,8 @@ export class UpdateUserDto {
   @IsUUID('4', { message: "ID de l'organisation doit être un UUID valide" })
   @IsOptional()
   public organizationId?: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: 'ID du rôle doit être un UUID valide' })
+  public roleId?: string;
 }

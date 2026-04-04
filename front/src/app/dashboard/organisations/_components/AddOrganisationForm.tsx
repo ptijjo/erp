@@ -1,24 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import type { Resolver } from "react-hook-form";
-import { ImagePlus } from "lucide-react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+import { api } from "~/lib/api";
 
-const LOGO_ACCEPT = "image/webp,image/png,image/jpeg";
-const LOGO_MIME_TYPES: string[] = ["image/webp", "image/png", "image/jpeg"];
+import { apiErrorMessage } from "../../produits/_lib/api-error-message";
 
 function slugify(value: string): string {
   return value
@@ -37,146 +28,155 @@ const schema = z.object({
     .string()
     .min(1, { message: "Le nom est requis" })
     .max(255, { message: "Le nom ne doit pas dépasser 255 caractères" })
-    .trim()
-    .toUpperCase(),
+    .trim(),
 
   slug: z
     .string()
     .min(1, { message: "Le slug est requis" })
     .max(255, { message: "Le slug ne doit pas dépasser 255 caractères" })
-    .trim()
-    .toLowerCase(),
+    .trim(),
 
-  logo: z
-    .custom<FileList>()
-    .refine((list) => list?.length !== 0, "Le logo est requis")
-    .refine(
-      (list) => list?.[0] && LOGO_MIME_TYPES.includes(list[0].type),
-      "Le fichier doit être en WebP, PNG ou JPG",
-    )
-    .transform((list) => list!.item(0)!),
+  description: z.string().max(2000).optional(),
 });
 
 type Schema = z.infer<typeof schema>;
 
-const AddOrganisationForm = () => {
+export default function AddOrganisationForm() {
   const router = useRouter();
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [isPending, setIsPending] = useState(false);
+  const queryClient = useQueryClient();
 
-  const { register, handleSubmit, watch, setValue, formState: { errors } } =
-    useForm<Schema>({
-      resolver: zodResolver(schema) as unknown as Resolver<Schema>,
-    });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<Schema>({
+    resolver: zodResolver(schema),
+    defaultValues: { description: "" },
+  });
 
   const nameValue = watch("name");
 
   useEffect(() => {
-    setValue("slug", slugify(nameValue ?? ""));
+    setValue("slug", slugify(nameValue ?? ""), { shouldValidate: true });
   }, [nameValue, setValue]);
 
-  const { ref: logoRef, ...logoRegister } = register("logo", {
-    onChange: (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      setLogoPreview(file ? URL.createObjectURL(file) : null);
+  const createMutation = useMutation({
+    mutationFn: async (body: Schema) => {
+      const payload = {
+        name: body.name.trim(),
+        slug: body.slug.trim(),
+        ...(body.description?.trim()
+          ? { description: body.description.trim() }
+          : {}),
+      };
+      await api.post("/organisation", payload);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["organisation"] });
+      router.push("/dashboard/organisations");
+    },
+    onError: (err) => {
+      setError("root", {
+        message: apiErrorMessage(err, "Impossible de créer l’organisation"),
+      });
     },
   });
 
-  useEffect(
-    () => () => {
-      if (logoPreview) URL.revokeObjectURL(logoPreview);
-    },
-    [logoPreview],
-  );
-
-  const onSubmit = async (data: Schema) => {
-    setIsPending(true);
-    try {
-      await fileToDataUrl(data.logo);
-      alert(
-        "Formulaire prêt. Branchez POST vers l'API .NET pour créer l'organisation.",
-      );
-      router.push("/dashboard/organisations");
-    } finally {
-      setIsPending(false);
-    }
-  };
-
   return (
     <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="flex flex-1 max-w-md flex-col items-center justify-center gap-4"
+      onSubmit={handleSubmit((data) => createMutation.mutate(data))}
+      className="flex w-full max-w-lg flex-col gap-5"
     >
-      <div className="flex w-full flex-col gap-1">
-        <label htmlFor="name">Nom</label>
+      <p className="rounded-lg border border-amber-100 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
+        Création réservée aux <strong>filiales (boutiques)</strong>. La maison
+        mère existe déjà et ne peut pas être dupliquée.
+      </p>
+
+      {errors.root && (
+        <p className="text-sm text-red-600" role="alert">
+          {errors.root.message}
+        </p>
+      )}
+
+      <div>
+        <label
+          htmlFor="org-name"
+          className="mb-1 block text-sm font-medium text-gray-800"
+        >
+          Nom de la filiale <span className="text-red-500">*</span>
+        </label>
         <input
-          id="name"
+          id="org-name"
           {...register("name")}
-          className="h-10 w-full rounded border border-gray-300 bg-white px-3 py-2"
+          className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
           aria-invalid={!!errors.name}
+          autoComplete="organization"
         />
         {errors.name && (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="mt-1 text-sm text-red-600" role="alert">
             {errors.name.message}
           </p>
         )}
       </div>
-      <div className="flex w-full flex-col gap-1">
-        <label htmlFor="slug">Slug</label>
+
+      <div>
+        <label
+          htmlFor="org-slug"
+          className="mb-1 block text-sm font-medium text-gray-800"
+        >
+          Slug <span className="text-red-500">*</span>
+        </label>
         <input
-          id="slug"
+          id="org-slug"
           {...register("slug")}
-          className="h-10 w-full rounded border border-gray-300 bg-white px-3 py-2"
+          className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 font-mono text-sm text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
           aria-invalid={!!errors.slug}
+          spellCheck={false}
         />
+        <p className="mt-1 text-xs text-gray-500">
+          Identifiant URL unique ; généré depuis le nom, modifiable avant
+          envoi.
+        </p>
         {errors.slug && (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="mt-1 text-sm text-red-600" role="alert">
             {errors.slug.message}
           </p>
         )}
       </div>
-      <div className="flex w-full flex-col items-center gap-1">
+
+      <div>
         <label
-          htmlFor="logo"
-          className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-gray-300 p-4 transition-colors hover:border-orange-400 hover:bg-orange-50/50 focus-within:ring-2 focus-within:ring-orange-500 focus-within:ring-offset-2 aria-invalid:border-red-500"
-          aria-invalid={!!errors.logo}
+          htmlFor="org-description"
+          className="mb-1 block text-sm font-medium text-gray-800"
         >
-          <input
-            id="logo"
-            type="file"
-            accept={LOGO_ACCEPT}
-            {...logoRegister}
-            ref={logoRef}
-            className="sr-only"
-            aria-invalid={!!errors.logo}
-          />
-          {logoPreview ? (
-            <img
-              src={logoPreview}
-              alt="Aperçu du logo"
-              className="size-24 rounded-lg border border-gray-200 object-contain bg-gray-50"
-            />
-          ) : (
-            <span className="text-gray-400" aria-hidden>
-              <ImagePlus className="size-12" />
-            </span>
-          )}
+          Description <span className="text-gray-400">(facultatif)</span>
         </label>
-        {errors.logo && (
-          <p className="text-center text-sm text-red-600" role="alert">
-            {errors.logo.message}
+        <textarea
+          id="org-description"
+          {...register("description")}
+          rows={4}
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
+          aria-invalid={!!errors.description}
+        />
+        {errors.description && (
+          <p className="mt-1 text-sm text-red-600" role="alert">
+            {errors.description.message}
           </p>
         )}
       </div>
+
       <button
         type="submit"
-        disabled={isPending}
-        className="w-fit rounded-md bg-orange-500 px-4 py-2 text-white disabled:opacity-50"
+        disabled={isSubmitting || createMutation.isPending}
+        className="w-fit rounded-lg bg-orange-500 px-5 py-2.5 font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isPending ? "Création…" : "Ajouter"}
+        {isSubmitting || createMutation.isPending
+          ? "Création…"
+          : "Créer la filiale"}
       </button>
     </form>
   );
-};
-
-export default AddOrganisationForm;
+}

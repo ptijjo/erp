@@ -18,6 +18,78 @@ enum OrganizationType {
   SUBSIDIARY
 }
 
+enum VenteStatut {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum ModePaiement {
+  ESPECES
+  CARTE
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum SessionCaisseStatut {
+  OUVERTE
+  CLOTUREE
+}
+
+enum ContratType {
+  CDI
+  CDD
+  TEMPS_PARTIEL
+  STAGE
+  FREELANCE
+  AUTRE
+}
+
+enum PlanningShiftType {
+  TRAVAIL
+  FORMATION
+  REUNION
+  AUTRE
+}
+
+enum PointageStatut {
+  EN_COURS
+  COMPLETE
+  ANNULE
+}
+
+enum AbsenceType {
+  CONGE_PAYE
+  ARRET_MALADIE
+  SANS_SOLDE
+  RTT
+  MATERNITE
+  AUTRE
+}
+
+enum AbsenceStatut {
+  DEMANDE
+  VALIDE
+  REFUSE
+  ANNULE
+}
+
+enum BulletinPaieStatut {
+  BROUILLON
+  VALIDE
+  PAYE
+}
+
+enum BulletinPaieLigneSens {
+  GAIN
+  RETENUE
+  INFORMATION
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -28,30 +100,35 @@ model User {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
-  loginAttempts LoginAttempt[]
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
-  userRoles UserRole[]
+  loginAttempts LoginAttempt[]
+  ventes        Vente[]
+  auditLogs     AuditLog[]
+  sessionsCaisseOuvertes  SessionCaisse[] @relation("SessionCaisseOuvertePar")
+  sessionsCaisseCloturees SessionCaisse[] @relation("SessionCaisseClotureePar")
+  contrats                Contrat[]
+  planningShifts          PlanningShift[]
+  pointages               Pointage[]
+  absences                Absence[]
+  bulletinsPaie           BulletinPaie[]
+  pointagesValides        Pointage[]      @relation("PointageValidePar")
 }
 
 model Role {
-  id              String           @id @default(uuid())
-  name            String           @unique
-  description     String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  userRoles       UserRole[]
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  /// Rôle défini pour cette organisation (ex. directions de la maison mère). Null = rôle global (ex. ADMIN).
+  organizationScopeId String?
+  organizationScope   Organization? @relation("RoleOrganizationScope", fields: [organizationScopeId], references: [id], onDelete: Restrict)
+
+  users           User[]
   permissionRoles PermissionRole[]
-
-}
-
-model UserRole {
-  id     String @id @default(uuid())
-  userId String
-  roleId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
-
-  @@unique([userId, roleId])
 }
 
 model Organization {
@@ -64,10 +141,211 @@ model Organization {
   updatedAt        DateTime         @updatedAt
 
   //Relations
-  users User[]
+  users       User[]
+  scopedRoles Role[] @relation("RoleOrganizationScope")
+  stocks      Stock[]
+  ventes         Vente[]
+  auditLogs      AuditLog[]
+  sessionsCaisse SessionCaisse[]
+  contrats       Contrat[]
+  planningShifts PlanningShift[]
+  pointages      Pointage[]
+  absences       Absence[]
+  bulletinsPaie  BulletinPaie[]
 
-  
   @@index([organizationType])
+}
+
+/// Contrat de travail (base pour planning, heures et préparation paie).
+model Contrat {
+  id        String       @id @default(uuid())
+  type      ContratType
+  dateDebut DateTime
+  dateFin   DateTime?
+  /// Volume horaire hebdomadaire prévu (ex. 35h).
+  heuresHebdomadaires Decimal?
+  actif     Boolean      @default(true)
+  commentaire String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([userId, actif])
+  @@index([organizationId])
+  @@index([dateDebut])
+}
+
+/// Créneau planifié pour un salarié sur une filiale.
+model PlanningShift {
+  id        String            @id @default(uuid())
+  startsAt  DateTime
+  endsAt    DateTime
+  type      PlanningShiftType @default(TRAVAIL)
+  note      String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  pointages Pointage[]
+
+  @@index([userId, startsAt])
+  @@index([organizationId])
+  @@index([startsAt])
+}
+
+/// Pointage (entrée / sortie), lié optionnellement à un créneau planifié.
+model Pointage {
+  id        String         @id @default(uuid())
+  entreeAt  DateTime
+  sortieAt  DateTime?
+  statut    PointageStatut @default(EN_COURS)
+  validatedAt DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  planningShiftId String?
+  planningShift   PlanningShift? @relation(fields: [planningShiftId], references: [id], onDelete: SetNull)
+
+  validatedByUserId String?
+  validatedByUser   User?   @relation("PointageValidePar", fields: [validatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId, entreeAt])
+  @@index([organizationId])
+  @@index([planningShiftId])
+}
+
+/// Absence (congé, arrêt, etc.) pour alimenter planning et paie.
+model Absence {
+  id        String         @id @default(uuid())
+  type      AbsenceType
+  debut     DateTime
+  fin       DateTime
+  statut    AbsenceStatut  @default(DEMANDE)
+  commentaire String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([userId, debut])
+  @@index([organizationId])
+}
+
+/// Bulletin de paie pour une période (synthèse + lignes détaillées).
+model BulletinPaie {
+  id        String             @id @default(uuid())
+  annee     Int
+  mois      Int
+  statut    BulletinPaieStatut @default(BROUILLON)
+  brutTotal Decimal?
+  netAPayer Decimal?
+  chargesPatronales  Decimal?
+  chargesSalariales  Decimal?
+  /// Snapshot JSON pour export vers logiciel de paie ou archivage.
+  donneesBrutes Json?
+  generatedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  lignes BulletinPaieLigne[]
+
+  @@unique([userId, organizationId, annee, mois])
+  @@index([organizationId, annee, mois])
+}
+
+model BulletinPaieLigne {
+  id        String                 @id @default(uuid())
+  code      String
+  libelle   String
+  montant   Decimal
+  sens      BulletinPaieLigneSens
+  ordre     Int                    @default(0)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  bulletinId String
+  bulletin   BulletinPaie @relation(fields: [bulletinId], references: [id], onDelete: Cascade)
+
+  @@index([bulletinId])
+}
+
+/// Prise de poste caisse : fond d’ouverture, clôture, ventes rattachées pour ticket / rapport Z.
+model SessionCaisse {
+  id        String               @id @default(uuid())
+  statut    SessionCaisseStatut  @default(OUVERTE)
+  openedAt  DateTime             @default(now())
+  closedAt  DateTime?
+  /// Fond de caisse (espèces) au début de session.
+  fondOuverture       Decimal
+  /// Espèces comptées en fin de session (saisie à la clôture).
+  fondCloture         Decimal?
+  /// Remarque sur la clôture (écart, incident, etc.).
+  commentaireCloture  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  userId         String
+  user           User           @relation("SessionCaisseOuvertePar", fields: [userId], references: [id], onDelete: Restrict)
+  closedByUserId String?
+  closedByUser   User?          @relation("SessionCaisseClotureePar", fields: [closedByUserId], references: [id], onDelete: SetNull)
+
+  ventes Vente[]
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([statut])
+  @@index([openedAt])
+}
+
+/// Piste d’audit : utilisateur, action, entité, horodatage (remplir depuis les services ou un interceptor Nest).
+model AuditLog {
+  id        String      @id @default(uuid())
+  createdAt DateTime    @default(now())
+  action    AuditAction
+  /// Nom du domaine / modèle (ex. "Vente", "Product").
+  entityType String
+  /// Identifiant métier de l’enregistrement concerné.
+  entityId   String?
+  /// Détail libre (avant/après, champs touchés, message, etc.).
+  details    Json?
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Contexte organisationnel au moment de l’action (filtrage des rapports).
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  ipAddress String?
+  userAgent String?
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([organizationId])
 }
 
 model Permission {
@@ -83,8 +361,8 @@ model PermissionRole {
   id           String     @id @default(uuid())
   permissionId String
   roleId       String
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
   @@unique([permissionId, roleId])
 }
@@ -94,10 +372,128 @@ model LoginAttempt {
   ipAddress String
   userAgent String
   userId    String?
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   success   Boolean
   createdAt DateTime @default(now())
 
   @@index([ipAddress, userAgent])
   @@index([userId])
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parentId String?
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children Category[] @relation("CategoryHierarchy")
+
+  //relations
+  products Product[]
+
+  @@unique([parentId, name]) // optionnel : même nom autorisé sous un autre parent, interdit en doublon sous le même parent
+  @@index([parentId])
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  price       Decimal
+  /// Valeur encodée dans le QR et lue par la douchette ; unique pour identification (lookup par scan).
+  qrCode      String   @unique @default(uuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  stocks      Stock[]
+  venteLines  VenteLine[]
+}
+
+model Vente {
+  id          String       @id @default(uuid())
+  status      VenteStatut  @default(DRAFT)
+  /// Total de la vente ; à maintenir lors des changements de lignes (snapshot métier).
+  totalAmount Decimal      @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  /// Magasin / point de vente : en principe une organisation `SUBSIDIARY` (filiale).
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Utilisateur (employé) ayant encaissé ; le rôle métier est défini via `User.role`.
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  lignes         VenteLine[]
+  /// Répartition du règlement (ex. une ligne espèces + une ligne carte). La somme des `amount` doit correspondre au total à valider côté API.
+  paiements      VentePaiement[]
+  /// Session de caisse (prise de poste) ; renseigner pour les ventes caisse.
+  sessionCaisseId String?
+  sessionCaisse   SessionCaisse? @relation(fields: [sessionCaisseId], references: [id], onDelete: Restrict)
+  /// Numéro de ticket incrémenté dans la session (affichage client).
+  numeroTicket    Int?
+  /// Horodatage du dernier tirage / impression du ticket de caisse.
+  ticketImprimeAt DateTime?
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([sessionCaisseId])
+  @@unique([sessionCaisseId, numeroTicket])
+}
+
+/// Une part du paiement d’une vente (permet le mix espèces + carte, ou plusieurs fractions).
+model VentePaiement {
+  id           String       @id @default(uuid())
+  modePaiement ModePaiement
+  amount       Decimal
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  venteId String
+  vente   Vente @relation(fields: [venteId], references: [id], onDelete: Cascade)
+
+  @@index([venteId])
+}
+
+model VenteLine {
+  id        String   @id @default(uuid())
+  quantity  Int
+  /// Prix unitaire figé au moment de la ligne (indépendant du prix catalogue actuel).
+  unitPrice Decimal
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  venteId   String
+  vente     Vente   @relation(fields: [venteId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([venteId])
+  @@index([productId])
+}
+
+/// Stock courant et seuils min / max par organisation et par produit.
+model Stock {
+  id        String   @id @default(uuid())
+  quantity  Int      @default(0)
+  /// Seuil bas (alerte réapprovisionnement, etc.).
+  minQuantity Int    @default(0)
+  /// Plafond cible ou limite ; null = pas de maximum défini en base.
+  maxQuantity Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  productId      String
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, productId])
+  @@index([productId])
 }

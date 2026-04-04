@@ -1,7 +1,5 @@
-import { Controller, Get, Post, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
-import { LocalAuthGuard } from './auth/local.strategy/local-auth.guard';
-import type { Request as RequestExpress } from 'express';
 
 @Controller()
 export class AppController {
@@ -11,6 +9,4 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
-
-
 }

@@ -1,14 +1,20 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import type {
+  AccessTokenPayload,
+  AuthenticatedUser,
+  MeResponse,
+} from './auth.types';
+import type { SafeUserWithRole } from '../user/user.types';
 import { UserService } from '../user/user.service';
-import { User } from '../generated/prisma/client';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '../redis/redis.service';
 import { PrismaService } from '../prisma/prisma.service';
-
 const MAX_LOGIN_FAILS = Number(process.env.MAX_LOGIN_FAILS);
 const BLOCK_SECONDS = Number(process.env.BLOCK_SECONDS);
 /** Fenêtre après la 1ʳᵉ erreur pour cumuler les échecs ; au-delà le compteur Redis expire. */
@@ -18,6 +24,13 @@ export type LoginContext = {
   ip: string;
   userAgent: string;
 };
+
+export type {
+  AccessTokenPayload,
+  AuthenticatedUser,
+  JwtRoleClaims,
+  MeResponse,
+} from './auth.types';
 
 @Injectable()
 export class AuthService {
@@ -44,7 +57,7 @@ export class AuthService {
     email: string,
     password: string,
     ctx: LoginContext,
-  ): Promise<Omit<User, 'password'> | null> {
+  ): Promise<SafeUserWithRole | null> {
     if (await this.redis.exists(this.blockKey(ctx.ip))) {
       throw new HttpException(
         'Too many failed login attempts. Try again later.',
@@ -68,7 +81,7 @@ export class AuthService {
       await this.redis.del(this.failKey(ctx.ip));
       await this.redis.del(this.blockKey(ctx.ip));
       const { password: _p, ...result } = user;
-      return result;
+      return result satisfies SafeUserWithRole;
     }
 
     await this.prisma.loginAttempt.create({
@@ -92,8 +105,34 @@ export class AuthService {
     return null;
   }
 
-  login(user: User) {
-    const payload = { email: user.email, sub: user.id };
+  login(user: SafeUserWithRole) {
+    const payload: AccessTokenPayload = {
+      email: user.email,
+      sub: user.id,
+      organisationId: user.organizationId,
+      role: {
+        id: user.role.id,
+        name: user.role.name,
+        description: user.role.description,
+      },
+    };
     return { access_token: this.jwtService.sign(payload) };
+  }
+
+  /** Profil pour /auth/me : claims JWT + nom de l’organisation (lookup Prisma). */
+  async getMeProfile(jwtUser: AuthenticatedUser): Promise<MeResponse> {
+    const row = await this.prisma.user.findUnique({
+      where: { id: jwtUser.sub },
+      select: {
+        organization: { select: { name: true } },
+      },
+    });
+    if (!row?.organization) {
+      throw new NotFoundException('Utilisateur ou organisation introuvable');
+    }
+    return {
+      ...jwtUser,
+      organisationName: row.organization.name,
+    };
   }
 }

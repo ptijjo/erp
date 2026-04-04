@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-local';
 import { AuthService } from '../auth.service';
-import { User } from '../../generated/prisma/client';
+import type { SafeUserWithRole } from '../../user/user.types';
 import type { Request } from 'express';
 
 @Injectable()
@@ -19,7 +19,7 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     req: Request,
     email: string,
     password: string,
-  ): Promise<Omit<User, 'password'>> {
+  ): Promise<SafeUserWithRole> {
     const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
     const userAgent = req.get('user-agent') ?? '';
     const user = await this.authService.validateLogin(email, password, {

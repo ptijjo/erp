@@ -16,10 +16,31 @@ export type Me = {
   email: string;
   sub: string;
   organisationId: string;
+  /** Maison mère ou filiale (aligné sur Prisma `OrganizationType`). */
+  organizationType: "MAIN" | "SUBSIDIARY";
+  /** Slug pour `/dashboard/organisations/[slug]`. */
+  organizationSlug: string;
   role: MeRole;
   organisationName: string;
   firstLogin: boolean;
 };
+
+export function isMainOrganization(me: Me): boolean {
+  return me.organizationType === "MAIN";
+}
+
+/** Page d’accueil dashboard après connexion (hors parcours premier login). */
+export function dashboardHomePath(_me: Me): string {
+  return "/dashboard";
+}
+
+/** Fiche détail de la filiale connectée (menu « Mon organisation »). */
+export function subsidiaryOrganizationPath(me: Me): string | null {
+  if (me.organizationType === "SUBSIDIARY" && me.organizationSlug) {
+    return `/dashboard/organisations/${me.organizationSlug}`;
+  }
+  return null;
+}
 
 export const meQueryKey = ["auth", "me"] as const;
 

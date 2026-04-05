@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
 import { CheckPolicies } from '../casl/check-policies.decorator';
+import { FullAccessRoleGuard } from '../casl/full-access-role.guard';
 import { PoliciesGuard } from '../casl/policies.guard';
 import { RoleService } from './role.service';
 import { Role } from '../generated/prisma/client';
@@ -45,6 +46,7 @@ export class RoleController {
 
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(FullAccessRoleGuard)
   @CheckPolicies({ action: 'update', subject: 'Role' })
   public updateRole(
     @Param('id') id: string,
@@ -55,6 +57,7 @@ export class RoleController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(FullAccessRoleGuard)
   @CheckPolicies({ action: 'delete', subject: 'Role' })
   public deleteRole(@Param('id') id: string): Promise<Role> {
     return this.roleService.deleteRole(id);

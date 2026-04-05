@@ -155,7 +155,34 @@ model Organization {
   absences       Absence[]
   bulletinsPaie  BulletinPaie[]
 
+  /// Catégories du catalogue attribuées à cette filiale (maison mère).
+  catalogCategories OrganizationCatalogCategory[]
+  /// Produits supplémentaires attribués à cette filiale (en plus de ceux des catégories).
+  catalogProducts   OrganizationCatalogProduct[]
+
   @@index([organizationType])
+}
+
+/// Catégorie (et sous-arbre) incluse dans le catalogue d’une filiale.
+model OrganizationCatalogCategory {
+  organizationId String
+  categoryId     String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category       Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, categoryId])
+  @@index([categoryId])
+}
+
+/// Produit additionnel dans le catalogue d’une filiale (doit rester `offeredToSubsidiaries`).
+model OrganizationCatalogProduct {
+  organizationId String
+  productId      String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, productId])
+  @@index([productId])
 }
 
 /// Contrat de travail (base pour planning, heures et préparation paie).
@@ -394,7 +421,8 @@ model Category {
   children Category[] @relation("CategoryHierarchy")
 
   //relations
-  products Product[]
+  products                    Product[]
+  organizationCatalogEntries OrganizationCatalogCategory[]
 
   @@unique([parentId, name]) // optionnel : même nom autorisé sous un autre parent, interdit en doublon sous le même parent
   @@index([parentId])
@@ -407,6 +435,8 @@ model Product {
   price       Decimal
   /// Valeur encodée dans le QR et lue par la douchette ; unique pour identification (lookup par scan).
   qrCode      String   @unique @default(uuid())
+  /// Si vrai, les organisations filiales peuvent voir, vendre et stocker ce produit (défini par la maison mère).
+  offeredToSubsidiaries Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -414,6 +444,9 @@ model Product {
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   stocks      Stock[]
   venteLines  VenteLine[]
+  organizationCatalogEntries OrganizationCatalogProduct[]
+
+  @@index([offeredToSubsidiaries])
 }
 
 model Vente {

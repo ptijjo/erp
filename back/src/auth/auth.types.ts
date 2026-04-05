@@ -10,6 +10,10 @@ export type AccessTokenPayload = {
   email: string;
   sub: string;
   organisationId: string;
+  /** `MAIN` = maison mère ; `SUBSIDIARY` = filiale. Absent sur les anciens jetons → traité comme MAIN. */
+  organizationType?: 'MAIN' | 'SUBSIDIARY';
+  /** Slug unique pour l’URL front (`/dashboard/organisations/:slug`). */
+  organizationSlug?: string;
   firstLogin?: boolean;
   role: JwtRoleClaims;
 };
@@ -19,6 +23,8 @@ export type AuthenticatedUser = {
   email: string;
   sub: string;
   organisationId: string;
+  organizationType: 'MAIN' | 'SUBSIDIARY';
+  organizationSlug: string;
   firstLogin: boolean;
   role: JwtRoleClaims;
 };

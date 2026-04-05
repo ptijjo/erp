@@ -9,6 +9,8 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { CurrentUser } from '../auth/current-user.decorator';
 import type { Prisma } from '../generated/prisma/client';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
 import { CheckPolicies } from '../casl/check-policies.decorator';
@@ -25,29 +27,36 @@ export class PointageController {
   @CheckPolicies({ action: 'read', subject: 'Pointage' })
   findByUser(
     @Param('userId') userId: string,
+    @CurrentUser() viewer: AuthenticatedUser,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
     const fromD = from ? new Date(from) : undefined;
     const toD = to ? new Date(to) : undefined;
-    return this.pointageService.findByUserId(userId, fromD, toD);
+    return this.pointageService.findByUserId(userId, viewer, fromD, toD);
   }
 
   @Get()
   @CheckPolicies({ action: 'read', subject: 'Pointage' })
-  findAll() {
-    return this.pointageService.findAll();
+  findAll(@CurrentUser() viewer: AuthenticatedUser) {
+    return this.pointageService.findAll(viewer);
   }
 
   @Get(':id')
   @CheckPolicies({ action: 'read', subject: 'Pointage' })
-  findOne(@Param('id') id: string) {
-    return this.pointageService.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.pointageService.findOne(id, viewer);
   }
 
   @Post()
   @CheckPolicies({ action: 'create', subject: 'Pointage' })
-  create(@Body() dto: CreatePointageDto) {
+  create(
+    @Body() dto: CreatePointageDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
     const data: Prisma.PointageCreateInput = {
       entreeAt: new Date(dto.entreeAt),
       user: { connect: { id: dto.userId } },
@@ -63,12 +72,16 @@ export class PointageController {
         ? { validatedByUser: { connect: { id: dto.validatedByUserId } } }
         : {}),
     };
-    return this.pointageService.create(data);
+    return this.pointageService.create(data, viewer);
   }
 
   @Patch(':id')
   @CheckPolicies({ action: 'update', subject: 'Pointage' })
-  update(@Param('id') id: string, @Body() dto: UpdatePointageDto) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePointageDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
     const data: Prisma.PointageUpdateInput = {
       ...(dto.entreeAt !== undefined ? { entreeAt: new Date(dto.entreeAt) } : {}),
       ...(dto.sortieAt !== undefined
@@ -91,12 +104,15 @@ export class PointageController {
           ? { disconnect: true }
           : { connect: { id: dto.validatedByUserId } };
     }
-    return this.pointageService.update(id, data);
+    return this.pointageService.update(id, data, viewer);
   }
 
   @Delete(':id')
   @CheckPolicies({ action: 'delete', subject: 'Pointage' })
-  remove(@Param('id') id: string) {
-    return this.pointageService.remove(id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.pointageService.remove(id, viewer);
   }
 }

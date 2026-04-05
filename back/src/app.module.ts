@@ -3,7 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
@@ -52,13 +52,19 @@ import { BulletinPaieModule } from './bulletin-paie/bulletin-paie.module';
     SeederModule,
     SessionCaisseModule,
     StockModule,
-    ThrottlerModule.forRoot({
-      throttlers: [
-        {
-          ttl: 60000,
-          limit: 5,
-        },
-      ],
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const limit =
+          parseInt(config.get<string>('THROTTLE_LIMIT') ?? '120', 10) || 120;
+        const ttl =
+          parseInt(config.get<string>('THROTTLE_TTL_MS') ?? '60000', 10) ||
+          60_000;
+        return {
+          throttlers: [{ ttl, limit }],
+        };
+      },
     }),
     UserModule,
     VenteModule,

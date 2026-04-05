@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 
 import { Button } from "~/components/ui/button";
+import { isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { CategoryDto } from "~/lib/api-types";
 
@@ -22,6 +23,7 @@ const schema = z.object({
       message: "Le prix doit être un nombre positif",
     }),
   categoryId: z.string().uuid({ message: "Choisissez une catégorie" }),
+  offeredToSubsidiaries: z.boolean().optional(),
 });
 
 type Schema = z.infer<typeof schema>;
@@ -42,6 +44,8 @@ function apiErrorMessage(error: unknown): string {
 export default function AddProductForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: me } = useMe();
+  const isMain = me != null && isMainOrganization(me);
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ["category"] as const,
@@ -60,7 +64,7 @@ export default function AddProductForm() {
     setError,
   } = useForm<Schema>({
     resolver: zodResolver(schema),
-    defaultValues: { description: "" },
+    defaultValues: { description: "", offeredToSubsidiaries: false },
   });
 
   const createMutation = useMutation({
@@ -72,6 +76,9 @@ export default function AddProductForm() {
           : {}),
         price: body.price,
         categoryId: body.categoryId,
+        ...(isMain
+          ? { offeredToSubsidiaries: Boolean(body.offeredToSubsidiaries) }
+          : {}),
       };
       await api.post("/product", payload);
     },
@@ -189,6 +196,27 @@ export default function AddProductForm() {
           </p>
         ) : null}
       </div>
+
+      {isMain ? (
+        <div className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+          <input
+            id="product-offered-subs"
+            type="checkbox"
+            className="mt-1 size-4 cursor-pointer rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+            {...register("offeredToSubsidiaries")}
+          />
+          <label
+            htmlFor="product-offered-subs"
+            className="cursor-pointer text-sm text-gray-800"
+          >
+            <span className="font-medium">Proposer aux filiales</span>
+            <span className="mt-1 block text-gray-600">
+              Les boutiques filiales pourront voir ce produit, le vendre et en
+              gérer le stock.
+            </span>
+          </label>
+        </div>
+      ) : null}
 
       {errors.root && (
         <p className="text-sm text-red-600" role="alert">

@@ -6,17 +6,26 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import {
+  assertOrganizationResourceAccess,
+  isMainOrganizationUser,
+} from '../auth/organization-scope';
 import type {
   SafeUserPublic,
   SafeUserWithRole,
+  SafeUserWithRoleAndOrg,
   UserWithRole,
+  UserWithRoleAndOrg,
 } from './user.types';
 
 export type {
   SafeUserPublic,
   SafeUserWithRole,
+  SafeUserWithRoleAndOrg,
   UserWithRole,
+  UserWithRoleAndOrg,
 } from './user.types';
 
 @Injectable()
@@ -59,19 +68,33 @@ export class UserService {
     }
   }
 
-  async findUser(email: string): Promise<UserWithRole | null> {
+  async findUser(email: string): Promise<UserWithRoleAndOrg | null> {
     return this.prisma.user.findUnique({
       where: {
         email,
       },
       include: {
         role: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            organizationType: true,
+          },
+        },
       },
     });
   }
 
-  public findAll = async (): Promise<SafeUserPublic[]> => {
+  public findAll = async (
+    viewer: AuthenticatedUser,
+  ): Promise<SafeUserPublic[]> => {
+    const where = isMainOrganizationUser(viewer)
+      ? {}
+      : { organizationId: viewer.organisationId };
     const users = await this.prisma.user.findMany({
+      where,
       include: {
         organization: true,
         role: true,
@@ -80,7 +103,10 @@ export class UserService {
     return users.map(({ password: _p, ...rest }): SafeUserPublic => rest);
   };
 
-  public findOne = async (id: string): Promise<SafeUserWithRole> => {
+  public findOne = async (
+    id: string,
+    viewer: AuthenticatedUser,
+  ): Promise<SafeUserWithRole> => {
     const user = await this.prisma.user.findUnique({
       where: {
         id,
@@ -90,6 +116,7 @@ export class UserService {
     if (!user) {
       throw new NotFoundException('Utilisateur non trouvé');
     }
+    assertOrganizationResourceAccess(viewer, user.organizationId);
     const { password: _p, ...rest } = user;
     return rest;
   };
@@ -97,6 +124,7 @@ export class UserService {
   public create = async (
     user: CreateUserDto,
     organizationId: string,
+    viewer: AuthenticatedUser,
   ): Promise<SafeUserWithRole> => {
     const existingUser = await this.prisma.user.findUnique({
       where: {
@@ -106,7 +134,11 @@ export class UserService {
     if (existingUser) {
       throw new ConflictException('Utilisateur déjà existant');
     }
-    await this.assertRoleAllowedForOrganization(user.roleId, organizationId);
+    const effectiveOrgId = isMainOrganizationUser(viewer)
+      ? organizationId
+      : viewer.organisationId;
+    assertOrganizationResourceAccess(viewer, effectiveOrgId);
+    await this.assertRoleAllowedForOrganization(user.roleId, effectiveOrgId);
     await this.assertRoleNotAdminViaApi(user.roleId);
     const newUser = await this.prisma.user.create({
       data: {
@@ -115,7 +147,7 @@ export class UserService {
           user.password,
           Number(process.env.PASSWORD_ROUNDS),
         ),
-        organizationId,
+        organizationId: effectiveOrgId,
         roleId: user.roleId,
       },
       include: { role: true },
@@ -127,6 +159,7 @@ export class UserService {
   public update = async (
     id: string,
     user: UpdateUserDto,
+    viewer: AuthenticatedUser,
   ): Promise<SafeUserWithRole> => {
     const existingUser = await this.prisma.user.findUnique({
       where: { id },
@@ -134,8 +167,10 @@ export class UserService {
     if (!existingUser) {
       throw new NotFoundException('Utilisateur non trouvé');
     }
-    const nextOrganizationId =
-      user.organizationId ?? existingUser.organizationId;
+    assertOrganizationResourceAccess(viewer, existingUser.organizationId);
+    const nextOrganizationId = isMainOrganizationUser(viewer)
+      ? (user.organizationId ?? existingUser.organizationId)
+      : existingUser.organizationId;
     const nextRoleId = user.roleId ?? existingUser.roleId;
     if (user.roleId !== undefined) {
       await this.assertRoleNotAdminViaApi(user.roleId);
@@ -150,9 +185,7 @@ export class UserService {
               Number(process.env.PASSWORD_ROUNDS),
             )
           : undefined,
-        organizationId: user.organizationId
-          ? user.organizationId
-          : existingUser.organizationId,
+        organizationId: nextOrganizationId,
         roleId: user.roleId ?? undefined,
       },
       include: { role: true },
@@ -163,6 +196,7 @@ export class UserService {
 
   public delete = async (
     id: string,
+    viewer: AuthenticatedUser,
   ): Promise<
     Pick<
       UserWithRole,
@@ -175,6 +209,7 @@ export class UserService {
     if (!existingUser) {
       throw new NotFoundException('Utilisateur non trouvé');
     }
+    assertOrganizationResourceAccess(viewer, existingUser.organizationId);
     await this.prisma.user.delete({ where: { id } });
     return {
       id: existingUser.id,

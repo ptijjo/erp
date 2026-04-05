@@ -10,16 +10,28 @@ import type {
   AuthenticatedUser,
   MeResponse,
 } from './auth.types';
-import type { SafeUserWithRole } from '../user/user.types';
+import type { SafeUserWithRoleAndOrg } from '../user/user.types';
 import { UserService } from '../user/user.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '../redis/redis.service';
 import { PrismaService } from '../prisma/prisma.service';
-const MAX_LOGIN_FAILS = Number(process.env.MAX_LOGIN_FAILS);
-const BLOCK_SECONDS = Number(process.env.BLOCK_SECONDS);
+
+function envPositiveInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') {
+    return fallback;
+  }
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/** Nombre d’échecs avant blocage IP (défaut si env absent ou invalide). */
+const MAX_LOGIN_FAILS = envPositiveInt('MAX_LOGIN_FAILS', 5);
+/** Durée du blocage Redis après trop d’échecs (secondes). */
+const BLOCK_SECONDS = envPositiveInt('BLOCK_SECONDS', 900);
 /** Fenêtre après la 1ʳᵉ erreur pour cumuler les échecs ; au-delà le compteur Redis expire. */
-const FAIL_COUNTER_TTL_SECONDS = Number(process.env.FAIL_COUNTER_TTL_SECONDS);
+const FAIL_COUNTER_TTL_SECONDS = envPositiveInt('FAIL_COUNTER_TTL_SECONDS', 900);
 
 export type LoginContext = {
   ip: string;
@@ -58,7 +70,7 @@ export class AuthService {
     email: string,
     password: string,
     ctx: LoginContext,
-  ): Promise<SafeUserWithRole | null> {
+  ): Promise<SafeUserWithRoleAndOrg | null> {
     if (await this.redis.exists(this.blockKey(ctx.ip))) {
       throw new HttpException(
         'Too many failed login attempts. Try again later.',
@@ -82,7 +94,7 @@ export class AuthService {
       await this.redis.del(this.failKey(ctx.ip));
       await this.redis.del(this.blockKey(ctx.ip));
       const { password: _p, ...result } = user;
-      return result satisfies SafeUserWithRole;
+      return result satisfies SafeUserWithRoleAndOrg;
     }
 
     await this.prisma.loginAttempt.create({
@@ -106,11 +118,13 @@ export class AuthService {
     return null;
   }
 
-  login(user: SafeUserWithRole) {
+  login(user: SafeUserWithRoleAndOrg) {
     const payload: AccessTokenPayload = {
       email: user.email,
       sub: user.id,
       organisationId: user.organizationId,
+      organizationType: user.organization.organizationType,
+      organizationSlug: user.organization.slug,
       firstLogin: user.firstLogin,
       role: {
         id: user.role.id,
@@ -128,7 +142,17 @@ export class AuthService {
   ): Promise<{ access_token: string }> {
     const row = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { role: true },
+      include: {
+        role: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            organizationType: true,
+          },
+        },
+      },
     });
     if (!row) {
       throw new NotFoundException('Utilisateur introuvable');
@@ -145,10 +169,20 @@ export class AuthService {
     const updated = await this.prisma.user.update({
       where: { id: userId },
       data: { password: hashed, firstLogin: false },
-      include: { role: true },
+      include: {
+        role: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            organizationType: true,
+          },
+        },
+      },
     });
     const { password: _p, ...safe } = updated;
-    return this.login(safe satisfies SafeUserWithRole);
+    return this.login(safe satisfies SafeUserWithRoleAndOrg);
   }
 
   /** Profil pour /auth/me : claims JWT + nom de l’organisation (lookup Prisma). */
@@ -157,7 +191,9 @@ export class AuthService {
       where: { id: jwtUser.sub },
       select: {
         firstLogin: true,
-        organization: { select: { name: true } },
+        organization: {
+          select: { name: true, slug: true, organizationType: true },
+        },
       },
     });
     if (!row?.organization) {
@@ -166,6 +202,8 @@ export class AuthService {
     return {
       ...jwtUser,
       organisationName: row.organization.name,
+      organizationSlug: row.organization.slug,
+      organizationType: row.organization.organizationType,
       firstLogin: row.firstLogin,
     };
   }

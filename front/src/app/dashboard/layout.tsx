@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-import { useMe } from "~/hooks/use-me";
+import { dashboardHomePath, useMe } from "~/hooks/use-me";
 import Header from "./_components/header/Header";
 import NavBar from "./_components/NavBar";
 
@@ -29,7 +29,8 @@ export default function DashboardLayout({
       return;
     }
     if (!me.firstLogin && pathname === FIRST_LOGIN_PATH) {
-      router.replace("/dashboard");
+      router.replace(dashboardHomePath(me));
+      return;
     }
   }, [isPending, me, isError, pathname, router]);
 

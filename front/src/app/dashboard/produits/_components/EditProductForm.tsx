@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "~/components/ui/button";
+import { isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { CategoryDto, ProductDto } from "~/lib/api-types";
 import { parseDecimal } from "~/lib/parse-decimal";
@@ -24,6 +25,7 @@ const schema = z.object({
       message: "Le prix doit être un nombre positif",
     }),
   categoryId: z.string().uuid({ message: "Choisissez une catégorie" }),
+  offeredToSubsidiaries: z.boolean().optional(),
 });
 
 type Schema = z.infer<typeof schema>;
@@ -33,6 +35,9 @@ type Props = { productId: string };
 export default function EditProductForm({ productId }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: me } = useMe();
+  const isMain = me != null && isMainOrganization(me);
+  const readOnly = !isMain;
 
   const {
     data: product,
@@ -71,6 +76,7 @@ export default function EditProductForm({ productId }: Props) {
       description: product.description ?? "",
       price: parseDecimal(product.price),
       categoryId: product.categoryId,
+      offeredToSubsidiaries: product.offeredToSubsidiaries ?? false,
     });
   }, [product, reset]);
 
@@ -81,6 +87,9 @@ export default function EditProductForm({ productId }: Props) {
         description: body.description?.trim() ?? "",
         price: body.price,
         categoryId: body.categoryId,
+        ...(isMain
+          ? { offeredToSubsidiaries: Boolean(body.offeredToSubsidiaries) }
+          : {}),
       });
     },
     onSuccess: async () => {
@@ -134,6 +143,12 @@ export default function EditProductForm({ productId }: Props) {
 
   return (
     <div className="flex w-full max-w-lg flex-col gap-6">
+      {readOnly ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          Catalogue en lecture seule : seule la maison mère peut modifier ou
+          supprimer les produits.
+        </p>
+      ) : null}
       <form
         onSubmit={handleSubmit((data) => updateMutation.mutate(data))}
         className="flex flex-col gap-5"
@@ -149,8 +164,9 @@ export default function EditProductForm({ productId }: Props) {
             id="edit-product-name"
             type="text"
             autoComplete="off"
-            className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none ring-orange-500/30 focus:border-orange-500 focus:ring-2"
+            className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none ring-orange-500/30 focus:border-orange-500 focus:ring-2 disabled:bg-gray-100"
             aria-invalid={!!errors.name}
+            disabled={readOnly}
             {...register("name")}
           />
           {errors.name && (
@@ -170,7 +186,8 @@ export default function EditProductForm({ productId }: Props) {
           <textarea
             id="edit-product-description"
             rows={3}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none ring-orange-500/30 focus:border-orange-500 focus:ring-2"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none ring-orange-500/30 focus:border-orange-500 focus:ring-2 disabled:bg-gray-100"
+            disabled={readOnly}
             {...register("description")}
           />
         </div>
@@ -188,8 +205,9 @@ export default function EditProductForm({ productId }: Props) {
             min={1}
             step={1}
             inputMode="numeric"
-            className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none ring-orange-500/30 focus:border-orange-500 focus:ring-2"
+            className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none ring-orange-500/30 focus:border-orange-500 focus:ring-2 disabled:bg-gray-100"
             aria-invalid={!!errors.price}
+            disabled={readOnly}
             {...register("price", { valueAsNumber: true })}
           />
           {errors.price && (
@@ -208,9 +226,11 @@ export default function EditProductForm({ productId }: Props) {
           </label>
           <select
             id="edit-product-category"
-            className="h-11 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none ring-orange-500/30 focus:border-orange-500 focus:ring-2"
+            className="h-11 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none ring-orange-500/30 focus:border-orange-500 focus:ring-2 disabled:bg-gray-100"
             aria-invalid={!!errors.categoryId}
-            disabled={categoriesLoading || categories.length === 0}
+            disabled={
+              readOnly || categoriesLoading || categories.length === 0
+            }
             {...register("categoryId")}
           >
             {categorySelectOptions.map(({ id, label }) => (
@@ -226,6 +246,27 @@ export default function EditProductForm({ productId }: Props) {
           )}
         </div>
 
+        {isMain ? (
+          <div className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+            <input
+              id="edit-product-offered-subs"
+              type="checkbox"
+              className="mt-1 size-4 cursor-pointer rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              {...register("offeredToSubsidiaries")}
+            />
+            <label
+              htmlFor="edit-product-offered-subs"
+              className="cursor-pointer text-sm text-gray-800"
+            >
+              <span className="font-medium">Proposer aux filiales</span>
+              <span className="mt-1 block text-gray-600">
+                Les boutiques filiales pourront voir ce produit, le vendre et en
+                gérer le stock.
+              </span>
+            </label>
+          </div>
+        ) : null}
+
         {errors.root && (
           <p className="text-sm text-red-600" role="alert">
             {errors.root.message}
@@ -236,6 +277,7 @@ export default function EditProductForm({ productId }: Props) {
           <Button
             type="submit"
             disabled={
+              readOnly ||
               isSubmitting ||
               updateMutation.isPending ||
               deleteMutation.isPending
@@ -244,14 +286,18 @@ export default function EditProductForm({ productId }: Props) {
           >
             {updateMutation.isPending ? "Enregistrement…" : "Enregistrer"}
           </Button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending || updateMutation.isPending}
-            className="inline-flex h-11 cursor-pointer items-center justify-center rounded-lg border-2 border-red-700 bg-red-600 px-6 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {deleteMutation.isPending ? "Suppression…" : "Supprimer le produit"}
-          </button>
+          {isMain ? (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending || updateMutation.isPending}
+              className="inline-flex h-11 cursor-pointer items-center justify-center rounded-lg border-2 border-red-700 bg-red-600 px-6 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {deleteMutation.isPending
+                ? "Suppression…"
+                : "Supprimer le produit"}
+            </button>
+          ) : null}
         </div>
       </form>
 

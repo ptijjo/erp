@@ -8,6 +8,8 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { CurrentUser } from '../auth/current-user.decorator';
 import type { Prisma } from '../generated/prisma/client';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
 import { CheckPolicies } from '../casl/check-policies.decorator';
@@ -22,25 +24,34 @@ export class VenteController {
 
   @Get('organization/:organizationId')
   @CheckPolicies({ action: 'read', subject: 'Vente' })
-  findByOrganization(@Param('organizationId') organizationId: string) {
-    return this.venteService.findByOrganizationId(organizationId);
+  findByOrganization(
+    @Param('organizationId') organizationId: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.venteService.findByOrganizationId(organizationId, viewer);
   }
 
   @Get()
   @CheckPolicies({ action: 'read', subject: 'Vente' })
-  findAll() {
-    return this.venteService.findAll();
+  findAll(@CurrentUser() viewer: AuthenticatedUser) {
+    return this.venteService.findAll(viewer);
   }
 
   @Get(':id')
   @CheckPolicies({ action: 'read', subject: 'Vente' })
-  findOne(@Param('id') id: string) {
-    return this.venteService.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.venteService.findOne(id, viewer);
   }
 
   @Post()
   @CheckPolicies({ action: 'create', subject: 'Vente' })
-  create(@Body() dto: CreateVenteDto) {
+  create(
+    @Body() dto: CreateVenteDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
     const data: Prisma.VenteCreateInput = {
       organization: { connect: { id: dto.organizationId } },
       ...(dto.userId ? { user: { connect: { id: dto.userId } } } : {}),
@@ -54,12 +65,16 @@ export class VenteController {
         ? { ticketImprimeAt: new Date(dto.ticketImprimeAt) }
         : {}),
     };
-    return this.venteService.create(data);
+    return this.venteService.create(data, viewer);
   }
 
   @Patch(':id')
   @CheckPolicies({ action: 'update', subject: 'Vente' })
-  update(@Param('id') id: string, @Body() dto: UpdateVenteDto) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateVenteDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
     const data: Prisma.VenteUpdateInput = {
       ...(dto.status !== undefined ? { status: dto.status } : {}),
       ...(dto.totalAmount !== undefined ? { totalAmount: dto.totalAmount } : {}),
@@ -84,12 +99,15 @@ export class VenteController {
           ? { disconnect: true }
           : { connect: { id: dto.sessionCaisseId } };
     }
-    return this.venteService.update(id, data);
+    return this.venteService.update(id, data, viewer);
   }
 
   @Delete(':id')
   @CheckPolicies({ action: 'delete', subject: 'Vente' })
-  remove(@Param('id') id: string) {
-    return this.venteService.remove(id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.venteService.remove(id, viewer);
   }
 }

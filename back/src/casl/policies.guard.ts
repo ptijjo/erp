@@ -17,7 +17,7 @@ export class PoliciesGuard implements CanActivate {
     private readonly caslAbilityFactory: CaslAbilityFactory,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const policies = this.reflector.getAllAndOverride<PolicyRule[] | undefined>(
       CHECK_POLICIES_KEY,
       [context.getHandler(), context.getClass()],
@@ -34,7 +34,7 @@ export class PoliciesGuard implements CanActivate {
       throw new ForbiddenException();
     }
 
-    const ability = this.caslAbilityFactory.createForUser(user);
+    const ability = await this.caslAbilityFactory.createForUser(user);
     const allowed = policies.every((rule) =>
       ability.can(rule.action, rule.subject),
     );

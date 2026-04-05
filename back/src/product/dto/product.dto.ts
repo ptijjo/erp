@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -22,6 +23,10 @@ export class CreateProductDto {
 
   @IsUUID('4')
   categoryId!: string;
+
+  @IsBoolean()
+  @IsOptional()
+  offeredToSubsidiaries?: boolean;
 }
 
 export class UpdateProductDto {
@@ -41,4 +46,8 @@ export class UpdateProductDto {
   @IsUUID('4')
   @IsOptional()
   categoryId?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  offeredToSubsidiaries?: boolean;
 }

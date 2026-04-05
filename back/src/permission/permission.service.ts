@@ -50,6 +50,7 @@ export class PermissionService {
 
   async remove(id: string): Promise<Permission> {
     const row = await this.findOne(id);
+    await this.prisma.permissionRole.deleteMany({ where: { permissionId: id } });
     await this.prisma.permission.delete({ where: { id } });
     return row;
   }

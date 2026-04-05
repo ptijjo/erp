@@ -11,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { CategoryDto, ProductDto } from "~/lib/api-types";
 import { parseDecimal } from "~/lib/parse-decimal";
@@ -29,6 +30,8 @@ type ProductSort =
 export default function ProduitsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: me } = useMe();
+  const isMain = me != null && isMainOrganization(me);
 
   const [showProductFilters, setShowProductFilters] = useState(true);
   const [productSearch, setProductSearch] = useState("");
@@ -118,13 +121,15 @@ export default function ProduitsPage() {
     <main className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto bg-white p-6">
       <div className="flex w-full flex-wrap items-center gap-4">
         <div className="flex flex-1 flex-wrap justify-start gap-3">
-          <Link
-            href="/dashboard/produits/add"
-            className="flex w-fit cursor-pointer items-center gap-2 rounded-md bg-gray-100 p-4 transition-all duration-300 hover:bg-gray-200"
-          >
-            <SquarePlus className="size-4" />
-            Ajouter un produit
-          </Link>
+          {isMain ? (
+            <Link
+              href="/dashboard/produits/add"
+              className="flex w-fit cursor-pointer items-center gap-2 rounded-md bg-gray-100 p-4 transition-all duration-300 hover:bg-gray-200"
+            >
+              <SquarePlus className="size-4" />
+              Ajouter un produit
+            </Link>
+          ) : null}
         </div>
         <h1 className="shrink-0 text-4xl font-extrabold text-orange-500">
           Produits
@@ -234,6 +239,11 @@ export default function ProduitsPage() {
                 <th className="px-4 py-3 font-semibold text-gray-900">Nom</th>
                 <th className="px-4 py-3 font-semibold text-gray-900">Catégorie</th>
                 <th className="px-4 py-3 font-semibold text-gray-900">Prix</th>
+                {isMain ? (
+                  <th className="px-4 py-3 font-semibold text-gray-900">
+                    Filiales
+                  </th>
+                ) : null}
                 <th className="px-4 py-3 font-semibold text-gray-900">QR</th>
                 <th className="px-4 py-3 text-right font-semibold text-gray-900">
                   Actions
@@ -267,20 +277,37 @@ export default function ProduitsPage() {
                       maximumFractionDigits: 0,
                     }).format(parseDecimal(p.price))}
                   </td>
+                  {isMain ? (
+                    <td className="px-4 py-3 text-gray-700">
+                      {p.offeredToSubsidiaries ? (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                          Oui
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                          Non
+                        </span>
+                      )}
+                    </td>
+                  ) : null}
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">
                     {p.qrCode}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      title="Supprimer"
-                      disabled={deleteProductMutation.isPending}
-                      onClick={(e) => handleDeleteProduct(e, p.id, p.name)}
-                      className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      aria-label={`Supprimer ${p.name}`}
-                    >
-                      <Trash2 className="size-4" strokeWidth={2} />
-                    </button>
+                    {isMain ? (
+                      <button
+                        type="button"
+                        title="Supprimer"
+                        disabled={deleteProductMutation.isPending}
+                        onClick={(e) => handleDeleteProduct(e, p.id, p.name)}
+                        className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label={`Supprimer ${p.name}`}
+                      >
+                        <Trash2 className="size-4" strokeWidth={2} />
+                      </button>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

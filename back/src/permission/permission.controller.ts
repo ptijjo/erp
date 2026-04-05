@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
 import { CheckPolicies } from '../casl/check-policies.decorator';
+import { FullAccessRoleGuard } from '../casl/full-access-role.guard';
 import { PoliciesGuard } from '../casl/policies.guard';
 import { PermissionService } from './permission.service';
 import { PermissionRoleService } from './permission-role.service';
@@ -53,35 +54,40 @@ export class PermissionController {
   }
 
   @Post()
+  @UseGuards(FullAccessRoleGuard)
   @CheckPolicies({ action: 'create', subject: 'Permission' })
   create(@Body() dto: CreatePermissionDto) {
     return this.permissionService.create(dto);
   }
 
-  @Patch(':id')
-  @CheckPolicies({ action: 'update', subject: 'Permission' })
-  update(@Param('id') id: string, @Body() dto: UpdatePermissionDto) {
-    return this.permissionService.update(id, dto);
-  }
-
-  @Delete(':id')
-  @CheckPolicies({ action: 'delete', subject: 'Permission' })
-  remove(@Param('id') id: string) {
-    return this.permissionService.remove(id);
-  }
-
   @Post('link')
+  @UseGuards(FullAccessRoleGuard)
   @CheckPolicies({ action: 'update', subject: 'Permission' })
   link(@Body() dto: LinkPermissionRoleDto) {
     return this.permissionRoleService.link(dto.permissionId, dto.roleId);
   }
 
   @Delete('link')
+  @UseGuards(FullAccessRoleGuard)
   @CheckPolicies({ action: 'update', subject: 'Permission' })
   unlink(
     @Query('permissionId') permissionId: string,
     @Query('roleId') roleId: string,
   ) {
     return this.permissionRoleService.unlink(permissionId, roleId);
+  }
+
+  @Patch(':id')
+  @UseGuards(FullAccessRoleGuard)
+  @CheckPolicies({ action: 'update', subject: 'Permission' })
+  update(@Param('id') id: string, @Body() dto: UpdatePermissionDto) {
+    return this.permissionService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(FullAccessRoleGuard)
+  @CheckPolicies({ action: 'delete', subject: 'Permission' })
+  remove(@Param('id') id: string) {
+    return this.permissionService.remove(id);
   }
 }

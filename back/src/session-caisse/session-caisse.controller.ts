@@ -8,6 +8,8 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { CurrentUser } from '../auth/current-user.decorator';
 import type { Prisma } from '../generated/prisma/client';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
 import { CheckPolicies } from '../casl/check-policies.decorator';
@@ -25,37 +27,53 @@ export class SessionCaisseController {
 
   @Get('open/:organizationId')
   @CheckPolicies({ action: 'read', subject: 'SessionCaisse' })
-  findOpen(@Param('organizationId') organizationId: string) {
-    return this.sessionCaisseService.findOpenByOrganization(organizationId);
+  findOpen(
+    @Param('organizationId') organizationId: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.sessionCaisseService.findOpenByOrganization(
+      organizationId,
+      viewer,
+    );
   }
 
   @Get()
   @CheckPolicies({ action: 'read', subject: 'SessionCaisse' })
-  findAll() {
-    return this.sessionCaisseService.findAll();
+  findAll(@CurrentUser() viewer: AuthenticatedUser) {
+    return this.sessionCaisseService.findAll(viewer);
   }
 
   @Get(':id')
   @CheckPolicies({ action: 'read', subject: 'SessionCaisse' })
-  findOne(@Param('id') id: string) {
-    return this.sessionCaisseService.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.sessionCaisseService.findOne(id, viewer);
   }
 
   @Post()
   @CheckPolicies({ action: 'create', subject: 'SessionCaisse' })
-  create(@Body() dto: CreateSessionCaisseDto) {
+  create(
+    @Body() dto: CreateSessionCaisseDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
     const data: Prisma.SessionCaisseCreateInput = {
       organization: { connect: { id: dto.organizationId } },
       user: { connect: { id: dto.userId } },
       fondOuverture: dto.fondOuverture,
       ...(dto.statut !== undefined ? { statut: dto.statut } : {}),
     };
-    return this.sessionCaisseService.create(data);
+    return this.sessionCaisseService.create(data, viewer);
   }
 
   @Patch(':id')
   @CheckPolicies({ action: 'update', subject: 'SessionCaisse' })
-  update(@Param('id') id: string, @Body() dto: UpdateSessionCaisseDto) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateSessionCaisseDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
     const data: Prisma.SessionCaisseUpdateInput = {
       ...(dto.statut !== undefined ? { statut: dto.statut } : {}),
       ...(dto.closedAt !== undefined
@@ -72,12 +90,15 @@ export class SessionCaisseController {
           ? { disconnect: true }
           : { connect: { id: dto.closedByUserId } };
     }
-    return this.sessionCaisseService.update(id, data);
+    return this.sessionCaisseService.update(id, data, viewer);
   }
 
   @Delete(':id')
   @CheckPolicies({ action: 'delete', subject: 'SessionCaisse' })
-  remove(@Param('id') id: string) {
-    return this.sessionCaisseService.remove(id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.sessionCaisseService.remove(id, viewer);
   }
 }

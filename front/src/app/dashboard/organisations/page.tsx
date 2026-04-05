@@ -1,13 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SquarePlus } from "lucide-react";
 
 import { api } from "~/lib/api";
 import type { OrganizationDto } from "~/lib/api-types";
+import { dashboardHomePath, isMainOrganization, useMe } from "~/hooks/use-me";
 
 export default function OrganisationsPage() {
+  const router = useRouter();
+  const { data: me } = useMe();
+
+  useEffect(() => {
+    if (!me) return;
+    if (!isMainOrganization(me) && me.organizationSlug) {
+      router.replace(dashboardHomePath(me));
+    }
+  }, [me, router]);
+
   const { data: organizations = [], isLoading, isError } = useQuery({
     queryKey: ["organisation"] as const,
     queryFn: async () => {
@@ -15,6 +28,14 @@ export default function OrganisationsPage() {
       return data;
     },
   });
+
+  if (me && !isMainOrganization(me)) {
+    return (
+      <main className="flex flex-1 items-center justify-center bg-white p-6 text-gray-600">
+        Redirection…
+      </main>
+    );
+  }
 
   return (
     <main className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-4 overflow-auto bg-white p-6">

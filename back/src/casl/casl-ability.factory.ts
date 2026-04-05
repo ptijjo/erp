@@ -1,10 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { defineAbilityFor, type AppAbility } from './define-ability';
+import { PrismaService } from '../prisma/prisma.service';
+import {
+  buildAbilityFromDatabase,
+  type AppAbility,
+} from './define-ability';
 
 @Injectable()
 export class CaslAbilityFactory {
-  createForUser(user: AuthenticatedUser): AppAbility {
-    return defineAbilityFor(user);
+  constructor(private readonly prisma: PrismaService) {}
+
+  createForUser(user: AuthenticatedUser): Promise<AppAbility> {
+    return buildAbilityFromDatabase(user, this.prisma);
   }
 }

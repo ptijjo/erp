@@ -8,6 +8,8 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { CurrentUser } from '../auth/current-user.decorator';
 import type { Prisma } from '../generated/prisma/client';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
 import { CheckPolicies } from '../casl/check-policies.decorator';
@@ -27,19 +29,28 @@ export class BulletinPaieLigneController {
 
   @Get('by-bulletin/:bulletinId')
   @CheckPolicies({ action: 'read', subject: 'BulletinPaieLigne' })
-  findByBulletin(@Param('bulletinId') bulletinId: string) {
-    return this.bulletinPaieLigneService.findByBulletinId(bulletinId);
+  findByBulletin(
+    @Param('bulletinId') bulletinId: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.bulletinPaieLigneService.findByBulletinId(bulletinId, viewer);
   }
 
   @Get(':id')
   @CheckPolicies({ action: 'read', subject: 'BulletinPaieLigne' })
-  findOne(@Param('id') id: string) {
-    return this.bulletinPaieLigneService.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.bulletinPaieLigneService.findOne(id, viewer);
   }
 
   @Post()
   @CheckPolicies({ action: 'create', subject: 'BulletinPaieLigne' })
-  create(@Body() dto: CreateBulletinPaieLigneDto) {
+  create(
+    @Body() dto: CreateBulletinPaieLigneDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
     const data: Prisma.BulletinPaieLigneCreateInput = {
       bulletin: { connect: { id: dto.bulletinId } },
       code: dto.code,
@@ -48,12 +59,16 @@ export class BulletinPaieLigneController {
       sens: dto.sens,
       ...(dto.ordre !== undefined ? { ordre: dto.ordre } : {}),
     };
-    return this.bulletinPaieLigneService.create(data);
+    return this.bulletinPaieLigneService.create(data, viewer);
   }
 
   @Patch(':id')
   @CheckPolicies({ action: 'update', subject: 'BulletinPaieLigne' })
-  update(@Param('id') id: string, @Body() dto: UpdateBulletinPaieLigneDto) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateBulletinPaieLigneDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
     const data: Prisma.BulletinPaieLigneUpdateInput = {
       ...(dto.code !== undefined ? { code: dto.code } : {}),
       ...(dto.libelle !== undefined ? { libelle: dto.libelle } : {}),
@@ -61,12 +76,15 @@ export class BulletinPaieLigneController {
       ...(dto.sens !== undefined ? { sens: dto.sens } : {}),
       ...(dto.ordre !== undefined ? { ordre: dto.ordre } : {}),
     };
-    return this.bulletinPaieLigneService.update(id, data);
+    return this.bulletinPaieLigneService.update(id, data, viewer);
   }
 
   @Delete(':id')
   @CheckPolicies({ action: 'delete', subject: 'BulletinPaieLigne' })
-  remove(@Param('id') id: string) {
-    return this.bulletinPaieLigneService.remove(id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.bulletinPaieLigneService.remove(id, viewer);
   }
 }

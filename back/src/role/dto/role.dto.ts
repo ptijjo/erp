@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateRoleDto {
   @Transform(({ value }: { value: unknown }): unknown =>
@@ -14,6 +14,11 @@ export class CreateRoleDto {
   })
   @IsOptional({ message: 'La description du rôle est facultative' })
   public description?: string;
+
+  /** Rôle limité à une organisation (ex. direction maison mère) ; absent = rôle global. */
+  @IsUUID('4', { message: "L'identifiant d'organisation doit être un UUID valide" })
+  @IsOptional()
+  public organizationScopeId?: string;
 }
 
 export class UpdateRoleDto {

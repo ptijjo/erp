@@ -9,6 +9,8 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { CurrentUser } from '../auth/current-user.decorator';
 import type { Prisma } from '../generated/prisma/client';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
 import { CheckPolicies } from '../casl/check-policies.decorator';
@@ -28,6 +30,7 @@ export class PlanningShiftController {
   @CheckPolicies({ action: 'read', subject: 'PlanningShift' })
   findByOrganization(
     @Param('organizationId') organizationId: string,
+    @CurrentUser() viewer: AuthenticatedUser,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
@@ -35,6 +38,7 @@ export class PlanningShiftController {
     const toD = to ? new Date(to) : undefined;
     return this.planningShiftService.findByOrganizationId(
       organizationId,
+      viewer,
       fromD,
       toD,
     );
@@ -44,29 +48,41 @@ export class PlanningShiftController {
   @CheckPolicies({ action: 'read', subject: 'PlanningShift' })
   findByUser(
     @Param('userId') userId: string,
+    @CurrentUser() viewer: AuthenticatedUser,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
     const fromD = from ? new Date(from) : undefined;
     const toD = to ? new Date(to) : undefined;
-    return this.planningShiftService.findByUserId(userId, fromD, toD);
+    return this.planningShiftService.findByUserId(
+      userId,
+      viewer,
+      fromD,
+      toD,
+    );
   }
 
   @Get()
   @CheckPolicies({ action: 'read', subject: 'PlanningShift' })
-  findAll() {
-    return this.planningShiftService.findAll();
+  findAll(@CurrentUser() viewer: AuthenticatedUser) {
+    return this.planningShiftService.findAll(viewer);
   }
 
   @Get(':id')
   @CheckPolicies({ action: 'read', subject: 'PlanningShift' })
-  findOne(@Param('id') id: string) {
-    return this.planningShiftService.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.planningShiftService.findOne(id, viewer);
   }
 
   @Post()
   @CheckPolicies({ action: 'create', subject: 'PlanningShift' })
-  create(@Body() dto: CreatePlanningShiftDto) {
+  create(
+    @Body() dto: CreatePlanningShiftDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
     const data: Prisma.PlanningShiftCreateInput = {
       startsAt: new Date(dto.startsAt),
       endsAt: new Date(dto.endsAt),
@@ -75,24 +91,31 @@ export class PlanningShiftController {
       ...(dto.type !== undefined ? { type: dto.type } : {}),
       ...(dto.note !== undefined ? { note: dto.note } : {}),
     };
-    return this.planningShiftService.create(data);
+    return this.planningShiftService.create(data, viewer);
   }
 
   @Patch(':id')
   @CheckPolicies({ action: 'update', subject: 'PlanningShift' })
-  update(@Param('id') id: string, @Body() dto: UpdatePlanningShiftDto) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePlanningShiftDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
     const data: Prisma.PlanningShiftUpdateInput = {
       ...(dto.startsAt !== undefined ? { startsAt: new Date(dto.startsAt) } : {}),
       ...(dto.endsAt !== undefined ? { endsAt: new Date(dto.endsAt) } : {}),
       ...(dto.type !== undefined ? { type: dto.type } : {}),
       ...(dto.note !== undefined ? { note: dto.note } : {}),
     };
-    return this.planningShiftService.update(id, data);
+    return this.planningShiftService.update(id, data, viewer);
   }
 
   @Delete(':id')
   @CheckPolicies({ action: 'delete', subject: 'PlanningShift' })
-  remove(@Param('id') id: string) {
-    return this.planningShiftService.remove(id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.planningShiftService.remove(id, viewer);
   }
 }

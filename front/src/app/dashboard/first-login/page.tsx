@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
-import { fetchMe, meQueryKey } from "~/hooks/use-me";
+import { dashboardHomePath, fetchMe, meQueryKey } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 
 const passwordField = z
@@ -67,8 +67,11 @@ export default function FirstLoginPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: meQueryKey });
-      await queryClient.fetchQuery({ queryKey: meQueryKey, queryFn: fetchMe });
-      router.replace("/dashboard");
+      const profile = await queryClient.fetchQuery({
+        queryKey: meQueryKey,
+        queryFn: fetchMe,
+      });
+      router.replace(profile ? dashboardHomePath(profile) : "/dashboard");
     },
     onError: (err) => {
       setError("root", { message: errorMessage(err) });

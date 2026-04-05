@@ -1,4 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import {
+  assertOrganizationResourceAccess,
+  organizationListWhere,
+} from '../auth/organization-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Vente, Prisma } from '../generated/prisma/client';
 
@@ -6,8 +15,9 @@ import type { Vente, Prisma } from '../generated/prisma/client';
 export class VenteService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(): Promise<Vente[]> {
+  async findAll(viewer: AuthenticatedUser): Promise<Vente[]> {
     return this.prisma.vente.findMany({
+      where: organizationListWhere(viewer),
       orderBy: { createdAt: 'desc' },
       include: {
         organization: true,
@@ -19,7 +29,11 @@ export class VenteService {
     });
   }
 
-  async findByOrganizationId(organizationId: string): Promise<Vente[]> {
+  async findByOrganizationId(
+    organizationId: string,
+    viewer: AuthenticatedUser,
+  ): Promise<Vente[]> {
+    assertOrganizationResourceAccess(viewer, organizationId);
     return this.prisma.vente.findMany({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },
@@ -33,7 +47,7 @@ export class VenteService {
     });
   }
 
-  async findOne(id: string): Promise<Vente> {
+  async findOne(id: string, viewer: AuthenticatedUser): Promise<Vente> {
     const row = await this.prisma.vente.findUnique({
       where: { id },
       include: {
@@ -47,12 +61,22 @@ export class VenteService {
     if (!row) {
       throw new NotFoundException('Vente introuvable');
     }
+    assertOrganizationResourceAccess(viewer, row.organizationId);
     return row;
   }
 
-  async create(data: Prisma.VenteCreateInput): Promise<Vente> {
+  async create(
+    data: Prisma.VenteCreateInput,
+    viewer: AuthenticatedUser,
+  ): Promise<Vente> {
+    const orgId = this.resolveVenteOrganizationId(data, viewer);
+    assertOrganizationResourceAccess(viewer, orgId);
+    const scopedData: Prisma.VenteCreateInput = {
+      ...data,
+      organization: { connect: { id: orgId } },
+    };
     return this.prisma.vente.create({
-      data,
+      data: scopedData,
       include: {
         organization: true,
         user: true,
@@ -63,8 +87,34 @@ export class VenteService {
     });
   }
 
-  async update(id: string, data: Prisma.VenteUpdateInput): Promise<Vente> {
-    await this.findOne(id);
+  private resolveVenteOrganizationId(
+    data: Prisma.VenteCreateInput,
+    viewer: AuthenticatedUser,
+  ): string {
+    const connectId =
+      data.organization &&
+      typeof data.organization === 'object' &&
+      'connect' in data.organization &&
+      data.organization.connect &&
+      typeof data.organization.connect === 'object' &&
+      'id' in data.organization.connect
+        ? (data.organization.connect as { id: string }).id
+        : undefined;
+    if (viewer.organizationType === 'SUBSIDIARY') {
+      return viewer.organisationId;
+    }
+    if (!connectId) {
+      throw new BadRequestException('Organisation de la vente manquante');
+    }
+    return connectId;
+  }
+
+  async update(
+    id: string,
+    data: Prisma.VenteUpdateInput,
+    viewer: AuthenticatedUser,
+  ): Promise<Vente> {
+    await this.findOne(id, viewer);
     return this.prisma.vente.update({
       where: { id },
       data,
@@ -78,8 +128,8 @@ export class VenteService {
     });
   }
 
-  async remove(id: string): Promise<Vente> {
-    const row = await this.findOne(id);
+  async remove(id: string, viewer: AuthenticatedUser): Promise<Vente> {
+    const row = await this.findOne(id, viewer);
     await this.prisma.vente.delete({ where: { id } });
     return row;
   }

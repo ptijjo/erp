@@ -13,11 +13,30 @@ export type OrganizationDto = {
   updatedAt?: string;
 };
 
+/** GET/PUT `/organisation/:id/catalog` */
+export type OrganizationCatalogDto = {
+  categoryIds: string[];
+  productIds: string[];
+};
+
 export type RoleDto = {
   id: string;
   name: string;
   description: string | null;
   organizationScopeId: string | null;
+};
+
+export type PermissionDto = {
+  id: string;
+  name: string;
+  description: string | null;
+};
+
+export type PermissionRoleDto = {
+  id: string;
+  roleId: string;
+  permissionId: string;
+  permission: PermissionDto;
 };
 
 export type UserListItemDto = {
@@ -84,6 +103,8 @@ export type ProductDto = {
   description: string | null;
   price: string | number;
   qrCode: string;
+  /** Catalogue visible / vendable par les filiales (défini par la maison mère). */
+  offeredToSubsidiaries: boolean;
   categoryId: string;
   category: CategoryDto;
 };

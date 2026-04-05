@@ -4,6 +4,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { slugify } from '../lib/Slugify';
 import * as bcrypt from 'bcrypt';
 import { MAISON_MERE_DIRECTOR_ROLES } from './maison-mere-roles';
+import {
+  CASL_SEED_PERMISSION_NAMES,
+  describeCaslPermission,
+} from './casl-permission-names';
 
 @Injectable()
 export class SeederService implements OnModuleInit {
@@ -55,6 +59,22 @@ export class SeederService implements OnModuleInit {
         },
       });
       Logger.log('Rôle ADMIN assuré (sans périmètre organisation)');
+
+      for (const name of CASL_SEED_PERMISSION_NAMES) {
+        await this.prisma.permission.upsert({
+          where: { name },
+          create: {
+            name,
+            description: describeCaslPermission(name),
+          },
+          update: {
+            description: describeCaslPermission(name),
+          },
+        });
+      }
+      Logger.log(
+        `Permissions CASL en base : ${CASL_SEED_PERMISSION_NAMES.length} entrées (catalogue PERMISSIONS-CASL.md)`,
+      );
 
       for (const def of MAISON_MERE_DIRECTOR_ROLES) {
         await this.prisma.role.upsert({

@@ -15,7 +15,7 @@ import type {
   Request as RequestExpress,
   Response as ResponseExpress,
 } from 'express';
-import type { SafeUserWithRole } from '../user/user.types';
+import type { SafeUserWithRoleAndOrg } from '../user/user.types';
 import type { AuthenticatedUser } from './auth.types';
 import { JwtAuthGuard } from './jwt.strategy/jwt-auth.guard';
 import { Throttle } from '@nestjs/throttler';
@@ -34,7 +34,7 @@ export class AuthController {
     @Response({ passthrough: true }) res: ResponseExpress,
     @Body() _body: LoginDto,
   ) {
-    const token = this.authService.login(req.user as SafeUserWithRole);
+    const token = this.authService.login(req.user as SafeUserWithRoleAndOrg);
     res.cookie('token', token.access_token, {
       httpOnly: true,
       secure: true,

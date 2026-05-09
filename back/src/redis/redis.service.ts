@@ -47,4 +47,21 @@ export class RedisService implements OnModuleInit {
   async setEx(key: string, seconds: number, value: string): Promise<void> {
     await this.redis.set(key, value, 'EX', seconds);
   }
+
+  /**
+   * GET puis DEL dans une transaction (atomique côté Redis à l’EXEC) :
+   * utilisé pour la rotation du refresh token (une seule consommation valide).
+   */
+  async getDel(key: string): Promise<string | null> {
+    const results = await this.redis.multi().get(key).del(key).exec();
+    if (!results?.length) {
+      return null;
+    }
+    const [getEntry] = results;
+    if (!getEntry || getEntry[0]) {
+      return null;
+    }
+    const value = getEntry[1];
+    return typeof value === 'string' ? value : null;
+  }
 }

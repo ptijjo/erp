@@ -4,20 +4,22 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import type { AccessTokenPayload } from '../auth.types';
-
-/** Doit correspondre au nom utilisé dans AuthController (res.cookie / clearCookie). */
-const JWT_COOKIE_NAME = 'token';
+import { AuthSessionSettings } from '../auth-session-settings.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(configService: ConfigService) {
+  constructor(
+    configService: ConfigService,
+    sessionSettings: AuthSessionSettings,
+  ) {
+    const accessCookieName = sessionSettings.accessCookieName;
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (request: Request) => {
           const cookies = request.cookies as
             | Record<string, unknown>
             | undefined;
-          const raw = cookies?.[JWT_COOKIE_NAME];
+          const raw = cookies?.[accessCookieName];
           return typeof raw === 'string' ? raw : null;
         },
       ]),

@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 
 import { Button } from "~/components/ui/button";
+import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { CategoryDto } from "~/lib/api-types";
 
@@ -40,6 +41,9 @@ function apiErrorMessage(error: unknown): string {
 export default function AddCategoryForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: me, isPending: mePending } = useMe();
+  const canCreateCategory =
+    me != null && hasMePermission(me, "create", "Category");
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ["category"] as const,
@@ -89,6 +93,32 @@ export default function AddCategoryForm() {
       setError("root", { message: apiErrorMessage(err) });
     },
   });
+
+  if (mePending) {
+    return <p className="text-sm text-gray-600">Vérification des droits…</p>;
+  }
+
+  if (me == null) {
+    return (
+      <div className="max-w-lg rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-800">
+        <p className="font-semibold">Session non disponible</p>
+      </div>
+    );
+  }
+
+  if (!canCreateCategory) {
+    return (
+      <div
+        className="max-w-lg rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-950"
+        role="alert"
+      >
+        <p className="font-semibold">Accès refusé</p>
+        <p className="mt-2">
+          Vous n’avez pas la permission de créer des catégories.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <form

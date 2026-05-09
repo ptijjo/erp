@@ -7,6 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 
 import { apiErrorMessage } from "../../produits/_lib/api-error-message";
@@ -44,6 +45,9 @@ type Schema = z.infer<typeof schema>;
 export default function AddOrganisationForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: me, isPending: mePending } = useMe();
+  const canCreateOrganization =
+    me != null && hasMePermission(me, "create", "Organization");
 
   const {
     register,
@@ -84,6 +88,32 @@ export default function AddOrganisationForm() {
       });
     },
   });
+
+  if (mePending) {
+    return <p className="text-sm text-gray-600">Vérification des droits…</p>;
+  }
+
+  if (me == null) {
+    return (
+      <div className="max-w-lg rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-800">
+        <p className="font-semibold">Session non disponible</p>
+      </div>
+    );
+  }
+
+  if (!canCreateOrganization) {
+    return (
+      <div
+        className="max-w-lg rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-950"
+        role="alert"
+      >
+        <p className="font-semibold">Accès refusé</p>
+        <p className="mt-2">
+          Vous n’avez pas la permission de créer des organisations.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <form

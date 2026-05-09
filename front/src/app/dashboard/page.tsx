@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Package, ShoppingBag, Wallet } from "lucide-react";
+import { Package } from "lucide-react";
 
 import {
   isMainOrganization,
@@ -50,20 +50,6 @@ export default function DashboardPage() {
             >
               <Package className="size-4 text-orange-600" />
               Produits
-            </Link>
-            <Link
-              href="/dashboard/ventes"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-100"
-            >
-              <ShoppingBag className="size-4 text-orange-600" />
-              Ventes
-            </Link>
-            <Link
-              href="/dashboard/caisse"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-100"
-            >
-              <Wallet className="size-4 text-orange-600" />
-              Caisse
             </Link>
             {orgHref ? (
               <Link

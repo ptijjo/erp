@@ -10,9 +10,7 @@ export function isMainOrganizationUser(user: AuthenticatedUser): boolean {
 
 export function assertMainOrganizationOnly(user: AuthenticatedUser): void {
   if (!isMainOrganizationUser(user)) {
-    throw new ForbiddenException(
-      'Cette action est réservée à la maison mère.',
-    );
+    throw new ForbiddenException('Cette action est réservée à la maison mère.');
   }
 }
 

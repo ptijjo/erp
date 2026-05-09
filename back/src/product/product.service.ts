@@ -22,14 +22,20 @@ export class ProductService {
     return this.prisma.product.findMany({
       where,
       orderBy: { name: 'asc' },
-      include: { category: true },
+      include: {
+        category: true,
+        productSuppliers: { include: { supplier: true } },
+      },
     });
   }
 
   async findOne(id: string, viewer: AuthenticatedUser): Promise<Product> {
     const row = await this.prisma.product.findUnique({
       where: { id },
-      include: { category: true },
+      include: {
+        category: true,
+        productSuppliers: { include: { supplier: true } },
+      },
     });
     if (!row) {
       throw new NotFoundException('Produit introuvable');
@@ -55,7 +61,10 @@ export class ProductService {
   ): Promise<Product> {
     const row = await this.prisma.product.findUnique({
       where: { qrCode },
-      include: { category: true },
+      include: {
+        category: true,
+        productSuppliers: { include: { supplier: true } },
+      },
     });
     if (!row) {
       throw new NotFoundException('Produit introuvable pour ce QR code');
@@ -93,7 +102,10 @@ export class ProductService {
     try {
       return await this.prisma.product.create({
         data,
-        include: { category: true },
+        include: {
+        category: true,
+        productSuppliers: { include: { supplier: true } },
+      },
       });
     } catch {
       throw new BadRequestException(
@@ -113,7 +125,10 @@ export class ProductService {
       return await this.prisma.product.update({
         where: { id },
         data,
-        include: { category: true },
+        include: {
+        category: true,
+        productSuppliers: { include: { supplier: true } },
+      },
       });
     } catch {
       throw new BadRequestException(

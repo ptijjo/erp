@@ -7,7 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { useMe, isMainOrganization } from "~/hooks/use-me";
+import { useMe, hasMePermission, isMainOrganization } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { OrganizationDto, RoleDto, UserDetailDto } from "~/lib/api-types";
 
@@ -59,6 +59,7 @@ export default function EditUserForm({ userId }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: me, isPending: mePending } = useMe();
+  const canUpdateUser = me != null && hasMePermission(me, "update", "User");
 
   const { data: user, isLoading: userLoading, isError: userError } = useQuery({
     queryKey: ["user", userId] as const,
@@ -160,6 +161,28 @@ export default function EditUserForm({ userId }: Props) {
 
   if (mePending || userLoading) {
     return <p className="text-sm text-gray-600">Chargement…</p>;
+  }
+
+  if (me == null) {
+    return (
+      <div className="max-w-lg rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-800">
+        <p className="font-semibold">Session non disponible</p>
+      </div>
+    );
+  }
+
+  if (!canUpdateUser) {
+    return (
+      <div
+        className="max-w-lg rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-950"
+        role="alert"
+      >
+        <p className="font-semibold">Accès refusé</p>
+        <p className="mt-2">
+          Vous n’avez pas la permission de modifier les utilisateurs.
+        </p>
+      </div>
+    );
   }
 
   if (userError || !user) {

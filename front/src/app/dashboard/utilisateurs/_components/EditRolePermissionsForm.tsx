@@ -43,9 +43,11 @@ export default function EditRolePermissionsForm({ roleId }: Props) {
   });
 
   const { data: allPermissions = [], isLoading: permsLoading } = useQuery({
-    queryKey: ["permission"] as const,
+    queryKey: ["permission", "assignment"] as const,
     queryFn: async () => {
-      const { data } = await api.get<PermissionDto[]>("/permission");
+      const { data } = await api.get<PermissionDto[]>(
+        "/permission/for-assignment",
+      );
       return data;
     },
     enabled: role !== undefined && !isFullAccessRole(role.name),
@@ -97,7 +99,9 @@ export default function EditRolePermissionsForm({ roleId }: Props) {
       await queryClient.invalidateQueries({
         queryKey: ["permission", "by-role", roleId],
       });
-      await queryClient.invalidateQueries({ queryKey: ["permission"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["permission", "assignment"],
+      });
       setRootError(null);
     },
     onError: (err) => {

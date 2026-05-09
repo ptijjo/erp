@@ -13,14 +13,17 @@ import {
   isMainOrganizationUser,
 } from '../auth/organization-scope';
 import type {
+  SafeUserDetail,
   SafeUserPublic,
   SafeUserWithRole,
   SafeUserWithRoleAndOrg,
   UserWithRole,
   UserWithRoleAndOrg,
 } from './user.types';
+import { OrganizationType } from '../generated/prisma/client';
 
 export type {
+  SafeUserDetail,
   SafeUserPublic,
   SafeUserWithRole,
   SafeUserWithRoleAndOrg,
@@ -32,17 +35,34 @@ export type {
 export class UserService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Rôle avec périmètre org : uniquement pour les utilisateurs de cette organisation. */
+  /** Rôle avec périmètre org : filiales = rôle strictement scoppé à leur id ; maison mère = scope null ou égal à l’org cible. */
   private async assertRoleAllowedForOrganization(
     roleId: string,
     organizationId: string,
   ): Promise<void> {
-    const role = await this.prisma.role.findUnique({
-      where: { id: roleId },
-    });
+    const [role, org] = await Promise.all([
+      this.prisma.role.findUnique({ where: { id: roleId } }),
+      this.prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { organizationType: true },
+      }),
+    ]);
     if (!role) {
       throw new NotFoundException('Rôle non trouvé');
     }
+    if (!org) {
+      throw new NotFoundException('Organisation non trouvée');
+    }
+
+    if (org.organizationType === OrganizationType.SUBSIDIARY) {
+      if (role.organizationScopeId !== organizationId) {
+        throw new BadRequestException(
+          'Pour une filiale, le rôle doit être défini pour cette organisation uniquement (pas de rôle global maison mère).',
+        );
+      }
+      return;
+    }
+
     if (
       role.organizationScopeId !== null &&
       role.organizationScopeId !== organizationId
@@ -87,6 +107,26 @@ export class UserService {
     });
   }
 
+  /** Session / refresh : charge l’utilisateur par id (même forme que `findUser`). */
+  async findUserByIdWithRoleAndOrg(
+    id: string,
+  ): Promise<UserWithRoleAndOrg | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        role: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            organizationType: true,
+          },
+        },
+      },
+    });
+  }
+
   public findAll = async (
     viewer: AuthenticatedUser,
   ): Promise<SafeUserPublic[]> => {
@@ -106,19 +146,40 @@ export class UserService {
   public findOne = async (
     id: string,
     viewer: AuthenticatedUser,
-  ): Promise<SafeUserWithRole> => {
+  ): Promise<SafeUserDetail> => {
     const user = await this.prisma.user.findUnique({
       where: {
         id,
       },
-      include: { role: true },
+      include: { role: true, organization: true },
     });
     if (!user) {
       throw new NotFoundException('Utilisateur non trouvé');
     }
     assertOrganizationResourceAccess(viewer, user.organizationId);
     const { password: _p, ...rest } = user;
-    return rest;
+
+    const creationEntry = await this.prisma.auditLog.findFirst({
+      where: {
+        entityType: 'User',
+        entityId: id,
+        action: 'CREATE',
+      },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: { select: { id: true, email: true } },
+      },
+    });
+
+    const createdBy =
+      creationEntry?.user != null
+        ? {
+            id: creationEntry.user.id,
+            email: creationEntry.user.email,
+          }
+        : null;
+
+    return { ...rest, createdBy };
   };
 
   public create = async (

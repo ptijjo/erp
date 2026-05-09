@@ -8,7 +8,12 @@ import { ArrowLeft } from "lucide-react";
 
 import { api } from "~/lib/api";
 import type { OrganizationDto } from "~/lib/api-types";
-import { dashboardHomePath, isMainOrganization, useMe } from "~/hooks/use-me";
+import {
+  dashboardHomePath,
+  hasMePermission,
+  isMainOrganization,
+  useMe,
+} from "~/hooks/use-me";
 
 import OrganisationCatalogPanel from "../_components/OrganisationCatalogPanel";
 
@@ -41,6 +46,8 @@ export default function OrganisationDetailPage() {
   const org = organizations.find((o) => o.slug === slug);
 
   const showBackToOrgList = me && isMainOrganization(me);
+  const canUpdateOrganization =
+    me != null && hasMePermission(me, "update", "Organization");
 
   return (
     <main className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto bg-white p-6">
@@ -100,6 +107,7 @@ export default function OrganisationDetailPage() {
             <OrganisationCatalogPanel
               organizationId={org.id}
               organizationName={org.name}
+              canEditCatalog={canUpdateOrganization}
             />
           ) : null}
         </div>

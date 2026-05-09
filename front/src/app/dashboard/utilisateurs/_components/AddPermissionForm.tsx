@@ -8,12 +8,11 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { useMe } from "~/hooks/use-me";
+import { hasMePermission, isAdminUser, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { PermissionDto } from "~/lib/api-types";
 
 import { apiErrorMessage } from "../../produits/_lib/api-error-message";
-import { isFullAccessRole } from "../_lib/full-access-roles";
 
 const schema = z.object({
   name: z.string().min(1, { message: "Le nom est requis" }).trim(),
@@ -27,7 +26,7 @@ export default function AddPermissionForm() {
   const queryClient = useQueryClient();
   const { data: me, isPending: mePending } = useMe();
   const canManage =
-    me != null && isFullAccessRole(me.role.name);
+    me != null && isAdminUser(me) && hasMePermission(me, "create", "Permission");
   const [rootError, setRootError] = useState<string | null>(null);
 
   const {
@@ -52,6 +51,7 @@ export default function AddPermissionForm() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["permission"] });
+      await queryClient.invalidateQueries({ queryKey: ["permission", "assignment"] });
       router.push("/dashboard/utilisateurs/permissions");
     },
     onError: (err) => {
@@ -87,8 +87,8 @@ export default function AddPermissionForm() {
       >
         <p className="font-semibold">Accès refusé</p>
         <p className="mt-2">
-          Seuls l’administrateur, le directeur général et le directeur des
-          opérations peuvent créer des permissions.
+          La création d’entrées dans le catalogue est réservée au compte
+          administrateur (rôle ADMIN).
         </p>
         <Link
           href="/dashboard/utilisateurs/permissions"
@@ -126,7 +126,7 @@ export default function AddPermissionForm() {
         <p className="mt-2 text-sm text-gray-600">
           Format conseillé pour les droits effectifs :{" "}
           <span className="font-mono">action:Sujet</span> (ex.{" "}
-          <span className="font-mono">read:Vente</span>,{" "}
+          <span className="font-mono">read:Product</span>,{" "}
           <span className="font-mono">manage:Stock</span>).
         </p>
         <div className="mt-4 flex flex-col gap-4">

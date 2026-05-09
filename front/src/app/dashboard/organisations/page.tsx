@@ -2,17 +2,28 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SquarePlus } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, SquarePlus } from "lucide-react";
 
 import { api } from "~/lib/api";
 import type { OrganizationDto } from "~/lib/api-types";
-import { dashboardHomePath, isMainOrganization, useMe } from "~/hooks/use-me";
+import {
+  dashboardHomePath,
+  hasMePermission,
+  isMainOrganization,
+  useMe,
+} from "~/hooks/use-me";
 
 export default function OrganisationsPage() {
   const router = useRouter();
+  const [sortBy, setSortBy] = useState<"name" | "slug">("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const { data: me } = useMe();
+  const canReadOrganization =
+    me != null && hasMePermission(me, "read", "Organization");
+  const canCreateOrganization =
+    me != null && hasMePermission(me, "create", "Organization");
 
   useEffect(() => {
     if (!me) return;
@@ -28,6 +39,33 @@ export default function OrganisationsPage() {
       return data;
     },
   });
+  const sortedOrganizations = useMemo(() => {
+    const collator = new Intl.Collator("fr", { sensitivity: "base" });
+    return [...organizations].sort((a, b) => {
+      const left = sortBy === "name" ? a.name : a.slug;
+      const right = sortBy === "name" ? b.name : b.slug;
+      const result = collator.compare(left, right);
+      return sortOrder === "asc" ? result : -result;
+    });
+  }, [organizations, sortBy, sortOrder]);
+
+  function toggleSort(column: "name" | "slug") {
+    if (sortBy === column) {
+      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortBy(column);
+    setSortOrder("asc");
+  }
+
+  function SortIcon({ column }: { column: "name" | "slug" }) {
+    if (sortBy !== column) return <ArrowUpDown className="size-3.5 text-gray-400" />;
+    return sortOrder === "asc" ? (
+      <ArrowUp className="size-3.5 text-orange-600" />
+    ) : (
+      <ArrowDown className="size-3.5 text-orange-600" />
+    );
+  }
 
   if (me && !isMainOrganization(me)) {
     return (
@@ -41,12 +79,14 @@ export default function OrganisationsPage() {
     <main className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-4 overflow-auto bg-white p-6">
       <div className="flex w-full items-center">
         <div className="flex flex-1 justify-start">
-          <Link
-            href="/dashboard/organisations/add"
-            className="flex w-fit cursor-pointer items-center gap-2 rounded-md bg-gray-100 p-4 transition-all duration-300 hover:bg-gray-200"
-          >
-            <SquarePlus className="size-4" /> Nouvelle filiale
-          </Link>
+          {canCreateOrganization && (
+            <Link
+              href="/dashboard/organisations/add"
+              className="flex w-fit cursor-pointer items-center gap-2 rounded-md bg-gray-100 p-4 transition-all duration-300 hover:bg-gray-200"
+            >
+              <SquarePlus className="size-4" /> Nouvelle filiale
+            </Link>
+          )}
         </div>
         <h1 className="shrink-0 text-4xl font-extrabold text-orange-500">
           Organisations
@@ -54,13 +94,25 @@ export default function OrganisationsPage() {
         <div className="flex-1" />
       </div>
 
-      {isError && (
+      {!canReadOrganization ? (
+        <div
+          className="max-w-lg rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-950"
+          role="alert"
+        >
+          <p className="font-semibold">Accès refusé</p>
+          <p className="mt-2">
+            Vous n’avez pas la permission de consulter les organisations.
+          </p>
+        </div>
+      ) : null}
+
+      {canReadOrganization && isError && (
         <p className="text-center text-red-600">
           Impossible de charger les organisations.
         </p>
       )}
 
-      {isLoading ? (
+      {!canReadOrganization ? null : isLoading ? (
         <p className="flex flex-1 items-center justify-center text-center text-gray-600">
           Chargement…
         </p>
@@ -73,13 +125,33 @@ export default function OrganisationsPage() {
           <table className="w-full min-w-[480px] text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-4 py-3 font-semibold text-gray-900">Nom</th>
-                <th className="px-4 py-3 font-semibold text-gray-900">Slug</th>
+                <th className="px-4 py-3 font-semibold text-gray-900">
+                  <button
+                    type="button"
+                    className="inline-flex cursor-pointer items-center gap-1.5 text-left hover:text-orange-600"
+                    onClick={() => toggleSort("name")}
+                    aria-label="Trier par nom"
+                  >
+                    Nom
+                    <SortIcon column="name" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 font-semibold text-gray-900">
+                  <button
+                    type="button"
+                    className="inline-flex cursor-pointer items-center gap-1.5 text-left hover:text-orange-600"
+                    onClick={() => toggleSort("slug")}
+                    aria-label="Trier par slug"
+                  >
+                    Slug
+                    <SortIcon column="slug" />
+                  </button>
+                </th>
                 <th className="px-4 py-3 font-semibold text-gray-900">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {organizations.map((org) => (
+              {sortedOrganizations.map((org) => (
                 <tr
                   key={org.id}
                   className="border-b border-gray-100 hover:bg-gray-50/80"

@@ -13,7 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { useMe } from "~/hooks/use-me";
+import { hasMePermission, isAdminUser, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { RoleDto } from "~/lib/api-types";
 
@@ -23,8 +23,16 @@ import { isFullAccessRole } from "../_lib/full-access-roles";
 export default function RolesListPage() {
   const queryClient = useQueryClient();
   const { data: me } = useMe();
-  const canManagePermissions =
-    me != null && isFullAccessRole(me.role.name);
+  const catalogAdminOnly = me != null && isAdminUser(me);
+  const canCreatePermission =
+    catalogAdminOnly &&
+    me != null &&
+    hasMePermission(me, "create", "Permission");
+  const canUpdatePermission =
+    me != null && hasMePermission(me, "update", "Permission");
+  const canCreateRole = me != null && hasMePermission(me, "create", "Role");
+  const canUpdateRole = me != null && hasMePermission(me, "update", "Role");
+  const canDeleteRole = me != null && hasMePermission(me, "delete", "Role");
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data: roles = [], isLoading, isError } = useQuery({
@@ -73,7 +81,7 @@ export default function RolesListPage() {
           </h1>
         </div>
         <div className="flex flex-1 flex-wrap justify-end gap-3">
-          {canManagePermissions && (
+          {catalogAdminOnly && (
             <>
               <Link
                 href="/dashboard/utilisateurs/permissions"
@@ -82,22 +90,26 @@ export default function RolesListPage() {
                 <KeyRound className="size-4" />
                 Catalogue permissions
               </Link>
-              <Link
-                href="/dashboard/utilisateurs/permissions/add"
-                className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
-              >
-                <Plus className="size-4" />
-                Nouvelle permission
-              </Link>
+              {canCreatePermission && (
+                <Link
+                  href="/dashboard/utilisateurs/permissions/add"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
+                >
+                  <Plus className="size-4" />
+                  Nouvelle permission
+                </Link>
+              )}
             </>
           )}
-          <Link
-            href="/dashboard/utilisateurs/roles/add"
-            className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
-          >
-            <ShieldPlus className="size-4" />
-            Nouveau rôle
-          </Link>
+          {canCreateRole && (
+            <Link
+              href="/dashboard/utilisateurs/roles/add"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
+            >
+              <ShieldPlus className="size-4" />
+              Nouveau rôle
+            </Link>
+          )}
         </div>
       </div>
 
@@ -148,55 +160,63 @@ export default function RolesListPage() {
                     {r.description ?? "—"}
                   </td>
                   <td className="px-4 py-3">
-                    {!canManagePermissions ? (
+                    {!canUpdatePermission && !canUpdateRole && !canDeleteRole ? (
                       <span className="text-xs text-gray-500">—</span>
                     ) : isFullAccessRole(r.name) ? (
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-gray-500">
                           Accès total (système)
                         </span>
-                        <Link
-                          href={`/dashboard/utilisateurs/roles/${r.id}/edit`}
-                          className="inline-flex w-fit items-center gap-1 text-gray-800 underline-offset-2 hover:underline"
-                        >
-                          <Pencil className="size-3.5" />
-                          Modifier la description
-                        </Link>
+                        {canUpdateRole && (
+                          <Link
+                            href={`/dashboard/utilisateurs/roles/${r.id}/edit`}
+                            className="inline-flex w-fit items-center gap-1 text-gray-800 underline-offset-2 hover:underline"
+                          >
+                            <Pencil className="size-3.5" />
+                            Modifier la description
+                          </Link>
+                        )}
                       </div>
                     ) : (
                       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1">
-                        <Link
-                          href={`/dashboard/utilisateurs/roles/${r.id}/permissions`}
-                          className="text-orange-600 underline-offset-2 hover:underline"
-                        >
-                          Permissions
-                        </Link>
-                        <Link
-                          href={`/dashboard/utilisateurs/roles/${r.id}/edit`}
-                          className="inline-flex items-center gap-1 text-gray-800 underline-offset-2 hover:underline"
-                        >
-                          <Pencil className="size-3.5" />
-                          Modifier
-                        </Link>
-                        <button
-                          type="button"
-                          disabled={deleteMutation.isPending}
-                          onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Supprimer le rôle « ${r.name} » ? Impossible s’il est encore attribué à des utilisateurs.`,
-                              )
-                            ) {
-                              return;
-                            }
-                            setDeleteError(null);
-                            deleteMutation.mutate(r.id);
-                          }}
-                          className="inline-flex cursor-pointer items-center gap-1 text-red-600 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Trash2 className="size-3.5" />
-                          Supprimer
-                        </button>
+                        {canUpdatePermission && (
+                          <Link
+                            href={`/dashboard/utilisateurs/roles/${r.id}/permissions`}
+                            className="text-orange-600 underline-offset-2 hover:underline"
+                          >
+                            Permissions
+                          </Link>
+                        )}
+                        {canUpdateRole && (
+                          <Link
+                            href={`/dashboard/utilisateurs/roles/${r.id}/edit`}
+                            className="inline-flex items-center gap-1 text-gray-800 underline-offset-2 hover:underline"
+                          >
+                            <Pencil className="size-3.5" />
+                            Modifier
+                          </Link>
+                        )}
+                        {canDeleteRole && (
+                          <button
+                            type="button"
+                            disabled={deleteMutation.isPending}
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  `Supprimer le rôle « ${r.name} » ? Impossible s’il est encore attribué à des utilisateurs.`,
+                                )
+                              ) {
+                                return;
+                              }
+                              setDeleteError(null);
+                              deleteMutation.mutate(r.id);
+                            }}
+                            className="inline-flex cursor-pointer items-center gap-1 text-red-600 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Trash2 className="size-3.5" />
+                            Supprimer
+                          </button>
+                        )}
                       </div>
                     )}
                   </td>

@@ -4,10 +4,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
 
-import { useMe } from "~/hooks/use-me";
+import { hasMePermission, useMe } from "~/hooks/use-me";
 
 import EditRoleForm from "../../../_components/EditRoleForm";
-import { isFullAccessRole } from "../../../_lib/full-access-roles";
 
 export default function EditRolePage() {
   const { data: me, isPending: mePending } = useMe();
@@ -54,7 +53,7 @@ export default function EditRolePage() {
             Se connecter
           </Link>
         </div>
-      ) : !isFullAccessRole(me.role.name) ? (
+      ) : !hasMePermission(me, "update", "Role") ? (
         <div
           className="max-w-lg rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-950"
           role="alert"

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -19,39 +19,33 @@ import { LoginAttemptModule } from './login-attempt/login-attempt.module';
 import { CategoryModule } from './category/category.module';
 import { ProductModule } from './product/product.module';
 import { StockModule } from './stock/stock.module';
-import { VenteModule } from './vente/vente.module';
-import { SessionCaisseModule } from './session-caisse/session-caisse.module';
-import { ContratModule } from './contrat/contrat.module';
-import { PlanningShiftModule } from './planning-shift/planning-shift.module';
-import { PointageModule } from './pointage/pointage.module';
-import { AbsenceModule } from './absence/absence.module';
-import { BulletinPaieModule } from './bulletin-paie/bulletin-paie.module';
+import { StockOrderModule } from './stock-order/stock-order.module';
+import { SupplierModule } from './supplier/supplier.module';
+import { BudgetModule } from './budget/budget.module';
+import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
 
 @Module({
   imports: [
-    AbsenceModule,
     AuditModule,
     AuthModule,
-    BulletinPaieModule,
     CaslModule,
     CategoryModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    ContratModule,
     HealthModule,
     LoginAttemptModule,
     OrganisationModule,
     PermissionModule,
-    PlanningShiftModule,
-    PointageModule,
     PrismaModule,
     ProductModule,
     RedisModule,
     RoleModule,
     SeederModule,
-    SessionCaisseModule,
     StockModule,
+    StockOrderModule,
+    SupplierModule,
+    BudgetModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -67,7 +61,6 @@ import { BulletinPaieModule } from './bulletin-paie/bulletin-paie.module';
       },
     }),
     UserModule,
-    VenteModule,
   ],
   controllers: [AppController],
   providers: [
@@ -75,6 +68,10 @@ import { BulletinPaieModule } from './bulletin-paie/bulletin-paie.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditContextInterceptor,
     },
   ],
 })

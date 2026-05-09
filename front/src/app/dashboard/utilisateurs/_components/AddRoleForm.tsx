@@ -8,12 +8,11 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { useMe } from "~/hooks/use-me";
+import { hasMePermission, isAdminUser, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { OrganizationDto, PermissionDto, RoleDto } from "~/lib/api-types";
 
 import { apiErrorMessage } from "../../produits/_lib/api-error-message";
-import { isFullAccessRole } from "../_lib/full-access-roles";
 
 const schema = z.object({
   roleName: z.string().min(1, { message: "Le nom du rôle est requis" }).trim(),
@@ -25,8 +24,9 @@ type Schema = z.infer<typeof schema>;
 
 export default function AddRoleForm() {
   const { data: me, isPending: mePending } = useMe();
+  const canCreateRole = me != null && hasMePermission(me, "create", "Role");
   const canManagePermissions =
-    me != null && isFullAccessRole(me.role.name);
+    me != null && hasMePermission(me, "update", "Permission");
   const router = useRouter();
   const queryClient = useQueryClient();
   const [selectedExisting, setSelectedExisting] = useState<Set<string>>(
@@ -41,12 +41,15 @@ export default function AddRoleForm() {
       const { data } = await api.get<OrganizationDto[]>("/organisation");
       return data;
     },
+    enabled: canCreateRole,
   });
 
   const { data: allPermissions = [], isLoading: permsLoading } = useQuery({
-    queryKey: ["permission"] as const,
+    queryKey: ["permission", "assignment"] as const,
     queryFn: async () => {
-      const { data } = await api.get<PermissionDto[]>("/permission");
+      const { data } = await api.get<PermissionDto[]>(
+        "/permission/for-assignment",
+      );
       return data;
     },
     enabled: canManagePermissions,
@@ -115,6 +118,9 @@ export default function AddRoleForm() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["role"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["permission", "assignment"],
+      });
       await queryClient.invalidateQueries({ queryKey: ["permission"] });
       router.push("/dashboard/utilisateurs");
     },
@@ -132,6 +138,42 @@ export default function AddRoleForm() {
       else next.add(id);
       return next;
     });
+  }
+
+  if (mePending) {
+    return <p className="text-sm text-gray-600">Vérification des droits…</p>;
+  }
+
+  if (me == null) {
+    return (
+      <div className="max-w-lg rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-800">
+        <p className="font-semibold">Session non disponible</p>
+        <Link
+          href="/"
+          className="mt-3 inline-block font-medium text-orange-600 underline-offset-2 hover:underline"
+        >
+          Se connecter
+        </Link>
+      </div>
+    );
+  }
+
+  if (!canCreateRole) {
+    return (
+      <div
+        className="max-w-lg rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-950"
+        role="alert"
+      >
+        <p className="font-semibold">Accès refusé</p>
+        <p className="mt-2">Vous n’avez pas la permission de créer des rôles.</p>
+        <Link
+          href="/dashboard/utilisateurs/roles"
+          className="mt-4 inline-block font-medium text-orange-700 underline-offset-2 hover:underline"
+        >
+          Retour à la liste des rôles
+        </Link>
+      </div>
+    );
   }
 
   return (
@@ -226,21 +268,30 @@ export default function AddRoleForm() {
             Permissions à associer
           </h2>
           <p className="mt-1 text-sm text-gray-600">
-            Les permissions se créent d’abord dans le{" "}
-            <Link
-              href="/dashboard/utilisateurs/permissions/add"
-              className="font-medium text-orange-600 underline-offset-2 hover:underline"
-            >
-              formulaire dédié
-            </Link>{" "}
-            ou le{" "}
-            <Link
-              href="/dashboard/utilisateurs/permissions"
-              className="font-medium text-orange-600 underline-offset-2 hover:underline"
-            >
-              catalogue
-            </Link>
-            , puis vous les cochez ici pour les lier à ce nouveau rôle.
+            {isAdminUser(me) ? (
+              <>
+                Les entrées du catalogue se créent dans le{" "}
+                <Link
+                  href="/dashboard/utilisateurs/permissions/add"
+                  className="font-medium text-orange-600 underline-offset-2 hover:underline"
+                >
+                  formulaire dédié
+                </Link>{" "}
+                ou le{" "}
+                <Link
+                  href="/dashboard/utilisateurs/permissions"
+                  className="font-medium text-orange-600 underline-offset-2 hover:underline"
+                >
+                  catalogue
+                </Link>
+                ; cochez ici celles à lier à ce nouveau rôle.
+              </>
+            ) : (
+              <>
+                Cochez les permissions existantes pour les lier à ce rôle. Seul
+                l’administrateur peut modifier le catalogue des permissions.
+              </>
+            )}
           </p>
           <input
             type="search"
@@ -255,12 +306,18 @@ export default function AddRoleForm() {
             ) : permissionsFiltered.length === 0 ? (
               <div className="p-4 text-sm text-gray-500">
                 <p>Aucune permission en base.</p>
-                <Link
-                  href="/dashboard/utilisateurs/permissions/add"
-                  className="mt-2 inline-block font-medium text-orange-600 underline-offset-2 hover:underline"
-                >
-                  Créer une permission
-                </Link>
+                {isAdminUser(me) ? (
+                  <Link
+                    href="/dashboard/utilisateurs/permissions/add"
+                    className="mt-2 inline-block font-medium text-orange-600 underline-offset-2 hover:underline"
+                  >
+                    Créer une permission
+                  </Link>
+                ) : (
+                  <p className="mt-2 text-xs text-gray-600">
+                    Contactez l’administrateur pour alimenter le catalogue.
+                  </p>
+                )}
               </div>
             ) : (
               <ul className="divide-y divide-gray-100">
@@ -297,7 +354,6 @@ export default function AddRoleForm() {
       <button
         type="submit"
         disabled={
-          mePending ||
           isSubmitting ||
           submitMutation.isPending ||
           orgsLoading ||

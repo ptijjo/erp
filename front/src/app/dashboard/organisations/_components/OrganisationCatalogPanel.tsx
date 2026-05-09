@@ -14,7 +14,11 @@ import type {
 
 import { categoryOptionsForSelect } from "../../produits/_lib/category-labels";
 
-type Props = { organizationId: string; organizationName: string };
+type Props = {
+  organizationId: string;
+  organizationName: string;
+  canEditCatalog: boolean;
+};
 
 function saveErrorMessage(error: unknown): string {
   if (isAxiosError(error) && error.response?.data) {
@@ -32,6 +36,7 @@ function saveErrorMessage(error: unknown): string {
 export default function OrganisationCatalogPanel({
   organizationId,
   organizationName,
+  canEditCatalog,
 }: Props) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -139,7 +144,11 @@ export default function OrganisationCatalogPanel({
             });
           }}
         >
-          {open ? "Fermer" : "Gérer catégories & produits"}
+          {open
+            ? "Fermer"
+            : canEditCatalog
+              ? "Gérer catégories & produits"
+              : "Voir catégories & produits"}
         </Button>
       </div>
 
@@ -163,6 +172,7 @@ export default function OrganisationCatalogPanel({
                     type="checkbox"
                     checked={catSel.has(id)}
                     onChange={() => toggleCat(id)}
+                    disabled={!canEditCatalog}
                     className="size-4 rounded border-gray-300 text-orange-600"
                   />
                   <span className="text-sm text-gray-800">{label}</span>
@@ -195,6 +205,7 @@ export default function OrganisationCatalogPanel({
                       type="checkbox"
                       checked={prodSel.has(p.id)}
                       onChange={() => toggleProd(p.id)}
+                      disabled={!canEditCatalog}
                       className="size-4 rounded border-gray-300 text-orange-600"
                     />
                     <span className="text-sm text-gray-800">{p.name}</span>
@@ -219,18 +230,27 @@ export default function OrganisationCatalogPanel({
             </p>
           ) : null}
 
+          {!canEditCatalog ? (
+            <p className="text-sm text-gray-600">
+              Mode lecture seule : vous n’avez pas la permission de modifier ce
+              catalogue.
+            </p>
+          ) : null}
+
           <div className="flex flex-wrap gap-3">
-            <Button
-              type="button"
-              className="bg-orange-500 text-white hover:bg-orange-600"
-              disabled={saveMutation.isPending}
-              onClick={() => {
-                saveMutation.reset();
-                saveMutation.mutate();
-              }}
-            >
-              {saveMutation.isPending ? "Enregistrement…" : "Enregistrer"}
-            </Button>
+            {canEditCatalog ? (
+              <Button
+                type="button"
+                className="bg-orange-500 text-white hover:bg-orange-600"
+                disabled={saveMutation.isPending}
+                onClick={() => {
+                  saveMutation.reset();
+                  saveMutation.mutate();
+                }}
+              >
+                {saveMutation.isPending ? "Enregistrement…" : "Enregistrer"}
+              </Button>
+            ) : null}
             <button
               type="button"
               className="text-sm text-gray-600 underline-offset-2 hover:underline"

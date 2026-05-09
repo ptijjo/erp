@@ -23,10 +23,77 @@ export type Me = {
   role: MeRole;
   organisationName: string;
   firstLogin: boolean;
+  permissionMode: "FULL_ACCESS" | "ROLE_PERMISSIONS" | "FALLBACK_READ_ALL";
+  permissions: string[];
 };
+
+type PermissionAction = "read" | "create" | "update" | "delete" | "manage";
+
+/** Aligné sur le backend `FULL_ACCESS_ROLE_NAMES` — accès total incl. journal d’audit. */
+const AUDIT_FULL_ACCESS_ROLE_NAMES = new Set([
+  "ADMIN",
+  "DIRECTOR_GENERAL",
+  "DIRECTOR_OPERATIONS",
+]);
+
+function normalizePermissionName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+export function hasMePermission(
+  me: Me,
+  action: PermissionAction,
+  subject: string,
+): boolean {
+  if (me.permissionMode === "FULL_ACCESS") {
+    return true;
+  }
+  const normalizedAction = action.trim().toLowerCase();
+  const normalizedSubject = subject.trim();
+  if (!normalizedSubject) {
+    return false;
+  }
+
+  const permissions = new Set(me.permissions.map(normalizePermissionName));
+
+  /**
+   * Journal d’audit : non couvert par le wildcard `read:all` (snapshot maison mère).
+   * Hors FULL_ACCESS : `read:AuditLog` / `manage:*` en base.
+   * Sécurité supplémentaire : ADMIN, DG et directeur opérations (noms de rôle stables).
+   */
+  if (
+    normalizedSubject.toLowerCase() === "auditlog" &&
+    normalizedAction === "read"
+  ) {
+    if (AUDIT_FULL_ACCESS_ROLE_NAMES.has(me.role.name)) {
+      return true;
+    }
+    return (
+      permissions.has("manage:all") ||
+      permissions.has("manage:auditlog") ||
+      permissions.has("read:auditlog")
+    );
+  }
+
+  const exact = `${normalizedAction}:${normalizedSubject}`.toLowerCase();
+  const actionAll = `${normalizedAction}:all`;
+  const manageSubject = `manage:${normalizedSubject}`.toLowerCase();
+
+  return (
+    permissions.has("manage:all") ||
+    permissions.has(manageSubject) ||
+    permissions.has(actionAll) ||
+    permissions.has(exact)
+  );
+}
 
 export function isMainOrganization(me: Me): boolean {
   return me.organizationType === "MAIN";
+}
+
+/** Catalogue des permissions et CRUD Permission : réservé au rôle ADMIN. */
+export function isAdminUser(me: Me | null | undefined): boolean {
+  return me?.role.name === "ADMIN";
 }
 
 /** Page d’accueil dashboard après connexion (hors parcours premier login). */

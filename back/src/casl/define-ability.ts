@@ -5,10 +5,6 @@ import {
 } from '@casl/ability';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { PrismaService } from '../prisma/prisma.service';
-import {
-  applyCheckoutRoleBaselineRules,
-  isCheckoutRoleName,
-} from './checkout-role';
 
 export type AppAbility = MongoAbility;
 
@@ -40,22 +36,15 @@ export const KNOWN_POLICY_SUBJECTS = [
   'Category',
   'Product',
   'Stock',
-  'Vente',
-  'VenteLine',
-  'VentePaiement',
-  'SessionCaisse',
-  'Contrat',
-  'PlanningShift',
-  'Pointage',
-  'Absence',
-  'BulletinPaie',
-  'BulletinPaieLigne',
+  'StockOrder',
+  'Supplier',
+  'Budget',
 ] as const;
 
 const VALID_ACTIONS = new Set(['read', 'create', 'update', 'delete', 'manage']);
 
 /**
- * Parse `Permission.name` au format `action:Subject` (ex. `read:Vente`, `manage:Stock`).
+ * Parse `Permission.name` au format `action:Subject` (ex. `read:Product`, `manage:Stock`).
  * `read:all` / `manage:all` / etc. s’appliquent à tous les sujets connus.
  */
 export function parsePermissionName(
@@ -77,13 +66,24 @@ export function parsePermissionName(
 /**
  * Fallback si aucune permission n’est liée au rôle en base (comportement historique).
  */
+/** Lecture large sans le journal d’audit (réservé à `read:AuditLog` explicite). */
+function grantReadAllSubjectsExceptAuditLog(
+  can: AbilityBuilder<AppAbility>['can'],
+): void {
+  for (const s of KNOWN_POLICY_SUBJECTS) {
+    if (s !== 'AuditLog') {
+      can('read', s);
+    }
+  }
+}
+
 export function defineAbilityFor(user: AuthenticatedUser): AppAbility {
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
 
   if (isFullAccessRoleName(user.role.name)) {
     can('manage', 'all');
   } else {
-    can('read', 'all');
+    grantReadAllSubjectsExceptAuditLog(can);
   }
 
   return build();
@@ -96,6 +96,9 @@ function applyParsedRule(
 ): void {
   if (subject === 'all') {
     for (const s of KNOWN_POLICY_SUBJECTS) {
+      if (action === 'read' && s === 'AuditLog') {
+        continue;
+      }
       can(action as 'read' | 'create' | 'update' | 'delete' | 'manage', s);
     }
     return;
@@ -132,15 +135,15 @@ export async function buildAbilityFromDatabase(
 
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
 
+  if (user.organizationType === 'MAIN') {
+    grantReadAllSubjectsExceptAuditLog(can);
+  }
+
   for (const row of links) {
     const parsed = parsePermissionName(row.permission.name);
     if (parsed) {
       applyParsedRule(can, parsed.action, parsed.subject);
     }
-  }
-
-  if (isCheckoutRoleName(user.role.name)) {
-    applyCheckoutRoleBaselineRules(can);
   }
 
   return build();

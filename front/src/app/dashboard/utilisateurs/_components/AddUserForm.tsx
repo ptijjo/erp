@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -9,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "~/lib/api";
 import type { OrganizationDto, RoleDto } from "~/lib/api-types";
+import { hasMePermission, useMe } from "~/hooks/use-me";
 
 import { apiErrorMessage } from "../../produits/_lib/api-error-message";
 
@@ -48,6 +50,8 @@ function rolesForOrganization(
 export default function AddUserForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: me, isPending: mePending } = useMe();
+  const canCreateUser = me != null && hasMePermission(me, "create", "User");
 
   const { data: organisations = [], isLoading: orgsLoading } = useQuery({
     queryKey: ["organisation"] as const,
@@ -114,6 +118,44 @@ export default function AddUserForm() {
       });
     },
   });
+
+  if (mePending) {
+    return <p className="text-sm text-gray-600">Chargement du profil…</p>;
+  }
+
+  if (me == null) {
+    return (
+      <div className="max-w-lg rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-800">
+        <p className="font-semibold">Session non disponible</p>
+        <Link
+          href="/"
+          className="mt-3 inline-block font-medium text-orange-600 underline-offset-2 hover:underline"
+        >
+          Se connecter
+        </Link>
+      </div>
+    );
+  }
+
+  if (!canCreateUser) {
+    return (
+      <div
+        className="max-w-lg rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-950"
+        role="alert"
+      >
+        <p className="font-semibold">Accès refusé</p>
+        <p className="mt-2">
+          Vous n’avez pas la permission de créer des utilisateurs.
+        </p>
+        <Link
+          href="/dashboard/utilisateurs"
+          className="mt-4 inline-block font-medium text-orange-700 underline-offset-2 hover:underline"
+        >
+          Retour à la liste des utilisateurs
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <form

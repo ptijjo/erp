@@ -18,86 +18,37 @@ enum OrganizationType {
   SUBSIDIARY
 }
 
-enum VenteStatut {
-  DRAFT
-  CONFIRMED
-  CANCELLED
-}
-
-enum ModePaiement {
-  ESPECES
-  CARTE
-}
-
 enum AuditAction {
   CREATE
   UPDATE
   DELETE
 }
 
-enum SessionCaisseStatut {
-  OUVERTE
-  CLOTUREE
+enum StockOrderStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
 }
 
-enum ContratType {
-  CDI
-  CDD
-  TEMPS_PARTIEL
-  STAGE
-  FREELANCE
-  AUTRE
+enum BudgetStatus {
+  DRAFT
+  APPROVED
 }
 
-enum PlanningShiftType {
-  TRAVAIL
-  FORMATION
-  REUNION
-  AUTRE
-}
-
-enum PointageStatut {
-  EN_COURS
-  COMPLETE
-  ANNULE
-}
-
-enum AbsenceType {
-  CONGE_PAYE
-  ARRET_MALADIE
-  SANS_SOLDE
-  RTT
-  MATERNITE
-  AUTRE
-}
-
-enum AbsenceStatut {
-  DEMANDE
-  VALIDE
-  REFUSE
-  ANNULE
-}
-
-enum BulletinPaieStatut {
-  BROUILLON
-  VALIDE
-  PAYE
-}
-
-enum BulletinPaieLigneSens {
-  GAIN
-  RETENUE
-  INFORMATION
+/// Lignes budgétaires ; étendre (SALAIRE, …) quand les modules suivront.
+enum BudgetLineCategory {
+  LOYER
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
+  id         String    @id @default(uuid())
+  email      String    @unique
+  password   String
   /// Tant que `true`, l’utilisateur doit définir son mot de passe (première connexion).
-  firstLogin Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  firstLogin Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -106,24 +57,17 @@ model User {
   role   Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
   loginAttempts LoginAttempt[]
-  ventes        Vente[]
   auditLogs     AuditLog[]
-  sessionsCaisseOuvertes  SessionCaisse[] @relation("SessionCaisseOuvertePar")
-  sessionsCaisseCloturees SessionCaisse[] @relation("SessionCaisseClotureePar")
-  contrats                Contrat[]
-  planningShifts          PlanningShift[]
-  pointages               Pointage[]
-  absences                Absence[]
-  bulletinsPaie           BulletinPaie[]
-  pointagesValides        Pointage[]      @relation("PointageValidePar")
+  stockOrders   StockOrder[]
 }
 
 model Role {
-  id          String   @id @default(uuid())
-  name        String   @unique
+  id          String    @id @default(uuid())
+  name        String    @unique
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 
   /// Rôle défini pour cette organisation (ex. directions de la maison mère). Null = rôle global (ex. ADMIN).
   organizationScopeId String?
@@ -141,24 +85,23 @@ model Organization {
   description      String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
-
+  deletedAt        DateTime?
   //Relations
-  users       User[]
-  scopedRoles Role[] @relation("RoleOrganizationScope")
-  stocks      Stock[]
-  ventes         Vente[]
-  auditLogs      AuditLog[]
-  sessionsCaisse SessionCaisse[]
-  contrats       Contrat[]
-  planningShifts PlanningShift[]
-  pointages      Pointage[]
-  absences       Absence[]
-  bulletinsPaie  BulletinPaie[]
+  users            User[]
+  scopedRoles      Role[]           @relation("RoleOrganizationScope")
+  stocks           Stock[]
+  auditLogs        AuditLog[]
+
+  /// Fournisseurs référencés par la maison mère (création / pilotage).
+  suppliersCreated Supplier[] @relation("SupplierCreatedByOrg")
 
   /// Catégories du catalogue attribuées à cette filiale (maison mère).
   catalogCategories OrganizationCatalogCategory[]
   /// Produits supplémentaires attribués à cette filiale (en plus de ceux des catégories).
   catalogProducts   OrganizationCatalogProduct[]
+  stockOrders       StockOrder[]
+  /// Budgets où cette organisation est la filiale concernée.
+  budgets           Budget[]
 
   @@index([organizationType])
 }
@@ -185,175 +128,11 @@ model OrganizationCatalogProduct {
   @@index([productId])
 }
 
-/// Contrat de travail (base pour planning, heures et préparation paie).
-model Contrat {
-  id        String       @id @default(uuid())
-  type      ContratType
-  dateDebut DateTime
-  dateFin   DateTime?
-  /// Volume horaire hebdomadaire prévu (ex. 35h).
-  heuresHebdomadaires Decimal?
-  actif     Boolean      @default(true)
-  commentaire String?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-
-  userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-
-  @@index([userId, actif])
-  @@index([organizationId])
-  @@index([dateDebut])
-}
-
-/// Créneau planifié pour un salarié sur une filiale.
-model PlanningShift {
-  id        String            @id @default(uuid())
-  startsAt  DateTime
-  endsAt    DateTime
-  type      PlanningShiftType @default(TRAVAIL)
-  note      String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-
-  userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-
-  pointages Pointage[]
-
-  @@index([userId, startsAt])
-  @@index([organizationId])
-  @@index([startsAt])
-}
-
-/// Pointage (entrée / sortie), lié optionnellement à un créneau planifié.
-model Pointage {
-  id        String         @id @default(uuid())
-  entreeAt  DateTime
-  sortieAt  DateTime?
-  statut    PointageStatut @default(EN_COURS)
-  validatedAt DateTime?
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-
-  userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-
-  planningShiftId String?
-  planningShift   PlanningShift? @relation(fields: [planningShiftId], references: [id], onDelete: SetNull)
-
-  validatedByUserId String?
-  validatedByUser   User?   @relation("PointageValidePar", fields: [validatedByUserId], references: [id], onDelete: SetNull)
-
-  @@index([userId, entreeAt])
-  @@index([organizationId])
-  @@index([planningShiftId])
-}
-
-/// Absence (congé, arrêt, etc.) pour alimenter planning et paie.
-model Absence {
-  id        String         @id @default(uuid())
-  type      AbsenceType
-  debut     DateTime
-  fin       DateTime
-  statut    AbsenceStatut  @default(DEMANDE)
-  commentaire String?
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-
-  userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-
-  @@index([userId, debut])
-  @@index([organizationId])
-}
-
-/// Bulletin de paie pour une période (synthèse + lignes détaillées).
-model BulletinPaie {
-  id        String             @id @default(uuid())
-  annee     Int
-  mois      Int
-  statut    BulletinPaieStatut @default(BROUILLON)
-  brutTotal Decimal?
-  netAPayer Decimal?
-  chargesPatronales  Decimal?
-  chargesSalariales  Decimal?
-  /// Snapshot JSON pour export vers logiciel de paie ou archivage.
-  donneesBrutes Json?
-  generatedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-
-  lignes BulletinPaieLigne[]
-
-  @@unique([userId, organizationId, annee, mois])
-  @@index([organizationId, annee, mois])
-}
-
-model BulletinPaieLigne {
-  id        String                 @id @default(uuid())
-  code      String
-  libelle   String
-  montant   Decimal
-  sens      BulletinPaieLigneSens
-  ordre     Int                    @default(0)
-  createdAt DateTime               @default(now())
-  updatedAt DateTime               @updatedAt
-
-  bulletinId String
-  bulletin   BulletinPaie @relation(fields: [bulletinId], references: [id], onDelete: Cascade)
-
-  @@index([bulletinId])
-}
-
-/// Prise de poste caisse : fond d’ouverture, clôture, ventes rattachées pour ticket / rapport Z.
-model SessionCaisse {
-  id        String               @id @default(uuid())
-  statut    SessionCaisseStatut  @default(OUVERTE)
-  openedAt  DateTime             @default(now())
-  closedAt  DateTime?
-  /// Fond de caisse (espèces) au début de session.
-  fondOuverture       Decimal
-  /// Espèces comptées en fin de session (saisie à la clôture).
-  fondCloture         Decimal?
-  /// Remarque sur la clôture (écart, incident, etc.).
-  commentaireCloture  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  userId         String
-  user           User           @relation("SessionCaisseOuvertePar", fields: [userId], references: [id], onDelete: Restrict)
-  closedByUserId String?
-  closedByUser   User?          @relation("SessionCaisseClotureePar", fields: [closedByUserId], references: [id], onDelete: SetNull)
-
-  ventes Vente[]
-
-  @@index([organizationId])
-  @@index([userId])
-  @@index([statut])
-  @@index([openedAt])
-}
-
 /// Piste d’audit : utilisateur, action, entité, horodatage (remplir depuis les services ou un interceptor Nest).
 model AuditLog {
-  id        String      @id @default(uuid())
-  createdAt DateTime    @default(now())
-  action    AuditAction
+  id         String      @id @default(uuid())
+  createdAt  DateTime    @default(now())
+  action     AuditAction
   /// Nom du domaine / modèle (ex. "Vente", "Product").
   entityType String
   /// Identifiant métier de l’enregistrement concerné.
@@ -421,114 +200,155 @@ model Category {
   children Category[] @relation("CategoryHierarchy")
 
   //relations
-  products                    Product[]
+  products                   Product[]
   organizationCatalogEntries OrganizationCatalogCategory[]
 
   @@unique([parentId, name]) // optionnel : même nom autorisé sous un autre parent, interdit en doublon sous le même parent
   @@index([parentId])
 }
 
+/// Fournisseur choisi par la maison mère pour les commandes de réapprovisionnement des filiales.
+model Supplier {
+  id        String   @id @default(uuid())
+  name      String
+  price     Decimal  @default(0)
+  email     String?
+  phone     String?
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Organisation maison mère qui a créé la fiche fournisseur (null si import migré).
+  createdByOrganizationId String?
+  createdByOrganization   Organization? @relation("SupplierCreatedByOrg", fields: [createdByOrganizationId], references: [id], onDelete: SetNull)
+
+  productSuppliers ProductSupplier[]
+  stockOrders      StockOrder[]
+
+  @@index([createdByOrganizationId])
+}
+
+/// Fournisseurs autorisés pour un produit (maison mère). La filiale choisit l’un d’eux à la commande.
+model ProductSupplier {
+  productId  String
+  supplierId String
+  createdAt  DateTime @default(now())
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@id([productId, supplierId])
+  @@index([supplierId])
+}
+
 model Product {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  price       Decimal
+  id                    String    @id @default(uuid())
+  name                  String    @unique
+  description           String?
+  price                 Decimal
   /// Valeur encodée dans le QR et lue par la douchette ; unique pour identification (lookup par scan).
-  qrCode      String   @unique @default(uuid())
+  qrCode                String    @unique @default(uuid())
   /// Si vrai, les organisations filiales peuvent voir, vendre et stocker ce produit (défini par la maison mère).
-  offeredToSubsidiaries Boolean @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  offeredToSubsidiaries Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  stocks      Stock[]
-  venteLines  VenteLine[]
+
+  productSuppliers           ProductSupplier[]
+  stocks                     Stock[]
   organizationCatalogEntries OrganizationCatalogProduct[]
+  stockOrders                StockOrder[]
 
   @@index([offeredToSubsidiaries])
 }
 
-model Vente {
-  id          String       @id @default(uuid())
-  status      VenteStatut  @default(DRAFT)
-  /// Total de la vente ; à maintenir lors des changements de lignes (snapshot métier).
-  totalAmount Decimal      @default(0)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  /// Magasin / point de vente : en principe une organisation `SUBSIDIARY` (filiale).
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  /// Utilisateur (employé) ayant encaissé ; le rôle métier est défini via `User.role`.
-  userId         String?
-  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-  lignes         VenteLine[]
-  /// Répartition du règlement (ex. une ligne espèces + une ligne carte). La somme des `amount` doit correspondre au total à valider côté API.
-  paiements      VentePaiement[]
-  /// Session de caisse (prise de poste) ; renseigner pour les ventes caisse.
-  sessionCaisseId String?
-  sessionCaisse   SessionCaisse? @relation(fields: [sessionCaisseId], references: [id], onDelete: Restrict)
-  /// Numéro de ticket incrémenté dans la session (affichage client).
-  numeroTicket    Int?
-  /// Horodatage du dernier tirage / impression du ticket de caisse.
-  ticketImprimeAt DateTime?
-
-  @@index([organizationId])
-  @@index([userId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([sessionCaisseId])
-  @@unique([sessionCaisseId, numeroTicket])
-}
-
-/// Une part du paiement d’une vente (permet le mix espèces + carte, ou plusieurs fractions).
-model VentePaiement {
-  id           String       @id @default(uuid())
-  modePaiement ModePaiement
-  amount       Decimal
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-
-  venteId String
-  vente   Vente @relation(fields: [venteId], references: [id], onDelete: Cascade)
-
-  @@index([venteId])
-}
-
-model VenteLine {
+/// Commande de réapprovisionnement (filiale → fournisseur désigné par la maison mère sur le produit).
+/// À la confirmation par la filiale (réception), la quantité est ajoutée au stock filiale.
+model StockOrder {
   id        String   @id @default(uuid())
-  quantity  Int
-  /// Prix unitaire figé au moment de la ligne (indépendant du prix catalogue actuel).
-  unitPrice Decimal
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  venteId   String
-  vente     Vente   @relation(fields: [venteId], references: [id], onDelete: Cascade)
+  subsidiaryOrganizationId String
+  subsidiaryOrganization   Organization @relation(fields: [subsidiaryOrganizationId], references: [id], onDelete: Restrict)
+
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
-  @@index([venteId])
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  /// Prix unitaire FCFA figé au moment de la commande (copie du tarif fournisseur catalogue).
+  unitPrice Decimal @default(0)
+
+  quantity Int
+  status   StockOrderStatus @default(PENDING)
+  note     String?
+
+  requestedByUserId String?
+  requestedBy       User?   @relation(fields: [requestedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([subsidiaryOrganizationId])
+  @@index([status])
   @@index([productId])
+  @@index([supplierId])
 }
 
 /// Stock courant et seuils min / max par organisation et par produit.
 model Stock {
-  id        String   @id @default(uuid())
-  quantity  Int      @default(0)
+  id          String   @id @default(uuid())
+  quantity    Int      @default(0)
   /// Seuil bas (alerte réapprovisionnement, etc.).
-  minQuantity Int    @default(0)
+  minQuantity Int      @default(0)
   /// Plafond cible ou limite ; null = pas de maximum défini en base.
   maxQuantity Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   productId      String
-  product        Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, productId])
   @@index([productId])
+}
+
+/// Budget mensuel pour une filiale — créé et validé par la maison mère uniquement.
+model Budget {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subsidiaryOrganizationId String
+  subsidiaryOrganization   Organization @relation(fields: [subsidiaryOrganizationId], references: [id], onDelete: Restrict)
+
+  year  Int
+  month Int
+
+  status BudgetStatus @default(DRAFT)
+
+  lines BudgetLine[]
+
+  @@unique([subsidiaryOrganizationId, year, month])
+  @@index([subsidiaryOrganizationId])
+}
+
+model BudgetLine {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  budgetId String
+  budget   Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  category       BudgetLineCategory
+  /// Libellé métier (ex. « Loyer siège »).
+  label          String
+  amountPlanned  Decimal
+
+  @@index([budgetId])
 }

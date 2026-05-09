@@ -5,38 +5,48 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, type MouseEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowDown,
   ArrowDownUp,
+  ArrowUp,
+  ArrowUpDown,
   ListFilter,
   SquarePlus,
   Trash2,
 } from "lucide-react";
 
-import { isMainOrganization, useMe } from "~/hooks/use-me";
+import { hasMePermission, isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { CategoryDto, ProductDto } from "~/lib/api-types";
+import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
 
 import { apiErrorMessage } from "./_lib/api-error-message";
-import { categoryOptionsForSelect } from "./_lib/category-labels";
+import {
+  categoryOptionsForSelect,
+  getParentId,
+  normalizeCategories,
+} from "./_lib/category-labels";
 
-type ProductSort =
-  | "name-asc"
-  | "name-desc"
-  | "price-asc"
-  | "price-desc"
-  | "category-asc"
-  | "category-desc";
+type ProductSortBy = "name" | "price" | "category";
+type SortOrder = "asc" | "desc";
 
 export default function ProduitsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const isMain = me != null && isMainOrganization(me);
+  const canCreateProduct =
+    me != null && hasMePermission(me, "create", "Product");
+  const canUpdateProduct =
+    me != null && hasMePermission(me, "update", "Product");
+  const canDeleteProduct =
+    me != null && hasMePermission(me, "delete", "Product");
 
   const [showProductFilters, setShowProductFilters] = useState(true);
   const [productSearch, setProductSearch] = useState("");
   const [productCategoryId, setProductCategoryId] = useState("");
-  const [productSort, setProductSort] = useState<ProductSort>("name-asc");
+  const [productSortBy, setProductSortBy] = useState<ProductSortBy>("name");
+  const [productSortOrder, setProductSortOrder] = useState<SortOrder>("asc");
 
   const { data: products = [], isLoading, isError } = useQuery({
     queryKey: ["product"] as const,
@@ -53,6 +63,21 @@ export default function ProduitsPage() {
       return data;
     },
   });
+  const normalizedCategories = useMemo(
+    () => normalizeCategories(categories),
+    [categories],
+  );
+  const categoryDescendants = useMemo(() => {
+    const childrenByParent = new Map<string, string[]>();
+    for (const category of normalizedCategories) {
+      const parentId = getParentId(category);
+      if (!parentId) continue;
+      const existing = childrenByParent.get(parentId) ?? [];
+      existing.push(category.id);
+      childrenByParent.set(parentId, existing);
+    }
+    return childrenByParent;
+  }, [normalizedCategories]);
 
   const filteredSortedProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
@@ -68,29 +93,60 @@ export default function ProduitsPage() {
     }
 
     if (productCategoryId) {
-      list = list.filter((p) => p.categoryId === productCategoryId);
+      const allowedCategoryIds = new Set<string>([productCategoryId]);
+      const queue = [productCategoryId];
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (!current) continue;
+        const children = categoryDescendants.get(current) ?? [];
+        for (const childId of children) {
+          if (allowedCategoryIds.has(childId)) continue;
+          allowedCategoryIds.add(childId);
+          queue.push(childId);
+        }
+      }
+      list = list.filter((p) => allowedCategoryIds.has(p.categoryId));
     }
 
     const sorted = [...list];
     sorted.sort((a, b) => {
-      switch (productSort) {
-        case "name-desc":
-          return b.name.localeCompare(a.name, "fr");
-        case "price-asc":
-          return parseDecimal(a.price) - parseDecimal(b.price);
-        case "price-desc":
-          return parseDecimal(b.price) - parseDecimal(a.price);
-        case "category-asc":
-          return a.category.name.localeCompare(b.category.name, "fr");
-        case "category-desc":
-          return b.category.name.localeCompare(a.category.name, "fr");
-        case "name-asc":
-        default:
-          return a.name.localeCompare(b.name, "fr");
-      }
+      const result =
+        productSortBy === "price"
+          ? parseDecimal(a.price) - parseDecimal(b.price)
+          : productSortBy === "category"
+            ? a.category.name.localeCompare(b.category.name, "fr")
+            : a.name.localeCompare(b.name, "fr");
+      return productSortOrder === "asc" ? result : -result;
     });
     return sorted;
-  }, [products, productSearch, productCategoryId, productSort]);
+  }, [
+    products,
+    productSearch,
+    productCategoryId,
+    productSortBy,
+    productSortOrder,
+    categoryDescendants,
+  ]);
+
+  function toggleProductSort(column: ProductSortBy) {
+    if (productSortBy === column) {
+      setProductSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setProductSortBy(column);
+    setProductSortOrder("asc");
+  }
+
+  function ProductSortIcon({ column }: { column: ProductSortBy }) {
+    if (productSortBy !== column) {
+      return <ArrowUpDown className="size-3.5 text-gray-400" />;
+    }
+    return productSortOrder === "asc" ? (
+      <ArrowUp className="size-3.5 text-orange-600" />
+    ) : (
+      <ArrowDown className="size-3.5 text-orange-600" />
+    );
+  }
 
   const deleteProductMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/product/${id}`),
@@ -100,6 +156,7 @@ export default function ProduitsPage() {
   });
 
   function goToProduct(id: string) {
+    if (!canUpdateProduct) return;
     router.push(`/dashboard/produits/${id}`);
   }
 
@@ -108,6 +165,7 @@ export default function ProduitsPage() {
     id: string,
     name: string,
   ) {
+    if (!canDeleteProduct) return;
     e.stopPropagation();
     if (!window.confirm(`Supprimer le produit « ${name} » ?`)) return;
     deleteProductMutation.mutate(id, {
@@ -121,7 +179,7 @@ export default function ProduitsPage() {
     <main className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto bg-white p-6">
       <div className="flex w-full flex-wrap items-center gap-4">
         <div className="flex flex-1 flex-wrap justify-start gap-3">
-          {isMain ? (
+          {isMain && canCreateProduct ? (
             <Link
               href="/dashboard/produits/add"
               className="flex w-fit cursor-pointer items-center gap-2 rounded-md bg-gray-100 p-4 transition-all duration-300 hover:bg-gray-200"
@@ -195,29 +253,6 @@ export default function ProduitsPage() {
                   ))}
                 </select>
               </div>
-              <div className="min-w-[200px]">
-                <label
-                  htmlFor="filter-product-sort"
-                  className="mb-1 block text-xs font-medium text-gray-600"
-                >
-                  Trier par
-                </label>
-                <select
-                  id="filter-product-sort"
-                  value={productSort}
-                  onChange={(e) =>
-                    setProductSort(e.target.value as ProductSort)
-                  }
-                  className="h-10 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
-                >
-                  <option value="name-asc">Nom (A → Z)</option>
-                  <option value="name-desc">Nom (Z → A)</option>
-                  <option value="price-asc">Prix croissant</option>
-                  <option value="price-desc">Prix décroissant</option>
-                  <option value="category-asc">Catégorie (A → Z)</option>
-                  <option value="category-desc">Catégorie (Z → A)</option>
-                </select>
-              </div>
             </div>
           )}
         </div>
@@ -236,9 +271,39 @@ export default function ProduitsPage() {
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-4 py-3 font-semibold text-gray-900">Nom</th>
-                <th className="px-4 py-3 font-semibold text-gray-900">Catégorie</th>
-                <th className="px-4 py-3 font-semibold text-gray-900">Prix</th>
+                <th className="px-4 py-3 font-semibold text-gray-900">
+                  <button
+                    type="button"
+                    className="inline-flex cursor-pointer items-center gap-1.5 text-left hover:text-orange-600"
+                    onClick={() => toggleProductSort("name")}
+                    aria-label="Trier par nom"
+                  >
+                    Nom
+                    <ProductSortIcon column="name" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 font-semibold text-gray-900">
+                  <button
+                    type="button"
+                    className="inline-flex cursor-pointer items-center gap-1.5 text-left hover:text-orange-600"
+                    onClick={() => toggleProductSort("category")}
+                    aria-label="Trier par catégorie"
+                  >
+                    Catégorie
+                    <ProductSortIcon column="category" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 font-semibold text-gray-900">
+                  <button
+                    type="button"
+                    className="inline-flex cursor-pointer items-center gap-1.5 text-left hover:text-orange-600"
+                    onClick={() => toggleProductSort("price")}
+                    aria-label="Trier par prix"
+                  >
+                    Prix
+                    <ProductSortIcon column="price" />
+                  </button>
+                </th>
                 {isMain ? (
                   <th className="px-4 py-3 font-semibold text-gray-900">
                     Filiales
@@ -254,7 +319,11 @@ export default function ProduitsPage() {
               {filteredSortedProducts.map((p) => (
                 <tr
                   key={p.id}
-                  className="cursor-pointer border-b border-gray-100 transition-colors hover:bg-gray-50/80"
+                  className={`border-b border-gray-100 transition-colors ${
+                    canUpdateProduct
+                      ? "cursor-pointer hover:bg-gray-50/80"
+                      : "cursor-default"
+                  }`}
                   onClick={() => goToProduct(p.id)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -262,20 +331,18 @@ export default function ProduitsPage() {
                       goToProduct(p.id);
                     }
                   }}
-                  tabIndex={0}
-                  role="link"
-                  aria-label={`Modifier le produit ${p.name}`}
+                  tabIndex={canUpdateProduct ? 0 : -1}
+                  role={canUpdateProduct ? "link" : undefined}
+                  aria-label={
+                    canUpdateProduct ? `Modifier le produit ${p.name}` : undefined
+                  }
                 >
                   <td className="px-4 py-3 font-medium text-gray-900">
                     {p.name}
                   </td>
                   <td className="px-4 py-3 text-gray-700">{p.category.name}</td>
                   <td className="px-4 py-3 text-gray-800">
-                    {new Intl.NumberFormat("fr-FR", {
-                      style: "currency",
-                      currency: "XOF",
-                      maximumFractionDigits: 0,
-                    }).format(parseDecimal(p.price))}
+                    {formatFcfa(parseDecimal(p.price))}
                   </td>
                   {isMain ? (
                     <td className="px-4 py-3 text-gray-700">
@@ -294,7 +361,7 @@ export default function ProduitsPage() {
                     {p.qrCode}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {isMain ? (
+                    {isMain && canDeleteProduct ? (
                       <button
                         type="button"
                         title="Supprimer"

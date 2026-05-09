@@ -115,6 +115,184 @@ export class SeederService implements OnModuleInit {
         });
         Logger.log('Utilisateur admin déjà présent (firstLogin = false)');
       }
+
+      const auditRead = await this.prisma.permission.findUnique({
+        where: { name: 'read:AuditLog' },
+      });
+      if (auditRead) {
+        const directorRoles = await this.prisma.role.findMany({
+          where: {
+            name: { in: ['DIRECTOR_GENERAL', 'DIRECTOR_OPERATIONS'] },
+          },
+          select: { id: true },
+        });
+        const roleIds = [adminRole.id, ...directorRoles.map((r) => r.id)];
+
+        for (const roleId of roleIds) {
+          await this.prisma.permissionRole.upsert({
+            where: {
+              permissionId_roleId: {
+                permissionId: auditRead.id,
+                roleId,
+              },
+            },
+            create: {
+              permissionId: auditRead.id,
+              roleId,
+            },
+            update: {},
+          });
+        }
+        Logger.log(
+          'Permission read:AuditLog liée à ADMIN, DIRECTOR_GENERAL et DIRECTOR_OPERATIONS',
+        );
+      }
+
+      const stockReadPerm = await this.prisma.permission.findUnique({
+        where: { name: 'read:Stock' },
+      });
+      const stockOrderNames = [
+        'read:StockOrder',
+        'create:StockOrder',
+        'update:StockOrder',
+        'delete:StockOrder',
+      ] as const;
+      if (stockReadPerm) {
+        const roleLinks = await this.prisma.permissionRole.findMany({
+          where: { permissionId: stockReadPerm.id },
+          select: { roleId: true },
+        });
+        for (const permName of stockOrderNames) {
+          const perm = await this.prisma.permission.findUnique({
+            where: { name: permName },
+          });
+          if (!perm) continue;
+          for (const { roleId } of roleLinks) {
+            await this.prisma.permissionRole.upsert({
+              where: {
+                permissionId_roleId: {
+                  permissionId: perm.id,
+                  roleId,
+                },
+              },
+              create: {
+                permissionId: perm.id,
+                roleId,
+              },
+              update: {},
+            });
+          }
+        }
+        Logger.log(
+          'Permissions StockOrder alignées sur les rôles ayant read:Stock',
+        );
+      }
+
+      const supplierNames = [
+        'read:Supplier',
+        'create:Supplier',
+        'update:Supplier',
+        'delete:Supplier',
+      ] as const;
+      const directorRoleNames = MAISON_MERE_DIRECTOR_ROLES.map((d) => d.name);
+      const supplierRoles = await this.prisma.role.findMany({
+        where: {
+          OR: [
+            { name: 'ADMIN' },
+            { name: { in: [...directorRoleNames] } },
+          ],
+        },
+        select: { id: true },
+      });
+      for (const permName of supplierNames) {
+        const perm = await this.prisma.permission.findUnique({
+          where: { name: permName },
+        });
+        if (!perm) continue;
+        for (const { id: roleId } of supplierRoles) {
+          await this.prisma.permissionRole.upsert({
+            where: {
+              permissionId_roleId: {
+                permissionId: perm.id,
+                roleId,
+              },
+            },
+            create: {
+              permissionId: perm.id,
+              roleId,
+            },
+            update: {},
+          });
+        }
+      }
+      if (supplierRoles.length > 0) {
+        Logger.log(
+          'Permissions Supplier liées à ADMIN et aux rôles direction maison mère',
+        );
+      }
+
+      const budgetCrudNames = [
+        'read:Budget',
+        'create:Budget',
+        'update:Budget',
+        'delete:Budget',
+      ] as const;
+      for (const permName of budgetCrudNames) {
+        const perm = await this.prisma.permission.findUnique({
+          where: { name: permName },
+        });
+        if (!perm) continue;
+        for (const { id: roleId } of supplierRoles) {
+          await this.prisma.permissionRole.upsert({
+            where: {
+              permissionId_roleId: {
+                permissionId: perm.id,
+                roleId,
+              },
+            },
+            create: {
+              permissionId: perm.id,
+              roleId,
+            },
+            update: {},
+          });
+        }
+      }
+      if (supplierRoles.length > 0) {
+        Logger.log(
+          'Permissions Budget liées à ADMIN et aux rôles direction maison mère',
+        );
+      }
+
+      const budgetReadPerm = await this.prisma.permission.findUnique({
+        where: { name: 'read:Budget' },
+      });
+      if (budgetReadPerm && stockReadPerm) {
+        const stockReadLinks = await this.prisma.permissionRole.findMany({
+          where: { permissionId: stockReadPerm.id },
+          select: { roleId: true },
+        });
+        for (const { roleId } of stockReadLinks) {
+          await this.prisma.permissionRole.upsert({
+            where: {
+              permissionId_roleId: {
+                permissionId: budgetReadPerm.id,
+                roleId,
+              },
+            },
+            create: {
+              permissionId: budgetReadPerm.id,
+              roleId,
+            },
+            update: {},
+          });
+        }
+        if (stockReadLinks.length > 0) {
+          Logger.log(
+            'Permission read:Budget alignée sur les rôles ayant read:Stock',
+          );
+        }
+      }
     } catch (error) {
       Logger.error(error);
       throw error;

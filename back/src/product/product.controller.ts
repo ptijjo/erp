@@ -60,6 +60,15 @@ export class ProductController {
       ...(dto.offeredToSubsidiaries !== undefined
         ? { offeredToSubsidiaries: dto.offeredToSubsidiaries }
         : {}),
+      ...(dto.supplierIds?.length
+        ? {
+            productSuppliers: {
+              create: dto.supplierIds.map((supplierId) => ({
+                supplier: { connect: { id: supplierId } },
+              })),
+            },
+          }
+        : {}),
     };
     return this.productService.create(data, viewer);
   }
@@ -80,6 +89,20 @@ export class ProductController {
         : {}),
       ...(dto.offeredToSubsidiaries !== undefined
         ? { offeredToSubsidiaries: dto.offeredToSubsidiaries }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(dto, 'supplierIds')
+        ? {
+            productSuppliers: {
+              deleteMany: {},
+              ...(dto.supplierIds?.length
+                ? {
+                    create: dto.supplierIds.map((supplierId) => ({
+                      supplier: { connect: { id: supplierId } },
+                    })),
+                  }
+                : {}),
+            },
+          }
         : {}),
     };
     return this.productService.update(id, data, viewer);

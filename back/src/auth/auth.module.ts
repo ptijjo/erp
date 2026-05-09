@@ -9,9 +9,10 @@ import { JwtStrategy } from './jwt.strategy/jwt.strategy';
 import { ConfigService } from '@nestjs/config';
 import { RedisModule } from '../redis/redis.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { AuthSessionSettings } from './auth-session-settings.service';
 
 @Module({
-  providers: [AuthService, LocalStrategy, JwtStrategy],
+  providers: [AuthSessionSettings, AuthService, LocalStrategy, JwtStrategy],
   imports: [
     PrismaModule,
     RedisModule,
@@ -20,7 +21,8 @@ import { PrismaModule } from '../prisma/prisma.module';
     JwtModule.registerAsync({
       useFactory: (config: ConfigService) => ({
         secret: config.getOrThrow<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '1h' },
+        // Durée d’accès : `AuthService` passe `expiresIn` à chaque `sign`.
+        signOptions: {},
       }),
       inject: [ConfigService],
     }),

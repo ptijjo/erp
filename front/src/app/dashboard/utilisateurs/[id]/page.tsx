@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 
-import { useMe } from "~/hooks/use-me";
+import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { UserDetailDto } from "~/lib/api-types";
 
@@ -16,6 +16,8 @@ export default function UserDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
+  const canUpdateUser = me != null && hasMePermission(me, "update", "User");
+  const canDeleteUser = me != null && hasMePermission(me, "delete", "User");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const params = useParams();
   const id =
@@ -70,37 +72,41 @@ export default function UserDetailPage() {
         <div className="flex min-w-0 flex-1 justify-end">
           {user && !isLoading && !isError ? (
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <Link
-                href={`/dashboard/utilisateurs/${id}/edit`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
-              >
-                <Pencil className="size-4" />
-                Modifier
-              </Link>
-              <button
-                type="button"
-                title={
-                  isSelf
-                    ? "Vous ne pouvez pas supprimer votre propre compte"
-                    : undefined
-                }
-                disabled={deleteMutation.isPending || isSelf}
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      `Supprimer définitivement l’utilisateur « ${user.email} » ? Cette action est irréversible.`,
-                    )
-                  ) {
-                    return;
+              {canUpdateUser && (
+                <Link
+                  href={`/dashboard/utilisateurs/${id}/edit`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
+                >
+                  <Pencil className="size-4" />
+                  Modifier
+                </Link>
+              )}
+              {canDeleteUser && (
+                <button
+                  type="button"
+                  title={
+                    isSelf
+                      ? "Vous ne pouvez pas supprimer votre propre compte"
+                      : undefined
                   }
-                  setDeleteError(null);
-                  deleteMutation.mutate();
-                }}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Trash2 className="size-4" />
-                Supprimer
-              </button>
+                  disabled={deleteMutation.isPending || isSelf}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        `Supprimer définitivement l’utilisateur « ${user.email} » ? Cette action est irréversible.`,
+                      )
+                    ) {
+                      return;
+                    }
+                    setDeleteError(null);
+                    deleteMutation.mutate();
+                  }}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2 className="size-4" />
+                  Supprimer
+                </button>
+              )}
             </div>
           ) : null}
         </div>
@@ -134,8 +140,38 @@ export default function UserDetailPage() {
             <p className="text-sm text-gray-600">{user.role.description}</p>
           ) : null}
           <p className="text-sm text-gray-500">
-            <span className="font-medium text-gray-700">Organisation (id) :</span>{" "}
-            <code className="font-mono">{user.organizationId}</code>
+            <span className="font-medium text-gray-700">Organisation (slug) :</span>{" "}
+            <code className="font-mono">
+              {user.organization?.slug ?? "—"}
+            </code>
+          </p>
+          <p className="text-sm text-gray-500">
+            <span className="font-medium text-gray-700">
+              Date de création :
+            </span>{" "}
+            {new Date(user.createdAt).toLocaleString("fr-FR", {
+              dateStyle: "long",
+              timeStyle: "short",
+            })}
+          </p>
+          <p className="text-sm text-gray-500">
+            <span className="font-medium text-gray-700">
+              Dernière mise à jour :
+            </span>{" "}
+            {new Date(user.updatedAt).toLocaleString("fr-FR", {
+              dateStyle: "long",
+              timeStyle: "short",
+            })}
+          </p>
+          <p className="text-sm text-gray-500">
+            <span className="font-medium text-gray-700">Créé par :</span>{" "}
+            {user.createdBy ? (
+              <span className="text-gray-800">{user.createdBy.email}</span>
+            ) : (
+              <span className="italic text-gray-500">
+                Non renseigné (journal d’audit absent ou création hors API)
+              </span>
+            )}
           </p>
           <p className="text-sm text-gray-500">
             <span className="font-medium text-gray-700">Id :</span>{" "}

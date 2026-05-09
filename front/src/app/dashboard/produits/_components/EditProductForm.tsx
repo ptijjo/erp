@@ -8,9 +8,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "~/components/ui/button";
-import { isMainOrganization, useMe } from "~/hooks/use-me";
+import { hasMePermission, isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
-import type { CategoryDto, ProductDto } from "~/lib/api-types";
+import type { CategoryDto, ProductDto, SupplierDto } from "~/lib/api-types";
 import { parseDecimal } from "~/lib/parse-decimal";
 
 import { apiErrorMessage } from "../_lib/api-error-message";
@@ -26,6 +26,7 @@ const schema = z.object({
     }),
   categoryId: z.string().uuid({ message: "Choisissez une catégorie" }),
   offeredToSubsidiaries: z.boolean().optional(),
+  supplierIds: z.array(z.string().uuid()).optional(),
 });
 
 type Schema = z.infer<typeof schema>;
@@ -35,9 +36,15 @@ type Props = { productId: string };
 export default function EditProductForm({ productId }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: me } = useMe();
+  const { data: me, isPending: mePending } = useMe();
   const isMain = me != null && isMainOrganization(me);
-  const readOnly = !isMain;
+  const canUpdateProduct =
+    me != null && hasMePermission(me, "update", "Product");
+  const canDeleteProduct =
+    me != null && hasMePermission(me, "delete", "Product");
+  const canReadSuppliers =
+    me != null && hasMePermission(me, "read", "Supplier");
+  const readOnly = !canUpdateProduct;
 
   const {
     data: product,
@@ -60,14 +67,31 @@ export default function EditProductForm({ productId }: Props) {
     },
   });
 
+  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery({
+    queryKey: ["supplier"] as const,
+    queryFn: async () => {
+      const { data } = await api.get<SupplierDto[]>("/supplier");
+      return data;
+    },
+    enabled: Boolean(isMain && canReadSuppliers),
+  });
+
   const categorySelectOptions = categoryOptionsForSelect(categories);
 
   const form = useForm<Schema>({
     resolver: zodResolver(schema),
   });
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting }, setError } =
-    form;
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    getValues,
+    formState: { errors, isSubmitting },
+    setError,
+  } = form;
 
   useEffect(() => {
     if (!product) return;
@@ -77,6 +101,8 @@ export default function EditProductForm({ productId }: Props) {
       price: parseDecimal(product.price),
       categoryId: product.categoryId,
       offeredToSubsidiaries: product.offeredToSubsidiaries ?? false,
+      supplierIds:
+        product.productSuppliers?.map((ps) => ps.supplier.id) ?? [],
     });
   }, [product, reset]);
 
@@ -88,7 +114,10 @@ export default function EditProductForm({ productId }: Props) {
         price: body.price,
         categoryId: body.categoryId,
         ...(isMain
-          ? { offeredToSubsidiaries: Boolean(body.offeredToSubsidiaries) }
+          ? {
+              offeredToSubsidiaries: Boolean(body.offeredToSubsidiaries),
+              supplierIds: body.supplierIds ?? [],
+            }
           : {}),
       });
     },
@@ -129,8 +158,16 @@ export default function EditProductForm({ productId }: Props) {
     deleteMutation.mutate();
   }
 
-  if (productLoading) {
+  if (mePending || productLoading) {
     return <p className="text-gray-600">Chargement du produit…</p>;
+  }
+
+  if (me == null) {
+    return (
+      <div className="max-w-lg rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-800">
+        <p className="font-semibold">Session non disponible</p>
+      </div>
+    );
   }
 
   if (productError || !product) {
@@ -267,6 +304,60 @@ export default function EditProductForm({ productId }: Props) {
           </div>
         ) : null}
 
+        {isMain && canReadSuppliers ? (
+          <fieldset
+            className="rounded-lg border border-gray-200 bg-gray-50/80 p-4"
+            disabled={readOnly || suppliersLoading}
+          >
+            <legend className="px-1 text-sm font-medium text-gray-800">
+              Fournisseurs (commandes filiales)
+            </legend>
+            <p className="mb-3 text-xs text-gray-600">
+              Cochez un ou plusieurs fournisseurs parmi lesquels les filiales
+              pourront choisir à la commande. Gérez les fiches depuis{" "}
+              <span className="font-medium">Fournisseurs</span>.
+            </p>
+            <div className="flex max-h-48 flex-col gap-2 overflow-y-auto">
+              {suppliers.map((sup) => {
+                const ids = watch("supplierIds") ?? [];
+                const checked = ids.includes(sup.id);
+                return (
+                  <label
+                    key={sup.id}
+                    className="flex cursor-pointer items-center gap-2 text-sm text-gray-800"
+                  >
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      checked={checked}
+                      onChange={(e) => {
+                        const cur = getValues("supplierIds") ?? [];
+                        if (e.target.checked) {
+                          setValue("supplierIds", [...cur, sup.id], {
+                            shouldDirty: true,
+                          });
+                        } else {
+                          setValue(
+                            "supplierIds",
+                            cur.filter((id) => id !== sup.id),
+                            { shouldDirty: true },
+                          );
+                        }
+                      }}
+                    />
+                    <span>{sup.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {errors.supplierIds && (
+              <p className="mt-2 text-sm text-red-600" role="alert">
+                {errors.supplierIds.message}
+              </p>
+            )}
+          </fieldset>
+        ) : null}
+
         {errors.root && (
           <p className="text-sm text-red-600" role="alert">
             {errors.root.message}
@@ -286,7 +377,7 @@ export default function EditProductForm({ productId }: Props) {
           >
             {updateMutation.isPending ? "Enregistrement…" : "Enregistrer"}
           </Button>
-          {isMain ? (
+          {isMain && canDeleteProduct ? (
             <button
               type="button"
               onClick={handleDelete}

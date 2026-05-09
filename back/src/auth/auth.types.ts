@@ -32,4 +32,6 @@ export type AuthenticatedUser = {
 /** Réponse de GET /auth/me (JWT + nom d’organisation résolu en base). */
 export type MeResponse = AuthenticatedUser & {
   organisationName: string;
+  permissionMode: 'FULL_ACCESS' | 'ROLE_PERMISSIONS' | 'FALLBACK_READ_ALL';
+  permissions: string[];
 };

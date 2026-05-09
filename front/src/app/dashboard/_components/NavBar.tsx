@@ -7,17 +7,21 @@ import {
   Users,
   Package,
   FolderTree,
-  ShoppingCart,
-  ShoppingBag,
   Layers,
-  Wallet,
-  FileText,
   Receipt,
   Settings,
   Building2,
+  ScrollText,
+  Truck,
+  Wallet,
 } from "lucide-react";
 
-import { isMainOrganization, subsidiaryOrganizationPath, useMe } from "~/hooks/use-me";
+import {
+  hasMePermission,
+  isMainOrganization,
+  subsidiaryOrganizationPath,
+  useMe,
+} from "~/hooks/use-me";
 
 type NavItem = {
   label: string;
@@ -25,23 +29,62 @@ type NavItem = {
   icon: typeof LayoutDashboard;
   /** Si true, seul `pathname === href` active l’entrée (évite que /dashboard matche tout). */
   exact?: boolean;
+  requiredPermission?: { action: "read"; subject: string };
+  /** Masqué pour les organisations filiales. */
+  mainOnly?: boolean;
 };
 
 const baseNavItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Utilisateurs", href: "/dashboard/utilisateurs", icon: Users },
+  {
+    label: "Utilisateurs",
+    href: "/dashboard/utilisateurs",
+    icon: Users,
+    requiredPermission: { action: "read", subject: "User" },
+  },
   {
     label: "Organisations",
     href: "/dashboard/organisations",
     icon: Building2,
+    requiredPermission: { action: "read", subject: "Organization" },
   },
-  { label: "Produits", href: "/dashboard/produits", icon: Package },
-  { label: "Catégories", href: "/dashboard/categories", icon: FolderTree },
-  { label: "Commandes", href: "/dashboard/commandes", icon: ShoppingCart },
-  { label: "Ventes", href: "/dashboard/ventes", icon: ShoppingBag },
-  { label: "Stocks", href: "/dashboard/stocks", icon: Layers },
-  { label: "Caisse", href: "/dashboard/caisse", icon: Wallet },
-  { label: "Factures", href: "/dashboard/facture", icon: FileText },
+  {
+    label: "Produits",
+    href: "/dashboard/produits",
+    icon: Package,
+    requiredPermission: { action: "read", subject: "Product" },
+  },
+  {
+    label: "Fournisseurs",
+    href: "/dashboard/fournisseurs",
+    icon: Truck,
+    requiredPermission: { action: "read", subject: "Supplier" },
+    mainOnly: true,
+  },
+  {
+    label: "Catégories",
+    href: "/dashboard/categories",
+    icon: FolderTree,
+    requiredPermission: { action: "read", subject: "Category" },
+  },
+  {
+    label: "Stocks",
+    href: "/dashboard/stocks",
+    icon: Layers,
+    requiredPermission: { action: "read", subject: "Stock" },
+  },
+  {
+    label: "Budgets",
+    href: "/dashboard/budgets",
+    icon: Wallet,
+    requiredPermission: { action: "read", subject: "Budget" },
+  },
+  {
+    label: "Journal d'audit",
+    href: "/dashboard/audit",
+    icon: ScrollText,
+    requiredPermission: { action: "read", subject: "AuditLog" },
+  },
   { label: "Comptabilité", href: "/dashboard/comptabilite", icon: Receipt },
   { label: "Gestion", href: "/dashboard/gestion", icon: Settings },
 ];
@@ -61,10 +104,19 @@ const NavBar = () => {
     if (!me) return baseNavItems.map((i) => ({ ...i, exact: i.href === "/dashboard" }));
 
     const orgPath = subsidiaryOrganizationPath(me);
-    const filtered = baseNavItems.filter(
-      (item) =>
+    const filtered = baseNavItems
+      .filter((item) =>
         isMainOrganization(me) || item.href !== "/dashboard/organisations",
-    );
+      )
+      .filter((item) => !item.mainOnly || isMainOrganization(me))
+      .filter((item) => {
+        if (!item.requiredPermission) return true;
+        return hasMePermission(
+          me,
+          item.requiredPermission.action,
+          item.requiredPermission.subject,
+        );
+      });
 
     const mapped: NavItem[] = [];
     for (const item of filtered) {

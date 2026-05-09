@@ -11,6 +11,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { CheckPolicies } from '../casl/check-policies.decorator';
 import { FullAccessRoleGuard } from '../casl/full-access-role.guard';
 import { PoliciesGuard } from '../casl/policies.guard';
@@ -26,22 +28,28 @@ export class RoleController {
   @Get()
   @HttpCode(HttpStatus.OK)
   @CheckPolicies({ action: 'read', subject: 'Role' })
-  public getAllRoles(): Promise<Role[]> {
-    return this.roleService.getAllRoles();
+  public getAllRoles(@CurrentUser() viewer: AuthenticatedUser): Promise<Role[]> {
+    return this.roleService.getAllRoles(viewer);
   }
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   @CheckPolicies({ action: 'read', subject: 'Role' })
-  public getRoleById(@Param('id') id: string): Promise<Role> {
-    return this.roleService.getRoleById(id);
+  public getRoleById(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ): Promise<Role> {
+    return this.roleService.getRoleById(id, viewer);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @CheckPolicies({ action: 'create', subject: 'Role' })
-  public createRole(@Body() data: CreateRoleDto): Promise<Role> {
-    return this.roleService.createRole(data);
+  public createRole(
+    @Body() data: CreateRoleDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ): Promise<Role> {
+    return this.roleService.createRole(data, viewer);
   }
 
   @Patch(':id')
@@ -51,15 +59,19 @@ export class RoleController {
   public updateRole(
     @Param('id') id: string,
     @Body() data: UpdateRoleDto,
+    @CurrentUser() viewer: AuthenticatedUser,
   ): Promise<Role> {
-    return this.roleService.updateRole(id, data);
+    return this.roleService.updateRole(id, data, viewer);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(FullAccessRoleGuard)
   @CheckPolicies({ action: 'delete', subject: 'Role' })
-  public deleteRole(@Param('id') id: string): Promise<Role> {
-    return this.roleService.deleteRole(id);
+  public deleteRole(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ): Promise<Role> {
+    return this.roleService.deleteRole(id, viewer);
   }
 }

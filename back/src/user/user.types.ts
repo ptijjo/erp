@@ -30,3 +30,8 @@ export type SafeUserWithRoleAndOrg = Omit<UserWithRoleAndOrg, 'password'>;
 export type SafeUserPublic = SafeUserWithRole & {
   organization: Organization;
 };
+
+/** Détail fiche utilisateur : métadonnées de création depuis `AuditLog` si disponible. */
+export type SafeUserDetail = SafeUserPublic & {
+  createdBy: { id: string; email: string } | null;
+};

@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsNotEmpty,
   IsNumber,
@@ -27,6 +28,12 @@ export class CreateProductDto {
   @IsBoolean()
   @IsOptional()
   offeredToSubsidiaries?: boolean;
+
+  /** Fournisseurs autorisés pour les commandes filiales (maison mère). */
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  supplierIds?: string[];
 }
 
 export class UpdateProductDto {
@@ -50,4 +57,9 @@ export class UpdateProductDto {
   @IsBoolean()
   @IsOptional()
   offeredToSubsidiaries?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  supplierIds?: string[];
 }

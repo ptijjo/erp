@@ -25,7 +25,7 @@ export class AuditLogService {
   constructor(private readonly prisma: PrismaService) {}
 
   async log(entry: AuditLogPayload) {
-    return this.prisma.auditLog.create({
+    return this.prisma.raw.auditLog.create({
       data: {
         action: entry.action,
         entityType: entry.entityType,

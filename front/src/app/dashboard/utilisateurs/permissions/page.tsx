@@ -5,18 +5,22 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
 
-import { useMe } from "~/hooks/use-me";
+import { hasMePermission, isAdminUser, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { PermissionDto } from "~/lib/api-types";
 
 import { apiErrorMessage } from "../../produits/_lib/api-error-message";
-import { isFullAccessRole } from "../_lib/full-access-roles";
 
 export default function PermissionsCatalogPage() {
   const queryClient = useQueryClient();
   const { data: me, isPending: mePending } = useMe();
-  const canManage =
-    me != null && isFullAccessRole(me.role.name);
+  const catalogAdminOnly = me != null && isAdminUser(me);
+  const canCreate =
+    catalogAdminOnly && hasMePermission(me, "create", "Permission");
+  const canUpdate =
+    catalogAdminOnly && hasMePermission(me, "update", "Permission");
+  const canDelete =
+    catalogAdminOnly && hasMePermission(me, "delete", "Permission");
 
   const { data: permissions = [], isLoading, isError } = useQuery({
     queryKey: ["permission"] as const,
@@ -24,7 +28,7 @@ export default function PermissionsCatalogPage() {
       const { data } = await api.get<PermissionDto[]>("/permission");
       return data;
     },
-    enabled: canManage,
+    enabled: catalogAdminOnly,
   });
 
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -70,7 +74,7 @@ export default function PermissionsCatalogPage() {
     );
   }
 
-  if (!canManage) {
+  if (!catalogAdminOnly) {
     return (
       <main className="flex flex-1 flex-col overflow-auto bg-white p-6">
         <div
@@ -79,8 +83,8 @@ export default function PermissionsCatalogPage() {
         >
           <p className="font-semibold">Accès refusé</p>
           <p className="mt-2">
-            Seuls l’administrateur, le directeur général et le directeur des
-            opérations peuvent gérer le catalogue des permissions.
+            Le catalogue des permissions est réservé au compte administrateur
+            (rôle ADMIN).
           </p>
           <Link
             href="/dashboard/utilisateurs/roles"
@@ -114,13 +118,15 @@ export default function PermissionsCatalogPage() {
           </h1>
         </div>
         <div className="flex flex-1 flex-wrap justify-end gap-3">
-          <Link
-            href="/dashboard/utilisateurs/permissions/add"
-            className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
-          >
-            <Plus className="size-4" />
-            Nouvelle permission
-          </Link>
+          {canCreate && (
+            <Link
+              href="/dashboard/utilisateurs/permissions/add"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
+            >
+              <Plus className="size-4" />
+              Nouvelle permission
+            </Link>
+          )}
         </div>
       </div>
 
@@ -146,13 +152,15 @@ export default function PermissionsCatalogPage() {
             Aucune permission en base. Créez-en une pour commencer, sans passer
             par un rôle.
           </p>
-          <Link
-            href="/dashboard/utilisateurs/permissions/add"
-            className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-orange-500 px-5 py-2.5 font-semibold text-white shadow-sm hover:opacity-95"
-          >
-            <Plus className="size-4" />
-            Nouvelle permission
-          </Link>
+          {canCreate && (
+            <Link
+              href="/dashboard/utilisateurs/permissions/add"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-orange-500 px-5 py-2.5 font-semibold text-white shadow-sm hover:opacity-95"
+            >
+              <Plus className="size-4" />
+              Nouvelle permission
+            </Link>
+          )}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -182,32 +190,39 @@ export default function PermissionsCatalogPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-3">
-                      <Link
-                        href={`/dashboard/utilisateurs/permissions/${p.id}/edit`}
-                        className="inline-flex items-center gap-1 text-orange-600 underline-offset-2 hover:underline"
-                      >
-                        <Pencil className="size-3.5" />
-                        Modifier
-                      </Link>
-                      <button
-                        type="button"
-                        disabled={deleteMutation.isPending}
-                        onClick={() => {
-                          if (
-                            !window.confirm(
-                              `Supprimer la permission « ${p.name} » ? Les liaisons avec les rôles seront retirées.`,
-                            )
-                          ) {
-                            return;
-                          }
-                          setDeleteError(null);
-                          deleteMutation.mutate(p.id);
-                        }}
-                        className="inline-flex cursor-pointer items-center gap-1 text-red-600 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Trash2 className="size-3.5" />
-                        Supprimer
-                      </button>
+                      {canUpdate && (
+                        <Link
+                          href={`/dashboard/utilisateurs/permissions/${p.id}/edit`}
+                          className="inline-flex items-center gap-1 text-orange-600 underline-offset-2 hover:underline"
+                        >
+                          <Pencil className="size-3.5" />
+                          Modifier
+                        </Link>
+                      )}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          disabled={deleteMutation.isPending}
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                `Supprimer la permission « ${p.name} » ? Les liaisons avec les rôles seront retirées.`,
+                              )
+                            ) {
+                              return;
+                            }
+                            setDeleteError(null);
+                            deleteMutation.mutate(p.id);
+                          }}
+                          className="inline-flex cursor-pointer items-center gap-1 text-red-600 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Trash2 className="size-3.5" />
+                          Supprimer
+                        </button>
+                      )}
+                      {!canUpdate && !canDelete && (
+                        <span className="text-xs text-gray-500">—</span>
+                      )}
                     </div>
                   </td>
                 </tr>

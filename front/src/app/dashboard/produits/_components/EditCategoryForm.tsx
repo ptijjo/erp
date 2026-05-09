@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "~/components/ui/button";
+import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { CategoryDto } from "~/lib/api-types";
 
@@ -32,6 +33,11 @@ type Props = { categoryId: string };
 export default function EditCategoryForm({ categoryId }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: me, isPending: mePending } = useMe();
+  const canUpdateCategory =
+    me != null && hasMePermission(me, "update", "Category");
+  const canDeleteCategory =
+    me != null && hasMePermission(me, "delete", "Category");
 
   const {
     data: category,
@@ -121,8 +127,16 @@ export default function EditCategoryForm({ categoryId }: Props) {
     deleteMutation.mutate();
   }
 
-  if (categoryLoading) {
+  if (mePending || categoryLoading) {
     return <p className="text-gray-600">Chargement de la catégorie…</p>;
+  }
+
+  if (me == null) {
+    return (
+      <div className="max-w-lg rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-800">
+        <p className="font-semibold">Session non disponible</p>
+      </div>
+    );
   }
 
   if (categoryError || !category) {
@@ -152,6 +166,7 @@ export default function EditCategoryForm({ categoryId }: Props) {
             autoComplete="off"
             className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none ring-orange-500/30 focus:border-orange-500 focus:ring-2"
             aria-invalid={!!errors.name}
+            disabled={!canUpdateCategory}
             {...register("name")}
           />
           {errors.name && (
@@ -172,6 +187,7 @@ export default function EditCategoryForm({ categoryId }: Props) {
             id="edit-category-description"
             rows={3}
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none ring-orange-500/30 focus:border-orange-500 focus:ring-2"
+            disabled={!canUpdateCategory}
             {...register("description")}
           />
         </div>
@@ -187,7 +203,7 @@ export default function EditCategoryForm({ categoryId }: Props) {
             id="edit-category-parent"
             className="h-11 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none ring-orange-500/30 focus:border-orange-500 focus:ring-2"
             aria-invalid={!!errors.parentId}
-            disabled={categoriesLoading}
+            disabled={categoriesLoading || !canUpdateCategory}
             {...register("parentId")}
           >
             <option value={ROOT}>— Catégorie racine —</option>
@@ -214,6 +230,7 @@ export default function EditCategoryForm({ categoryId }: Props) {
           <Button
             type="submit"
             disabled={
+              !canUpdateCategory ||
               isSubmitting ||
               updateMutation.isPending ||
               deleteMutation.isPending
@@ -222,16 +239,18 @@ export default function EditCategoryForm({ categoryId }: Props) {
           >
             {updateMutation.isPending ? "Enregistrement…" : "Enregistrer"}
           </Button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending || updateMutation.isPending}
-            className="inline-flex h-11 w-full max-w-xs cursor-pointer items-center justify-center rounded-lg border-2 border-red-700 bg-red-600 px-6 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-          >
-            {deleteMutation.isPending
-              ? "Suppression…"
-              : "Supprimer la catégorie"}
-          </button>
+          {canDeleteCategory && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending || updateMutation.isPending}
+              className="inline-flex h-11 w-full max-w-xs cursor-pointer items-center justify-center rounded-lg border-2 border-red-700 bg-red-600 px-6 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              {deleteMutation.isPending
+                ? "Suppression…"
+                : "Supprimer la catégorie"}
+            </button>
+          )}
         </div>
       </form>
     </div>

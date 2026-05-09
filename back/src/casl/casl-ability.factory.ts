@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  buildAbilityFromDatabase,
-  type AppAbility,
-} from './define-ability';
+import { buildAbilityFromDatabase, type AppAbility } from './define-ability';
 
 @Injectable()
 export class CaslAbilityFactory {

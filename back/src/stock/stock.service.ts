@@ -8,7 +8,6 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import {
   assertOrganizationResourceAccess,
   isMainOrganizationUser,
-  organizationListWhere,
 } from '../auth/organization-scope';
 import {
   assertProductUsableForOrganization,
@@ -16,6 +15,7 @@ import {
 } from '../product/product-subsidiary-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Stock, Prisma } from '../generated/prisma/client';
+import { OrganizationType } from '../generated/prisma/client';
 
 function productIdFromStockCreateInput(
   data: Prisma.StockCreateInput,
@@ -36,10 +36,25 @@ function productIdFromStockCreateInput(
 export class StockService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Les lignes de stock ne concernent que les organisations filiales. */
+  private async assertOrganizationIsSubsidiary(orgId: string): Promise<void> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { organizationType: true },
+    });
+    if (!org || org.organizationType !== OrganizationType.SUBSIDIARY) {
+      throw new BadRequestException(
+        'Le stock n’est défini que pour les filiales.',
+      );
+    }
+  }
+
   async findAll(viewer: AuthenticatedUser): Promise<Stock[]> {
-    const baseWhere = organizationListWhere(viewer);
-    const where: Prisma.StockWhereInput = { ...baseWhere };
+    const where: Prisma.StockWhereInput = {
+      organization: { organizationType: OrganizationType.SUBSIDIARY },
+    };
     if (!isMainOrganizationUser(viewer)) {
+      where.organizationId = viewer.organisationId;
       where.product = await productCatalogWhereForViewer(
         this.prisma,
         viewer,
@@ -48,19 +63,36 @@ export class StockService {
     return this.prisma.stock.findMany({
       where,
       orderBy: { updatedAt: 'desc' },
-      include: { product: true, organization: true },
+      include: {
+        product: {
+          include: {
+            productSuppliers: { include: { supplier: true } },
+          },
+        },
+        organization: true,
+      },
     });
   }
 
   async findOne(id: string, viewer: AuthenticatedUser): Promise<Stock> {
     const row = await this.prisma.stock.findUnique({
       where: { id },
-      include: { product: true, organization: true },
+      include: {
+        product: {
+          include: {
+            productSuppliers: { include: { supplier: true } },
+          },
+        },
+        organization: true,
+      },
     });
     if (!row) {
       throw new NotFoundException('Stock introuvable');
     }
     assertOrganizationResourceAccess(viewer, row.organizationId);
+    if (row.organization.organizationType !== OrganizationType.SUBSIDIARY) {
+      throw new NotFoundException('Stock introuvable');
+    }
     if (
       !isMainOrganizationUser(viewer) &&
       !row.product.offeredToSubsidiaries
@@ -78,11 +110,19 @@ export class StockService {
     viewer: AuthenticatedUser,
   ): Promise<Stock | null> {
     assertOrganizationResourceAccess(viewer, organizationId);
+    await this.assertOrganizationIsSubsidiary(organizationId);
     const row = await this.prisma.stock.findUnique({
       where: {
         organizationId_productId: { organizationId, productId },
       },
-      include: { product: true, organization: true },
+      include: {
+        product: {
+          include: {
+            productSuppliers: { include: { supplier: true } },
+          },
+        },
+        organization: true,
+      },
     });
     if (!row) {
       return null;
@@ -104,6 +144,7 @@ export class StockService {
   ): Promise<Stock> {
     const orgId = this.resolveStockOrganizationId(data, viewer);
     assertOrganizationResourceAccess(viewer, orgId);
+    await this.assertOrganizationIsSubsidiary(orgId);
     const productId = productIdFromStockCreateInput(data);
     if (!productId) {
       throw new BadRequestException('Produit du stock manquant');
@@ -120,7 +161,14 @@ export class StockService {
     try {
       return await this.prisma.stock.create({
         data: scoped,
-        include: { product: true, organization: true },
+        include: {
+          product: {
+            include: {
+              productSuppliers: { include: { supplier: true } },
+            },
+          },
+          organization: true,
+        },
       });
     } catch {
       throw new BadRequestException(
@@ -160,7 +208,14 @@ export class StockService {
     return this.prisma.stock.update({
       where: { id },
       data,
-      include: { product: true, organization: true },
+      include: {
+        product: {
+          include: {
+            productSuppliers: { include: { supplier: true } },
+          },
+        },
+        organization: true,
+      },
     });
   }
 
@@ -178,6 +233,7 @@ export class StockService {
       ? organizationId
       : viewer.organisationId;
     assertOrganizationResourceAccess(viewer, orgId);
+    await this.assertOrganizationIsSubsidiary(orgId);
     await assertProductUsableForOrganization(this.prisma, productId, orgId);
     return this.prisma.stock.upsert({
       where: {
@@ -199,7 +255,14 @@ export class StockService {
           ? { maxQuantity: data.maxQuantity }
           : {}),
       },
-      include: { product: true, organization: true },
+      include: {
+        product: {
+          include: {
+            productSuppliers: { include: { supplier: true } },
+          },
+        },
+        organization: true,
+      },
     });
   }
 

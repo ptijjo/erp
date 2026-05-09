@@ -74,6 +74,9 @@ export default function EditPermissionForm({ permissionId }: Props) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["permission"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["permission", "assignment"],
+      });
       router.push("/dashboard/utilisateurs/permissions");
     },
     onError: (err) => {
@@ -116,7 +119,7 @@ export default function EditPermissionForm({ permissionId }: Props) {
         <p className="mt-1 text-sm text-gray-600">
           Format conseillé pour les droits effectifs :{" "}
           <span className="font-mono">action:Sujet</span> (ex.{" "}
-          <span className="font-mono">read:Vente</span>).
+          <span className="font-mono">read:Product</span>).
         </p>
         <div className="mt-4 flex flex-col gap-4">
           <div>

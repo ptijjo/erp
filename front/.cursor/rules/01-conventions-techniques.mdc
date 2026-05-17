@@ -1,0 +1,132 @@
+---
+description: '[FRONT] Conventions techniques, DX, stack, patterns de code et permissions UI'
+alwaysApply: true
+---
+
+# Conventions techniques frontend
+
+## Workflow développeur (DX)
+
+| Commande | Usage |
+|----------|--------|
+| `npm run dev` | Next.js dev (port par défaut 3000) |
+| `npm run check` | **Obligatoire en fin de tâche** : ESLint + `tsc --noEmit` |
+| `npm run lint` / `lint:fix` | ESLint seul |
+| `npm run format:write` | Prettier + plugin Tailwind (classes triées) |
+| `npm run typecheck` | TypeScript seul |
+
+- **Ne pas** committer `.env` — modèle : `front/.env.example` (`NEXT_PUBLIC_BASE_URL` → API Nest, ex. `http://localhost:8686`).
+- Variables validées : `src/env.js` (`@t3-oss/env-nextjs` + Zod). Préférer `env` pour les nouvelles vars typées ; `getApiBaseUrl()` reste la source pour Axios.
+
+## Arborescence et colocation (pattern actuel)
+
+Tout écran métier vit sous `src/app/dashboard/<domaine>/` :
+
+```
+dashboard/<domaine>/
+├── page.tsx              # Liste / écran principal (souvent "use client")
+├── add/page.tsx          # Création
+├── [id]/page.tsx         # Détail
+├── [id]/edit/page.tsx    # Édition
+├── _components/          # Formulaires et UI propres à la route
+│   └── *Form.tsx
+└── _lib/                 # Helpers locaux (tri, labels métier)
+```
+
+**Règles de placement**
+
+- Logique **réutilisable sur 2+ domaines** → `~/hooks/`, `~/lib/`, `~/components/`.
+- Logique **spécifique à une page** → `_lib/` ou `_components/` du domaine.
+- Layout dashboard partagé : `dashboard/layout.tsx` (auth, first-login), `dashboard/_components/` (Header, NavBar).
+
+## Imports et typage
+
+- Alias **`~/`** → `src/` (`tsconfig.json`).
+- Imports de types : `import type { … }` (ESLint `consistent-type-imports`).
+- DTO API : `~/lib/api-types.ts` — y ajouter les formes JSON renvoyées par Nest (Decimal → `string`).
+- Erreurs HTTP : `~/lib/api-error-message.ts` — `apiErrorMessage(error, fallback)` (réponses Nest / Axios).
+- **Pas de `any`** ; `noUncheckedIndexedAccess` activé.
+
+## Client HTTP et session
+
+- **Axios** : `~/lib/api.ts` — `withCredentials: true`, cookies httpOnly.
+- **Refresh** : intercepteur 401 → `POST /auth/refresh` puis retry ; flag `skipAuthRefresh` sur login/logout/refresh.
+- Typage Axios custom : `src/axios-augmentation.d.ts` (`_retry`, `skipAuthRefresh`).
+
+## TanStack Query (données serveur)
+
+- Provider : `~/providers/query-provider.tsx` — `staleTime: 60_000`, **React Query Devtools** en `development` uniquement.
+- **Clés** : alignées sur la ressource API, forme stable `as const` :
+  - liste : `["product"]`, `["organisation"]`, `["role"]`, `["poles"]`, `["stock"]`, …
+  - détail : `["product", productId]`, `["user", userId]`, …
+  - session : `meQueryKey` = `["auth", "me"]` dans `use-me.ts`
+- **Mutations** : `invalidateQueries` sur la clé liste (et détail si besoin) après succès.
+- **Pages listes** : aujourd’hui tri/filtre **en mémoire** dans `page.tsx` (ex. `produits/page.tsx`). Pour nouvelles tables denses : viser **TanStack Table** + colonnes Shadcn — à valider avant ajout de dépendance.
+
+## Permissions (UI)
+
+- Profil : `useMe()` → `GET /auth/me`.
+- Affichage : `hasMePermission(me, action, subject)` — sujets CASL (`User`, `Product`, `Budget`, `AuditLog`, …).
+- **NavBar** (`dashboard/_components/NavBar.tsx`) :
+  - `requiredPermission` par entrée ;
+  - `mainOnly` pour écrans maison mère (ex. fournisseurs) ;
+  - filiales : masque « Organisations », ajoute « Mon organisation » via `subsidiaryOrganizationPath`.
+- Admin catalogue permissions : `isAdminUser(me)` (`role.name === "ADMIN"`).
+- Rôles plein accès : `FULL_ACCESS_ROLE_NAMES` dans `utilisateurs/_lib/full-access-roles.ts` — **garder aligné** avec Nest `define-ability.ts`.
+- **Ne jamais** traiter l’UI comme suffisante : 403 API → message clair (`apiErrorMessage`).
+
+## Formulaires (pattern de référence)
+
+S’aligner sur `utilisateurs/_components/AddUserForm.tsx` :
+
+1. `"use client"`.
+2. **Zod** + `zodResolver` + `useForm`.
+3. `useMe()` + `hasMePermission` avant d’afficher le formulaire ou les actions.
+4. `useQuery` pour les listes (orgs, rôles, pôles…) ; `useMutation` pour POST/PATCH/DELETE via `api`.
+5. Erreurs : `apiErrorMessage(error, "Message par défaut")` depuis `~/lib/api-error-message.ts`.
+6. Succès : `invalidateQueries` + `router.push` / `router.refresh` selon le flux.
+
+Schémas Zod : règles métier front (ex. mot de passe, pôle obligatoire si maison mère) en `superRefine` ; reste validé côté API.
+
+## UI, design system et graphiques
+
+- **Shadcn** : style `new-york`, `components.json` — composants dans `~/components/ui` ; CLI : `npx shadcn@latest add <component>`.
+- **Tailwind v4** : `src/styles/globals.css` (`@import "tailwindcss"`, `shadcn/tailwind.css`).
+- **Police** : Geist (`next/font/google`) dans `app/layout.tsx`, `lang="fr"`.
+- **Icônes** : `lucide-react` (taille courante `size-5`, navigation sidebar).
+- **Couleurs produit actuelles** (à réutiliser pour cohérence) :
+  - Sidebar : `#2D323E` ; lien actif : `#FF8C00` ;
+  - Fond dashboard : `bg-gray-500` (layout existant).
+- **Graphiques** : **Recharts** (dépendance du projet) — dashboards / budgets.
+- **Toasts** : `react-toastify` est dans `package.json` mais **non utilisé** dans `src/` — ne pas l’introduire sans accord ; préférer messages inline / erreurs formulaire comme aujourd’hui.
+
+## Argent et formats
+
+- Affichage : `~/lib/format-fcfa.ts`.
+- Saisie / parsing : `~/lib/parse-decimal.ts` — pas d’arithmétique `number` sur montants métier.
+
+## Server vs Client Components
+
+- Racine : `app/layout.tsx` (Server) + `QueryProvider` (client).
+- Dashboard : layout et pages métier majoritairement **client** (`useMe`, React Query, formulaires).
+- Nouveau code : Server Component seulement si pas de hooks ; sinon `"use client"` explicite.
+
+## Qualité et lint
+
+- ESLint : `eslint.config.js` (Next core-web-vitals + typescript-eslint).
+- Prettier : `prettier.config.js` + `prettier-plugin-tailwindcss`.
+
+## Source de vérité API
+
+- Dossier `api/` : routes, DTO, CASL, `casl-permission-names.ts`.
+- Avant un écran ou un appel : lire le contrôleur Nest et la permission associée.
+- Découpage domaines / phases : `03-conception-decoupage.mdc` + `api/.cursor/rules/03-conception-decoupage.mdc`.
+
+## Tests (quand ajoutés)
+
+- Priorité : `hasMePermission`, chemins `NavBar`, schémas Zod critiques.
+- E2E Playwright : validation explicite avant ajout au `package.json`.
+
+## Patterns nécessitant votre accord
+
+Middleware route, Zustand/Redux global, Tremor, i18n, PWA, WebSockets, TanStack Table (première adoption globale) — voir aussi `03-conception-decoupage.mdc`.

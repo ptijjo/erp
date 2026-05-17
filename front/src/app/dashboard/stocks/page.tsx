@@ -27,7 +27,7 @@ import type { Me } from "~/hooks/use-me";
 import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
 
-import { apiErrorMessage } from "../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
 
 const ORANGE = "#FF8C00";
 
@@ -111,6 +111,7 @@ export default function StocksPage() {
     me != null && hasMePermission(me, "update", "StockOrder");
   const canReadCatalog =
     me != null && hasMePermission(me, "read", "Product");
+  const canReadStock = me != null && hasMePermission(me, "read", "Stock");
 
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<EditingStockState | null>(null);
@@ -133,6 +134,7 @@ export default function StocksPage() {
       const { data } = await api.get<StockDto[]>("/stock");
       return data;
     },
+    enabled: !mePending && canReadStock,
   });
 
   const {

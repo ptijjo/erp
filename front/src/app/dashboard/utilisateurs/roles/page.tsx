@@ -17,7 +17,7 @@ import { hasMePermission, isAdminUser, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { RoleDto } from "~/lib/api-types";
 
-import { apiErrorMessage } from "../../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
 import { isFullAccessRole } from "../_lib/full-access-roles";
 
 export default function RolesListPage() {

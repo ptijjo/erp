@@ -1,0 +1,65 @@
+---
+description: '[FRONT] Métier ERP VIFAA — organisation, pôles, rôles et impact sur l’interface'
+alwaysApply: true
+---
+
+Cette application est un ERP avec une maison mère unique **VIFAA** et des filiales rattachées.
+Il ne peut exister qu'une seule maison mère ; on peut créer autant de filiales que nécessaire.
+
+## Hiérarchie
+
+La maison mère est divisée en **pôles** avec des rôles distincts. Certains pôles peuvent dépendre d'autres.
+
+Pôles :
+
+- `Pole_OPERATIONS` — opérations de la société
+- `Pole_STRATEGY_DEVELOPMENT` — stratégie et développement
+- `Pole_FINANCE` — finances
+- `Pole_LEGAL` — affaires juridiques
+- `Pole_TRADITIONAL_SPIRITUAL` — cultes traditionnels et spirituels
+- `Pole_ARCHITECTURE_HERITAGE` — architecture et patrimoine
+- `Pole_MARKETING_COMMUNICATION` — marketing et communication
+- `Pole_PRODUCTION` — production
+
+Directeurs de pôle (rôles stables) :
+
+- `DIRECTOR_OPERATIONS`, `DIRECTOR_STRATEGY_DEVELOPMENT`, `DIRECTOR_FINANCE`, `DIRECTOR_LEGAL`, `DIRECTOR_TRADITIONAL_SPIRITUAL`, `DIRECTOR_ARCHITECTURE_HERITAGE`, `DIRECTOR_MARKETING_COMMUNICATION`, `DIRECTOR_PRODUCTION`
+
+Rôles transverses (sans pôle) :
+
+- `ADMIN`, `DIRECTOR_GENERAL` — tous les droits
+
+Au démarrage de la base, les pôles et ces rôles doivent exister (seed API).
+
+RBAC + **CASL** côté API ; le front reflète les permissions reçues via `/auth/me`.
+
+## Actions valides
+
+```
+read | create | update | delete | manage
+```
+
+---
+
+Tous les **directeurs de pôle** peuvent `read` l'ensemble des données (selon périmètre pôle côté API).
+`ADMIN`, `DIRECTOR_GENERAL` et `DIRECTOR_OPERATIONS` peuvent tout `manage`.
+
+Des rôles personnalisés peuvent être créés pour les filiales avec un jeu de permissions dédié.
+
+## Utilisateurs, permissions et rôles
+
+Chaque utilisateur a un rôle et une société ; à la maison mère, un **pôle** via le rôle.
+
+- Utilisateurs maison mère : voient leur **pôle**, sauf ADMIN, DG et directeur opérations (vue élargie).
+- Maison mère : accès aux filiales selon permissions.
+- Filiales : uniquement leur société.
+
+**Frontend** : n'afficher que ce que l'utilisateur a le droit de voir (rôle, société, permissions). Masquer menus et actions ; bloquer les routes sensibles dès que le middleware ou les guards page seront en place (`03`).
+
+## Tables et évolutions
+
+À chaque nouvelle ressource API : mettre à jour permissions CASL côté `api/`, puis sujets et navigation côté `front/` (`hasMePermission`, entrées `NavBar`).
+
+## Budget
+
+Budget et lignes budgétaires définis par la maison mère ; saisie des **sorties** (loyer, salaires, …) dans les écrans finance / budgets.

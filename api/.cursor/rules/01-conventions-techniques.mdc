@@ -1,0 +1,79 @@
+---
+description: "[API] Conventions techniques, TDD obligatoire, auth et structure des modules"
+alwaysApply: true
+---
+
+# Conventions techniques API
+
+## TDD obligatoire — ordre strict
+
+**Interdit** d’implémenter du code métier ou HTTP avant d’avoir écrit (ou mis à jour) les tests qui décrivent le comportement attendu.
+
+Pour **chaque** fonctionnalité (nouveau module ou évolution) :
+
+### 1. Tests unitaires du service (en premier)
+
+- Fichier : `nom.service.spec.ts` à côté de `nom.service.ts`.
+- **Avant** toute ligne dans `nom.service.ts` (sauf squelette vide si indispensable à la compilation).
+- Mocker Prisma / Redis / dépendances via `src/test/mocks/` — **jamais** de vraie base en test unitaire.
+- Structure **Arrange – Act – Assert**.
+- Couvrir explicitement : cas nominal, chaque erreur métier (`NotFoundException`, `ForbiddenException`, `BadRequestException`, etc.), et les règles de périmètre (organisation, pôle, CASL) — cf. phase 2 dans `03-conception-decoupage.mdc`.
+
+### 2. Implémentation du service
+
+- Écrire le minimum dans `nom.service.ts` pour faire **passer** les tests unitaires.
+- Logique métier **uniquement** dans le service (jamais dans le contrôleur).
+
+### 3. Tests du contrôleur (ensuite)
+
+- Fichier : `nom.controller.spec.ts`.
+- Mocker le **service** (pas Prisma directement).
+- `overrideGuard` pour `JwtAuthGuard`, `PoliciesGuard`, etc. (`src/test/mocks/guards.mock.ts`).
+- Vérifier le câblage (délégation au service), pas la logique métier (déjà testée au §1).
+
+### 4. Implémentation du contrôleur
+
+- Contrôleur **mince** : validation DTO, appels service, codes HTTP.
+- Créer / compléter le `module`, les `dto`, les décorateurs CASL **après** les tests du contrôleur.
+
+### 5. Tests d’intégration (routes réelles)
+
+- **Supertest** dans `api/test/*.e2e-spec.ts` lorsque la route, les guards ou les cookies sont concernés.
+- Mocker Prisma / Redis comme dans les e2e existants (`test/helpers/`).
+- Lancer : `npm test` (unitaires) puis `npm run test:e2e` pour le module touché.
+
+### Fin de tâche
+
+- `npm test` vert sur le module modifié avant de considérer la tâche terminée.
+- Ne pas livrer de « tests après coup » uniquement pour faire passer la CI : les tests **précèdent** le code.
+
+## Tests — rappels
+
+- Jest : résolution Prisma via `moduleNameMapper` dans `package.json` (imports `.js` du client généré).
+- Réutiliser : `mockPrismaServiceProvider`, `mockConfigServiceProvider`, `allowAllGuard`.
+- Typage strict : **pas de `any`**.
+
+## Architecture
+
+- Un module = un dossier : `controller`, `service`, `dto`, `module`.
+- **Découpage domaines, multi-tenant, phases de build, audit, Decimal** : lire et appliquer `03-conception-decoupage.mdc` avant de créer un module ou une table.
+- Placer chaque feature dans le bon domaine (Core, Organisation, Catalogue HQ, Stock filiale, Budget, Inter-filiales — tableau dans `03`).
+- Isolation données : `organization-scope.ts` + filtres métier (`poleCode`, CASL) ; ne pas compter sur RLS tant qu’elle n’est pas livrée.
+- Exceptions : uniquement exceptions Nest (`BadRequestException`, `ForbiddenException`, …) — pas de `throw new Error()` dans le code métier (sauf bootstrap seeder documenté).
+- Ne jamais modifier `prisma/schema.prisma` sans migration nommée.
+
+## Auth
+
+- Passport + **access token** + **refresh token** (cookies + Redis).
+- JWT d’accès : charge utile minimale (`sub`) ; profil (rôle, organisation, pôle) **rechargé en base** à chaque requête (`AuthService.resolveAuthenticatedUser`).
+- S’inspirer de `back/` pour migrer, en respectant ces conventions.
+
+## Intégrations
+
+- Variables obligatoires : voir `api/.env.example` (`DATABASE_URL`, `JWT_SECRET`, `REDIS_*`, `SEED_*`, …).
+- Swagger : **développement uniquement** (`/docs` si `NODE_ENV !== 'production'`).
+
+## Décisions projet
+
+- Code source API dans `api/` (remplace progressivement `back/`).
+- Nouvelle table Prisma → permissions CASL + `casl-permission-names.ts` + seeder.

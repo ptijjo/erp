@@ -6,8 +6,8 @@ import { Geist } from "next/font/google";
 import { QueryProvider } from "~/providers/query-provider";
 
 export const metadata: Metadata = {
-  title: "Vifaa",
-  description: "Vifaa est une plateforme de gestion de projet",
+  title: "VIFAA ERP",
+  description: "Plateforme de gestion VIFAA — maison mère et filiales",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
@@ -20,8 +20,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="fr">
-      <body className={`${geist.variable} font-sans antialiased`}>
+    <html lang="fr" className={`${geist.variable} h-full`}>
+      <body className="min-h-full font-sans antialiased">
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

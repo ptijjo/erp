@@ -1,62 +1,44 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "~/lib/api";
 import type { PermissionDto, PermissionRoleDto, RoleDto } from "~/lib/api-types";
 
-import { apiErrorMessage } from "../../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
 import { isFullAccessRole } from "../_lib/full-access-roles";
 
 type Props = {
   roleId: string;
 };
 
-export default function EditRolePermissionsForm({ roleId }: Props) {
+function linksSyncKey(links: PermissionRoleDto[]): string {
+  return [...links]
+    .map((l) => l.permissionId)
+    .sort()
+    .join(",");
+}
+
+type InnerProps = {
+  roleId: string;
+  role: RoleDto;
+  links: PermissionRoleDto[];
+  allPermissions: PermissionDto[];
+};
+
+function EditRolePermissionsFormInner({
+  roleId,
+  role,
+  links,
+  allPermissions,
+}: InnerProps) {
   const queryClient = useQueryClient();
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [selectedIds, setSelectedIds] = useState(
+    () => new Set(links.map((l) => l.permissionId)),
+  );
   const [permSearch, setPermSearch] = useState("");
   const [rootError, setRootError] = useState<string | null>(null);
-
-  const { data: role, isLoading: roleLoading, isError: roleError } = useQuery({
-    queryKey: ["role", roleId] as const,
-    queryFn: async () => {
-      const { data } = await api.get<RoleDto>(`/role/${roleId}`);
-      return data;
-    },
-    enabled: Boolean(roleId),
-  });
-
-  const { data: links = [], isLoading: linksLoading } = useQuery({
-    queryKey: ["permission", "by-role", roleId] as const,
-    queryFn: async () => {
-      const { data } = await api.get<PermissionRoleDto[]>(
-        `/permission/by-role/${roleId}`,
-      );
-      return data;
-    },
-    enabled:
-      Boolean(roleId) &&
-      role !== undefined &&
-      !isFullAccessRole(role.name),
-  });
-
-  const { data: allPermissions = [], isLoading: permsLoading } = useQuery({
-    queryKey: ["permission", "assignment"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<PermissionDto[]>(
-        "/permission/for-assignment",
-      );
-      return data;
-    },
-    enabled: role !== undefined && !isFullAccessRole(role.name),
-  });
-
-  useEffect(() => {
-    if (linksLoading) return;
-    setSelectedIds(new Set(links.map((l) => l.permissionId)));
-  }, [links, linksLoading]);
 
   const permissionsFiltered = useMemo(() => {
     const q = permSearch.trim().toLowerCase();
@@ -120,39 +102,7 @@ export default function EditRolePermissionsForm({ roleId }: Props) {
     });
   }
 
-  if (roleLoading) {
-    return (
-      <p className="text-sm text-gray-600">Chargement du rôle…</p>
-    );
-  }
-
-  if (roleError || !role) {
-    return (
-      <p className="text-sm text-red-600" role="alert">
-        Rôle introuvable ou accès refusé.
-      </p>
-    );
-  }
-
-  if (isFullAccessRole(role.name)) {
-    return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-950">
-        <p className="font-semibold">Accès total (système)</p>
-        <p className="mt-2 text-amber-900/90">
-          Les rôles <span className="font-mono">{role.name}</span> ont un
-          accès complet géré par l’application : les permissions en base ne
-          s’appliquent pas à ce rôle. Modifiez plutôt les rôles métiers
-          personnalisés.
-        </p>
-      </div>
-    );
-  }
-
-  const busy =
-    roleLoading ||
-    linksLoading ||
-    permsLoading ||
-    saveMutation.isPending;
+  const busy = saveMutation.isPending;
 
   return (
     <div className="flex w-full max-w-5xl flex-col gap-6">
@@ -192,9 +142,7 @@ export default function EditRolePermissionsForm({ roleId }: Props) {
               className="mt-3 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm disabled:opacity-60"
             />
             <div className="mt-3 max-h-[min(22rem,45vh)] overflow-y-auto rounded-lg border border-gray-100 lg:max-h-[min(28rem,50vh)]">
-              {permsLoading || linksLoading ? (
-                <p className="p-4 text-sm text-gray-500">Chargement…</p>
-              ) : permissionsFiltered.length === 0 ? (
+              {permissionsFiltered.length === 0 ? (
                 <p className="p-4 text-sm text-gray-500">
                   Aucune permission en base.
                 </p>
@@ -242,9 +190,7 @@ export default function EditRolePermissionsForm({ roleId }: Props) {
               appliquer en base.
             </p>
             <div className="mt-3 max-h-[min(22rem,45vh)] overflow-y-auto rounded-lg border border-orange-100/80 bg-white/90 lg:max-h-[min(28rem,50vh)]">
-              {permsLoading || linksLoading ? (
-                <p className="p-4 text-sm text-gray-500">Chargement…</p>
-              ) : grantedPermissions.length === 0 ? (
+              {grantedPermissions.length === 0 ? (
                 <p className="p-4 text-sm text-gray-500">
                   Aucune permission sélectionnée. Cochez des entrées dans le
                   catalogue à gauche.
@@ -282,5 +228,81 @@ export default function EditRolePermissionsForm({ roleId }: Props) {
         {saveMutation.isPending ? "Enregistrement…" : "Enregistrer"}
       </button>
     </div>
+  );
+}
+
+export default function EditRolePermissionsForm({ roleId }: Props) {
+  const { data: role, isLoading: roleLoading, isError: roleError } = useQuery({
+    queryKey: ["role", roleId] as const,
+    queryFn: async () => {
+      const { data } = await api.get<RoleDto>(`/role/${roleId}`);
+      return data;
+    },
+    enabled: Boolean(roleId),
+  });
+
+  const { data: links = [], isLoading: linksLoading } = useQuery({
+    queryKey: ["permission", "by-role", roleId] as const,
+    queryFn: async () => {
+      const { data } = await api.get<PermissionRoleDto[]>(
+        `/permission/by-role/${roleId}`,
+      );
+      return data;
+    },
+    enabled:
+      Boolean(roleId) &&
+      role !== undefined &&
+      !isFullAccessRole(role.name),
+  });
+
+  const { data: allPermissions = [], isLoading: permsLoading } = useQuery({
+    queryKey: ["permission", "assignment"] as const,
+    queryFn: async () => {
+      const { data } = await api.get<PermissionDto[]>(
+        "/permission/for-assignment",
+      );
+      return data;
+    },
+    enabled: role !== undefined && !isFullAccessRole(role.name),
+  });
+
+  if (roleLoading) {
+    return <p className="text-sm text-gray-600">Chargement du rôle…</p>;
+  }
+
+  if (roleError || !role) {
+    return (
+      <p className="text-sm text-red-600" role="alert">
+        Rôle introuvable ou accès refusé.
+      </p>
+    );
+  }
+
+  if (isFullAccessRole(role.name)) {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-950">
+        <p className="font-semibold">Accès total (système)</p>
+        <p className="mt-2 text-amber-900/90">
+          Les rôles <span className="font-mono">{role.name}</span> ont un accès
+          complet géré par l’application : les permissions en base ne
+          s’appliquent pas à ce rôle. Modifiez plutôt les rôles métiers
+          personnalisés.
+        </p>
+      </div>
+    );
+  }
+
+  if (linksLoading || permsLoading) {
+    return <p className="text-sm text-gray-600">Chargement des permissions…</p>;
+  }
+
+  return (
+    <EditRolePermissionsFormInner
+      key={linksSyncKey(links)}
+      roleId={roleId}
+      role={role}
+      links={links}
+      allPermissions={allPermissions}
+    />
   );
 }

@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "~/lib/api";
 import type { RoleDto } from "~/lib/api-types";
 
-import { apiErrorMessage } from "../../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
 import { isFullAccessRole } from "../_lib/full-access-roles";
 
 const schema = z.object({

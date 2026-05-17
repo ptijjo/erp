@@ -4,11 +4,21 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { isAxiosError } from "axios";
 import { useRouter } from "next/navigation";
+
 import { Button } from "~/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import { dashboardHomePath, fetchMe, meQueryKey } from "~/hooks/use-me";
 import { api } from "~/lib/api";
+import { apiErrorMessage } from "~/lib/api-error-message";
 
 const schema = z.object({
   email: z.string().email({ message: "Email invalide" }),
@@ -17,26 +27,14 @@ const schema = z.object({
 
 type Schema = z.infer<typeof schema>;
 
-function loginErrorMessage(error: unknown): string {
-  if (isAxiosError(error) && error.response) {
-    const data = error.response.data;
-    if (typeof data === "string" && data.trim()) return data;
-    if (data && typeof data === "object" && "message" in data) {
-      const m = (data as { message?: unknown }).message;
-      if (typeof m === "string") return m;
-    }
-    return "Échec de connexion";
-  }
-  return "Erreur réseau lors de la connexion";
-}
-
-const LoginForm = () => {
+export default function LoginForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    setError,
   } = useForm<Schema>({
     resolver: zodResolver(schema),
   });
@@ -60,54 +58,64 @@ const LoginForm = () => {
             : "/dashboard",
       );
     } catch (error) {
-      alert(loginErrorMessage(error));
+      setError("root", {
+        message: apiErrorMessage(error, "Échec de connexion"),
+      });
     }
   };
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="flex w-1/3 flex-col items-center justify-center gap-4"
-    >
-      <div className="w-full">
-        <input
-          type="email"
-          placeholder="Email"
-          {...register("email")}
-          className="flex h-10 w-full items-center justify-center rounded border border-gray-300 bg-white px-3 py-2"
-          aria-invalid={!!errors.email}
-          autoComplete="email"
-        />
-        {errors.email && (
-          <p className="mt-1 text-center text-lg text-red-600" role="alert">
-            {errors.email.message}
-          </p>
-        )}
-      </div>
-      <div className="w-full">
-        <input
-          type="password"
-          placeholder="Mot de passe"
-          {...register("password")}
-          className="flex h-10 w-full items-center justify-center rounded border border-gray-300 bg-white px-3 py-2"
-          aria-invalid={!!errors.password}
-          autoComplete="current-password"
-        />
-        {errors.password && (
-          <p className="mt-1 text-center text-lg text-red-600" role="alert">
-            {errors.password.message}
-          </p>
-        )}
-      </div>
-      <Button
-        type="submit"
-        disabled={isSubmitting}
-        className="h-10 w-1/2 rounded-md bg-orange-500 text-center text-2xl text-white hover:bg-orange-600"
-      >
-        {isSubmitting ? "Connexion..." : "Connexion"}
-      </Button>
-    </form>
-  );
-};
+    <Card className="border-border/80 shadow-lg">
+      <CardHeader className="space-y-1">
+        <CardTitle className="text-xl">Connexion</CardTitle>
+        <CardDescription>Connectez-vous à votre espace</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <section className="space-y-2">
+            <Label htmlFor="email">Adresse e-mail</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="nom@entreprise.com"
+              autoComplete="email"
+              aria-invalid={!!errors.email}
+              {...register("email")}
+            />
+            {errors.email ? (
+              <p className="text-sm text-destructive" role="alert">
+                {errors.email.message}
+              </p>
+            ) : null}
+          </section>
 
-export default LoginForm;
+          <section className="space-y-2">
+            <Label htmlFor="password">Mot de passe</Label>
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              aria-invalid={!!errors.password}
+              {...register("password")}
+            />
+            {errors.password ? (
+              <p className="text-sm text-destructive" role="alert">
+                {errors.password.message}
+              </p>
+            ) : null}
+          </section>
+
+          {errors.root ? (
+            <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive" role="alert">
+              {errors.root.message}
+            </p>
+          ) : null}
+
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Connexion…" : "Se connecter"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}

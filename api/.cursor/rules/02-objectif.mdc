@@ -1,0 +1,70 @@
+---
+description: "[API] A quoi servira cet API"
+alwaysApply: true
+---
+
+Cette application sera un erp avec une maison mère qui sera unique du nom de VIFAA et des filiales qui seront rattachès à elle.
+Il ne peut exister qu'une seule maison mére on ne peut pas en créer une nouvelle, par contre on peut créer autant de filiale que l'on veut.
+
+## Hierarchie
+
+La maison mère sera divisée en plusieurs poles avec chacun des roles distincts. Il existera plusieurs roles par poles et certains poles dépendront d'autres.
+
+Il y'aura les poles suivants : 
+ - Pole_OPERATIONS : Gestion de toutes les différentes opérations de la société.
+ - Pole_STRATEGY_DEVELOPMENT : Gesttion stratégie et développement.
+ - Pole_FINANCE : Gestion des finances.
+ - Pole_LEGAL : Gestion des affaires juridiques.
+ - Pole_TRADITIONAL_SPIRITUAL : Gestion des cultes traditionnels et spirituels.
+ - Pole_ARCHITECTURE_HERITAGE : Gestion de l'architecture et du patrimoine.
+ - Pole_MARKETING_COMMUNICATION : Gestion du marketing, du développement et de la communication.
+ - Pole_PRODUCTION : Gestion production.
+
+Dans y'aura un role directeur dans chaque pole qui pilotera entièrement son pole ainsi que d'autres roles qu'on pourra crée pour assister le directeur du pole avec des roles bien définis. Ce qui veut dire qu'on aura : 
+
+ - DIRECTOR_OPERATIONS : Directeur opération.
+ - DIRECTOR_STRATEGY_DEVELOPMENT : Directeur stratégie et développement.
+ - DIRECTOR_FINANCE : Directeur des finances.
+ - DIRECTOR_LEGAL : Directeur des affaires juridiques.
+ - DIRECTOR_TRADITIONAL_SPIRITUAL : Directeur des cultes traditionnels et spirituels.
+ - DIRECTOR_ARCHITECTURE_HERITAGE : Directrice de l'architecture et du patrimoine.
+ - DIRECTOR_MARKETING_COMMUNICATION : Directrice du marketing, du développement et de la communication.
+ - DIRECTOR_PRODUCTION : Directeur production.
+
+ Il existera un role d'ADMIN et également un role de DIRECTOR_GENERAL : Directeur général, qui auront tous les droits et n'appartiendront à aucun pole.
+
+
+Lorsqu'on lance la base de données on vérifie toujours que ces poles existent ainsi que les roles des directeurs de pole, sans oublier l'admin et le directeur génral.
+
+L'admin sera automatiquement crée au lancement avec des variables dans le .env :  SEED_ADMIN_EMAIL pour l'email, SEED_ADMIN_PASSWORD pour le mot de passe, SEED_ADMIN_FIRST_NAME pour le prenom, SEED_ADMIN_LAST_NAME pour le nom, SEED_ADMIN_ROLE pour le role ,  SEED_ORGANIZATION_NAME queje définirai. On lancera une recherche via email et par role pour voir si le role ADMIN existe et si l'email existe, sinon on le crée.
+
+On utilisera un RBAC et des permissions qui sont liées à ces rôles avec CASL.
+
+## Actions valides
+
+```
+read | create | update | delete | manage
+```
+
+---
+
+Tous les directeurs de pole peuvent "read" tous ce qui existe dans la base de données.
+les role ADMIN, DIRECTOR_GENERAL et DIRECTOR_OPERATIONS eux par contre peuvent tout "manage".
+
+On a la possibilité de crée de nouveaux rôles pour les sociétés de filiations et leur donner un certain nombre de permission. CASL prendra en compte les permissions en fonction des rôles et filtera les différentes requêtes entrantes pour ainsi savoir qui peut faire quoi.
+
+## Utilisateurs , permissons et rôles.
+
+Chaque utilisateur a forcément un role et est forcément assicié a une société et si il appartient a la maison mère il aura obligatoirement un pole.
+Les utilisateur de la maison mère ne peuvent voir que ce qui se passe dans leur pole sauf l'admin, le durecteur général et le directeur des operations eux peuvent tout voir.
+Ceux de la maison mère ont accès à toutes les filiations et peuvent agir en fonction des permissions qu'ils ont.
+Ceux des filiales ne peuvent voir que ce qui se passe dans leur societé sans voir ce qui se passe ailleur et peuvent agir en fonction des permissions qu'ils ont mais seulement dans leur société.
+
+Au niveau du frontend on n'affichera que ce que la personne connectée a droit en fonction de rôle, sa société et ses permissions.
+
+## Table de la base donnée
+a chaque fois vérifier la table de données et mettre a jour les permissions pour que les utilisateurs concernées puissent l'utiliser correctement.
+
+## Budget
+Le buget est  crée et validé avec des lignes budgetaires nommées par la maison mère.
+Je veux aussi créer et saisir les sorties ( loyer, salaires...).

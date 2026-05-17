@@ -20,7 +20,7 @@ import type { CategoryDto, ProductDto } from "~/lib/api-types";
 import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
 
-import { apiErrorMessage } from "./_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
 import {
   categoryOptionsForSelect,
   getParentId,
@@ -30,11 +30,34 @@ import {
 type ProductSortBy = "name" | "price" | "category";
 type SortOrder = "asc" | "desc";
 
+function ProductSortIcon({
+  column,
+  sortBy,
+  sortOrder,
+}: {
+  column: ProductSortBy;
+  sortBy: ProductSortBy;
+  sortOrder: SortOrder;
+}) {
+  if (sortBy !== column) {
+    return <ArrowUpDown className="size-3.5 text-gray-400" />;
+  }
+  return sortOrder === "asc" ? (
+    <ArrowUp className="size-3.5 text-orange-600" />
+  ) : (
+    <ArrowDown className="size-3.5 text-orange-600" />
+  );
+}
+
 export default function ProduitsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: me } = useMe();
+  const { data: me, isPending: mePending } = useMe();
   const isMain = me != null && isMainOrganization(me);
+  const canReadProduct =
+    me != null && hasMePermission(me, "read", "Product");
+  const canReadCategory =
+    me != null && hasMePermission(me, "read", "Category");
   const canCreateProduct =
     me != null && hasMePermission(me, "create", "Product");
   const canUpdateProduct =
@@ -54,6 +77,7 @@ export default function ProduitsPage() {
       const { data } = await api.get<ProductDto[]>("/product");
       return data;
     },
+    enabled: !mePending && canReadProduct,
   });
 
   const { data: categories = [] } = useQuery({
@@ -62,6 +86,7 @@ export default function ProduitsPage() {
       const { data } = await api.get<CategoryDto[]>("/category");
       return data;
     },
+    enabled: !mePending && canReadCategory,
   });
   const normalizedCategories = useMemo(
     () => normalizeCategories(categories),
@@ -135,17 +160,6 @@ export default function ProduitsPage() {
     }
     setProductSortBy(column);
     setProductSortOrder("asc");
-  }
-
-  function ProductSortIcon({ column }: { column: ProductSortBy }) {
-    if (productSortBy !== column) {
-      return <ArrowUpDown className="size-3.5 text-gray-400" />;
-    }
-    return productSortOrder === "asc" ? (
-      <ArrowUp className="size-3.5 text-orange-600" />
-    ) : (
-      <ArrowDown className="size-3.5 text-orange-600" />
-    );
   }
 
   const deleteProductMutation = useMutation({
@@ -279,7 +293,11 @@ export default function ProduitsPage() {
                     aria-label="Trier par nom"
                   >
                     Nom
-                    <ProductSortIcon column="name" />
+                    <ProductSortIcon
+                      column="name"
+                      sortBy={productSortBy}
+                      sortOrder={productSortOrder}
+                    />
                   </button>
                 </th>
                 <th className="px-4 py-3 font-semibold text-gray-900">
@@ -290,7 +308,11 @@ export default function ProduitsPage() {
                     aria-label="Trier par catégorie"
                   >
                     Catégorie
-                    <ProductSortIcon column="category" />
+                    <ProductSortIcon
+                      column="category"
+                      sortBy={productSortBy}
+                      sortOrder={productSortOrder}
+                    />
                   </button>
                 </th>
                 <th className="px-4 py-3 font-semibold text-gray-900">
@@ -301,7 +323,11 @@ export default function ProduitsPage() {
                     aria-label="Trier par prix"
                   >
                     Prix
-                    <ProductSortIcon column="price" />
+                    <ProductSortIcon
+                      column="price"
+                      sortBy={productSortBy}
+                      sortOrder={productSortOrder}
+                    />
                   </button>
                 </th>
                 {isMain ? (

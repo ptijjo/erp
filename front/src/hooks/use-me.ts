@@ -9,6 +9,8 @@ export type MeRole = {
   id: string;
   name: string;
   description: string | null;
+  /** Code pôle du rôle (`null` si transversal ADMIN / DG). Aligné `GET /auth/me`. */
+  poleCode: string | null;
 };
 
 /** Profil renvoyé par `GET /auth/me` (JWT + nom d’organisation résolu côté API). */

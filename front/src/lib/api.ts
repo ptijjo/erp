@@ -1,4 +1,4 @@
-import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 
 export function getApiBaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_BASE_URL;

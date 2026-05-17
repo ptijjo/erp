@@ -13,6 +13,16 @@ export type OrganizationDto = {
   updatedAt?: string;
 };
 
+/** GET `/poles`, POST `/poles` */
+export type PoleDto = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** GET/PUT `/organisation/:id/catalog` */
 export type OrganizationCatalogDto = {
   categoryIds: string[];
@@ -24,6 +34,7 @@ export type RoleDto = {
   name: string;
   description: string | null;
   organizationScopeId: string | null;
+  poleId: string | null;
 };
 
 export type PermissionDto = {
@@ -59,6 +70,12 @@ export type PermissionRoleDto = {
   permission: PermissionDto;
 };
 
+export type RolePoleSummaryDto = {
+  id: string;
+  code: string;
+  name: string;
+};
+
 export type UserListItemDto = {
   id: string;
   email: string;
@@ -66,7 +83,12 @@ export type UserListItemDto = {
   roleId: string;
   createdAt: string;
   updatedAt: string;
-  role: { id: string; name: string; description: string | null };
+  role: {
+    id: string;
+    name: string;
+    description: string | null;
+    pole: RolePoleSummaryDto | null;
+  };
   organization: OrganizationDto;
 };
 
@@ -79,38 +101,13 @@ export type UserDetailDto = {
   updatedAt: string;
   /** Auteur de la création (journal d’audit), si enregistré. */
   createdBy: { id: string; email: string } | null;
-  role: { id: string; name: string; description: string | null };
-  organization?: OrganizationDto;
-};
-
-export type VentePaiementDto = {
-  id: string;
-  modePaiement: string;
-  amount: string | number;
-};
-
-export type VenteLineListItemDto = {
-  id: string;
-  productId: string;
-  quantity: number;
-  product: { id: string; name: string };
-};
-
-export type VenteListItemDto = {
-  id: string;
-  organizationId: string;
-  organization?: {
+  role: {
     id: string;
     name: string;
-    organizationType: string;
+    description: string | null;
+    pole: RolePoleSummaryDto | null;
   };
-  status: string;
-  totalAmount: string | number;
-  createdAt: string;
-  numeroTicket: number | null;
-  user: { email: string } | null;
-  paiements: VentePaiementDto[];
-  lignes?: VenteLineListItemDto[];
+  organization?: OrganizationDto;
 };
 
 export type CategoryDto = {
@@ -192,7 +189,7 @@ export type StockOrderDto = {
 
 export type BudgetStatusDto = "DRAFT" | "APPROVED";
 
-export type BudgetLineCategoryDto = "LOYER";
+export type BudgetLineCategoryDto = "LOYER" | "SALAIRE";
 
 export type BudgetLineDto = {
   id: string;
@@ -221,18 +218,21 @@ export type BudgetDto = {
   lines: BudgetLineDto[];
 };
 
-export type SessionCaisseDto = {
+/** GET `/budget/:budgetId/expenses` */
+export type BudgetExpenseDto = {
   id: string;
-  statut: string;
-  openedAt: string;
-  closedAt: string | null;
-  fondOuverture: string | number;
-  fondCloture: string | number | null;
-  commentaireCloture: string | null;
-  organizationId: string;
-  userId: string;
-  closedByUserId: string | null;
-  organization?: { id: string; name: string; slug: string };
-  user?: { id: string; email: string };
-  closedByUser?: { id: string; email: string } | null;
+  createdAt: string;
+  updatedAt: string;
+  budgetLineId: string;
+  amount: string | number;
+  label: string | null;
+  spentAt: string;
+  recordedByUserId: string | null;
+  budgetLine: {
+    id: string;
+    label: string;
+    category: BudgetLineCategoryDto;
+    budgetId: string;
+  };
+  recordedBy: { id: string; email: string } | null;
 };

@@ -9,7 +9,7 @@ import { hasMePermission, isAdminUser, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { PermissionDto } from "~/lib/api-types";
 
-import { apiErrorMessage } from "../../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
 
 export default function PermissionsCatalogPage() {
   const queryClient = useQueryClient();

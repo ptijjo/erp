@@ -13,7 +13,7 @@ import { api } from "~/lib/api";
 import type { CategoryDto, ProductDto, SupplierDto } from "~/lib/api-types";
 import { parseDecimal } from "~/lib/parse-decimal";
 
-import { apiErrorMessage } from "../_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
 import { categoryOptionsForSelect } from "../_lib/category-labels";
 
 const schema = z.object({

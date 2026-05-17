@@ -10,7 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 
-import { apiErrorMessage } from "../../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
 
 function slugify(value: string): string {
   return value

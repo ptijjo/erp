@@ -3,9 +3,10 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
+import { AppHeader } from "~/components/layout/app-header";
+import { AppSidebar } from "~/components/layout/app-sidebar";
+import { DashboardLoading } from "~/components/layout/dashboard-loading";
 import { dashboardHomePath, useMe } from "~/hooks/use-me";
-import Header from "./_components/header/Header";
-import NavBar from "./_components/NavBar";
 
 const FIRST_LOGIN_PATH = "/dashboard/first-login";
 
@@ -17,6 +18,8 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { data: me, isPending, isError } = useMe();
+
+  const isFirstLoginRoute = pathname === FIRST_LOGIN_PATH;
 
   useEffect(() => {
     if (isPending) return;
@@ -35,33 +38,22 @@ export default function DashboardLayout({
   }, [isPending, me, isError, pathname, router]);
 
   if (isPending) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-500 text-xl text-white">
-        Chargement…
-      </div>
-    );
+    return <DashboardLoading />;
   }
 
   if (!me) {
     return null;
   }
 
-  const displayName = me.email?.split("@")[0] ?? "Utilisateur";
-
   return (
-    <div className="flex h-screen w-full flex-col bg-gray-500">
-      <Header
-        nom={displayName}
-        imageUrl="https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png"
-        organization={me.organisationName}
-        displayName={me.email}
-      />
-      <div className="flex h-full min-h-0 w-full flex-1">
-        {pathname !== FIRST_LOGIN_PATH && <NavBar />}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
+    <section className="flex h-screen w-full flex-col overflow-hidden bg-background">
+      <AppHeader />
+      <section className="flex min-h-0 flex-1">
+        {!isFirstLoginRoute ? <AppSidebar /> : null}
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-muted/30">
           {children}
-        </div>
-      </div>
-    </div>
+        </section>
+      </section>
+    </section>
   );
 }

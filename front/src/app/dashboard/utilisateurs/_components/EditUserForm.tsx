@@ -9,9 +9,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useMe, hasMePermission, isMainOrganization } from "~/hooks/use-me";
 import { api } from "~/lib/api";
-import type { OrganizationDto, RoleDto, UserDetailDto } from "~/lib/api-types";
+import type { OrganizationDto, PoleDto, RoleDto, UserDetailDto } from "~/lib/api-types";
 
-import { apiErrorMessage } from "../../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
+import {
+  isMainOrganizationDto,
+  rolesForOrganization,
+} from "../_lib/user-form-roles";
 
 const passwordSchema = z
   .string()
@@ -21,35 +25,36 @@ const passwordSchema = z
   .regex(/[0-9]/, { message: "Au moins un chiffre" })
   .regex(/[^a-zA-Z0-9]/, { message: "Au moins un symbole" });
 
-const schema = z
-  .object({
-    organizationId: z.string().uuid({ message: "Choisissez une organisation" }),
-    roleId: z.string().uuid({ message: "Choisissez un rôle" }),
-    password: z.string(),
-  })
-  .refine(
-    (data) =>
-      data.password.trim() === "" ||
-      passwordSchema.safeParse(data.password).success,
-    { message: "Mot de passe invalide (voir la politique ci-dessous)", path: ["password"] },
-  );
-
-type Schema = z.infer<typeof schema>;
-
-const EXCLUDED_ROLE_NAMES = new Set(["ADMIN"]);
-
-function rolesForOrganization(
-  roles: RoleDto[],
-  organizationId: string,
-): RoleDto[] {
-  if (!organizationId) return [];
-  return roles.filter(
-    (r) =>
-      !EXCLUDED_ROLE_NAMES.has(r.name) &&
-      (r.organizationScopeId === null ||
-        r.organizationScopeId === organizationId),
-  );
+function buildSchema(organisations: OrganizationDto[]) {
+  return z
+    .object({
+      organizationId: z.string().uuid({ message: "Choisissez une organisation" }),
+      poleId: z.string().optional(),
+      roleId: z.string().uuid({ message: "Choisissez un rôle" }),
+      password: z.string(),
+    })
+    .superRefine((data, ctx) => {
+      const org = organisations.find((o) => o.id === data.organizationId);
+      if (isMainOrganizationDto(org) && !data.poleId) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Choisissez un pôle pour la maison mère (VIFAA)",
+          path: ["poleId"],
+        });
+      }
+    })
+    .refine(
+      (data) =>
+        data.password.trim() === "" ||
+        passwordSchema.safeParse(data.password).success,
+      {
+        message: "Mot de passe invalide (voir la politique ci-dessous)",
+        path: ["password"],
+      },
+    );
 }
+
+type Schema = z.infer<ReturnType<typeof buildSchema>>;
 
 type Props = {
   userId: string;
@@ -60,6 +65,7 @@ export default function EditUserForm({ userId }: Props) {
   const queryClient = useQueryClient();
   const { data: me, isPending: mePending } = useMe();
   const canUpdateUser = me != null && hasMePermission(me, "update", "User");
+  const canReadPole = me != null && hasMePermission(me, "read", "Pole");
 
   const { data: user, isLoading: userLoading, isError: userError } = useQuery({
     queryKey: ["user", userId] as const,
@@ -86,6 +92,15 @@ export default function EditUserForm({ userId }: Props) {
     },
   });
 
+  const { data: poles = [], isLoading: polesLoading } = useQuery({
+    queryKey: ["poles"] as const,
+    queryFn: async () => {
+      const { data } = await api.get<PoleDto[]>("/poles");
+      return data;
+    },
+    enabled: canReadPole && me != null && isMainOrganization(me),
+  });
+
   const orgsSorted = useMemo(
     () =>
       [...organisations].sort((a, b) => a.name.localeCompare(b.name, "fr")),
@@ -94,6 +109,8 @@ export default function EditUserForm({ userId }: Props) {
 
   const canChangeOrg = me != null && isMainOrganization(me);
   const isAdminTarget = user?.role.name === "ADMIN";
+
+  const schema = useMemo(() => buildSchema(organisations), [organisations]);
 
   const {
     register,
@@ -107,22 +124,33 @@ export default function EditUserForm({ userId }: Props) {
     resolver: zodResolver(schema),
     defaultValues: {
       organizationId: "",
+      poleId: "",
       roleId: "",
       password: "",
     },
   });
 
   const organizationId = useWatch({ control, name: "organizationId" });
+  const poleId = useWatch({ control, name: "poleId" });
+
+  const selectedOrg = useMemo(
+    () => organisations.find((o) => o.id === organizationId),
+    [organisations, organizationId],
+  );
+
+  const isMainOrg = isMainOrganizationDto(selectedOrg);
 
   const roleOptions = useMemo(
-    () => rolesForOrganization(roles, organizationId),
-    [roles, organizationId],
+    () =>
+      rolesForOrganization(roles, organizationId, selectedOrg, poleId || undefined),
+    [roles, organizationId, selectedOrg, poleId],
   );
 
   useEffect(() => {
     if (!user) return;
     reset({
       organizationId: user.organizationId,
+      poleId: user.role.pole?.id ?? "",
       roleId: user.roleId,
       password: "",
     });
@@ -233,7 +261,10 @@ export default function EditUserForm({ userId }: Props) {
           id="edit-user-org"
           {...register("organizationId", {
             onChange: () => {
-              if (!isAdminTarget) setValue("roleId", "");
+              if (!isAdminTarget) {
+                setValue("poleId", "");
+                setValue("roleId", "");
+              }
             },
           })}
           disabled={orgsLoading || !canChangeOrg}
@@ -258,6 +289,43 @@ export default function EditUserForm({ userId }: Props) {
           </p>
         )}
       </div>
+
+      {isMainOrg && !isAdminTarget ? (
+        <div>
+          <label
+            htmlFor="edit-user-pole"
+            className="mb-1 block text-sm font-medium text-gray-800"
+          >
+            Pôle <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="edit-user-pole"
+            {...register("poleId", {
+              onChange: () => setValue("roleId", ""),
+            })}
+            disabled={polesLoading || !canReadPole}
+            className="h-10 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25 disabled:opacity-60"
+            aria-invalid={!!errors.poleId}
+          >
+            <option value="">— Choisir un pôle —</option>
+            {poles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          {errors.poleId && (
+            <p className="mt-1 text-sm text-red-600" role="alert">
+              {errors.poleId.message}
+            </p>
+          )}
+          {!canReadPole ? (
+            <p className="mt-1 text-xs text-amber-800">
+              Vous n’avez pas la permission de consulter les pôles.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div>
         <label
@@ -285,7 +353,10 @@ export default function EditUserForm({ userId }: Props) {
               id="edit-user-role"
               {...register("roleId")}
               disabled={
-                rolesLoading || !organizationId || roleOptions.length === 0
+                rolesLoading ||
+                !organizationId ||
+                roleOptions.length === 0 ||
+                (isMainOrg && !poleId)
               }
               className="h-10 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25 disabled:opacity-60"
               aria-invalid={!!errors.roleId}
@@ -293,9 +364,11 @@ export default function EditUserForm({ userId }: Props) {
               <option value="">
                 {!organizationId
                   ? "— Choisissez d’abord une organisation —"
-                  : roleOptions.length === 0
-                    ? "— Aucun rôle compatible —"
-                    : "— Choisir —"}
+                  : isMainOrg && !poleId
+                    ? "— Choisissez d’abord un pôle —"
+                    : roleOptions.length === 0
+                      ? "— Aucun rôle compatible —"
+                      : "— Choisir —"}
               </option>
               {roleOptions.map((r) => (
                 <option
@@ -346,7 +419,8 @@ export default function EditUserForm({ userId }: Props) {
             isSubmitting ||
             updateMutation.isPending ||
             orgsLoading ||
-            rolesLoading
+            rolesLoading ||
+            (isMainOrg && polesLoading)
           }
           className="w-fit rounded-lg bg-orange-500 px-5 py-2.5 font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
         >

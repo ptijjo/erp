@@ -1,9 +1,36 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2, Wallet } from "lucide-react";
 
+import { BudgetExpensesPanel } from "~/app/dashboard/budgets/_components/BudgetExpensesPanel";
+import {
+  CATEGORY_LABEL,
+  MONTHS_FR,
+  STATUS_LABEL,
+} from "~/app/dashboard/budgets/_lib/budget-constants";
+import { PageHeader } from "~/components/layout/page-header";
+import { PageShell } from "~/components/layout/page-shell";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Skeleton } from "~/components/ui/skeleton";
 import {
   hasMePermission,
   isMainOrganization,
@@ -17,32 +44,7 @@ import type {
 } from "~/lib/api-types";
 import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
-
-import { apiErrorMessage } from "../produits/_lib/api-error-message";
-
-const CATEGORY_LABEL: Record<BudgetLineCategoryDto, string> = {
-  LOYER: "Loyer",
-};
-
-const STATUS_LABEL: Record<BudgetDto["status"], string> = {
-  DRAFT: "Brouillon",
-  APPROVED: "Validé",
-};
-
-const MONTHS_FR = [
-  "Janvier",
-  "Février",
-  "Mars",
-  "Avril",
-  "Mai",
-  "Juin",
-  "Juillet",
-  "Août",
-  "Septembre",
-  "Octobre",
-  "Novembre",
-  "Décembre",
-] as const;
+import { apiErrorMessage } from "~/lib/api-error-message";
 
 type LineForm = {
   category: BudgetLineCategoryDto;
@@ -74,7 +76,7 @@ export default function BudgetsPage() {
     me != null && hasMePermission(me, "delete", "Budget");
   const isMain = me != null && isMainOrganization(me);
 
-  const [subsidiaryId, setSubsidiaryId] = useState("");
+  const [subsidiaryId, setSubsidiaryId] = useState<string | null>(null);
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -107,10 +109,9 @@ export default function BudgetsPage() {
     [organizations],
   );
 
-  useEffect(() => {
-    if (!subsidiaries.length || subsidiaryId) return;
-    setSubsidiaryId(subsidiaries[0]?.id ?? "");
-  }, [subsidiaries, subsidiaryId]);
+  const firstSubId = subsidiaries[0]?.id ?? "";
+  const effectiveSubsidiaryId =
+    subsidiaryId !== null ? subsidiaryId : firstSubId;
 
   type SaveBody = {
     subsidiaryOrganizationId: string;
@@ -216,7 +217,7 @@ export default function BudgetsPage() {
       });
     }
 
-    if (!editingId && !subsidiaryId) {
+    if (!editingId && !effectiveSubsidiaryId) {
       alert("Choisissez une filiale.");
       return;
     }
@@ -224,7 +225,7 @@ export default function BudgetsPage() {
     saveMutation.mutate({
       editingBudgetId: editingId,
       body: {
-        subsidiaryOrganizationId: subsidiaryId,
+        subsidiaryOrganizationId: effectiveSubsidiaryId,
         year,
         month,
         lines: parsedLines,
@@ -234,331 +235,365 @@ export default function BudgetsPage() {
 
   if (mePending || !me) {
     return (
-      <main className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto bg-white p-6">
-        <p className="text-gray-600">Chargement…</p>
-      </main>
+      <PageShell>
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="mt-4 h-40 w-full max-w-3xl rounded-xl" />
+      </PageShell>
     );
   }
 
   if (!canReadBudget) {
     return (
-      <main className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto bg-white p-6">
-        <h1 className="text-4xl font-extrabold text-orange-500">Budgets</h1>
-        <p className="mt-4 text-gray-600">
+      <PageShell>
+        <PageHeader title="Budgets filiales" />
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           Vous n’avez pas la permission de consulter les budgets.
         </p>
-      </main>
+      </PageShell>
     );
   }
 
   return (
-    <main className="flex min-h-0 min-w-0 w-full flex-1 flex-col gap-6 overflow-auto bg-white p-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-4xl font-extrabold text-orange-500">
-          <Wallet className="size-9 shrink-0" />
-          Budgets filiales
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm text-gray-600">
-          {isMain
-            ? "La maison mère crée et valide les budgets mensuels par filiale. Les montants sont en FCFA. Pour l’instant, les lignes portent sur le loyer ; d’autres catégories suivront."
-            : "Budgets validés pour votre organisation (FCFA)."}
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Budgets filiales"
+        description={
+          isMain
+            ? "Création et validation des budgets mensuels par filiale. Les graphiques de consommation apparaissent une fois le budget validé et des sorties saisies."
+            : "Consultez votre budget validé, suivez vos dépenses en graphiques et enregistrez vos sorties réelles."
+        }
+        actions={
+          <Wallet className="size-8 shrink-0 text-primary" aria-hidden />
+        }
+      />
 
-      {isMain &&
-      (canCreateBudget || (editingId && canUpdateBudget)) ? (
-        <section className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {editingId ? "Modifier le brouillon" : "Nouveau budget (brouillon)"}
-          </h2>
-          <form className="mt-4 space-y-4" onSubmit={submitForm}>
-            <div className="flex flex-wrap gap-4">
-              <div className="min-w-[200px] flex-1">
-                <label className="block text-sm font-medium text-gray-700">
-                  Filiale
-                </label>
-                <select
-                  required={!editingId}
-                  disabled={Boolean(editingId)}
-                  value={subsidiaryId}
-                  onChange={(e) => setSubsidiaryId(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm disabled:bg-gray-100"
-                >
-                  <option value="">— Choisir —</option>
-                  {subsidiaries.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="w-28">
-                <label className="block text-sm font-medium text-gray-700">
-                  Année
-                </label>
-                <input
-                  type="number"
-                  min={2000}
-                  max={2100}
-                  disabled={Boolean(editingId)}
-                  value={year}
-                  onChange={(e) => setYear(Number(e.target.value))}
-                  className="mt-1 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm disabled:bg-gray-100"
-                />
-              </div>
-              <div className="w-44">
-                <label className="block text-sm font-medium text-gray-700">
-                  Mois
-                </label>
-                <select
-                  disabled={Boolean(editingId)}
-                  value={month}
-                  onChange={(e) => setMonth(Number(e.target.value))}
-                  className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm disabled:bg-gray-100"
-                >
-                  {MONTHS_FR.map((label, i) => (
-                    <option key={label} value={i + 1}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="text-sm font-medium text-gray-700">
-                Lignes budgétaires
-              </div>
-              {lines.map((row, idx) => (
-                <div
-                  key={idx}
-                  className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-white p-3"
-                >
-                  <div className="min-w-[120px]">
-                    <label className="text-xs text-gray-500">Catégorie</label>
-                    <select
-                      value={row.category}
-                      onChange={(e) => {
-                        const v = e.target.value as BudgetLineCategoryDto;
-                        setLines((prev) =>
-                          prev.map((l, i) =>
-                            i === idx ? { ...l, category: v } : l,
-                          ),
-                        );
-                      }}
-                      className="mt-0.5 h-9 w-full rounded border border-gray-300 px-2 text-sm"
-                    >
-                      <option value="LOYER">{CATEGORY_LABEL.LOYER}</option>
-                    </select>
-                  </div>
-                  <div className="min-w-[180px] flex-1">
-                    <label className="text-xs text-gray-500">Libellé</label>
-                    <input
-                      value={row.label}
-                      onChange={(e) =>
-                        setLines((prev) =>
-                          prev.map((l, i) =>
-                            i === idx ? { ...l, label: e.target.value } : l,
-                          ),
-                        )
+      <div className="mt-6 flex flex-col gap-6">
+        {isMain &&
+        (canCreateBudget || (editingId && canUpdateBudget)) ? (
+          <Card className="py-4">
+            <CardHeader className="px-4 sm:px-6">
+              <CardTitle className="text-lg">
+                {editingId ? "Modifier le brouillon" : "Nouveau budget (brouillon)"}
+              </CardTitle>
+              <CardDescription>
+                Définissez les lignes (loyer, salaires…) pour une filiale et une
+                période mensuelle.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-4 sm:px-6">
+              <form className="space-y-4" onSubmit={submitForm}>
+                <div className="flex flex-wrap gap-4">
+                  <div className="min-w-[200px] flex-1">
+                    <Label htmlFor="budget-subsidiary">Filiale</Label>
+                    <Select
+                      value={
+                        subsidiaryId !== null
+                          ? subsidiaryId
+                          : firstSubId || ""
                       }
-                      placeholder="ex. Loyer local centre-ville"
-                      className="mt-0.5 h-9 w-full rounded border border-gray-300 px-2 text-sm"
+                      onValueChange={setSubsidiaryId}
+                      disabled={Boolean(editingId)}
+                    >
+                      <SelectTrigger id="budget-subsidiary" className="mt-1">
+                        <SelectValue placeholder="— Choisir —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subsidiaries.map((o) => (
+                          <SelectItem key={o.id} value={o.id}>
+                            {o.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-28">
+                    <Label htmlFor="budget-year">Année</Label>
+                    <Input
+                      id="budget-year"
+                      type="number"
+                      min={2000}
+                      max={2100}
+                      disabled={Boolean(editingId)}
+                      value={year}
+                      onChange={(e) => setYear(Number(e.target.value))}
+                      className="mt-1"
                     />
                   </div>
-                  <div className="w-36">
-                    <label className="text-xs text-gray-500">
-                      Montant (FCFA)
-                    </label>
-                    <input
-                      inputMode="numeric"
-                      value={row.amountPlanned}
-                      onChange={(e) =>
-                        setLines((prev) =>
-                          prev.map((l, i) =>
-                            i === idx
-                              ? { ...l, amountPlanned: e.target.value }
-                              : l,
-                          ),
-                        )
-                      }
-                      className="mt-0.5 h-9 w-full rounded border border-gray-300 px-2 text-sm font-mono"
-                    />
-                  </div>
-                  {lines.length > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setLines((prev) => prev.filter((_, i) => i !== idx))
-                      }
-                      className="inline-flex h-9 items-center rounded border border-red-200 px-2 text-red-700 hover:bg-red-50"
-                      aria-label="Supprimer la ligne"
+                  <div className="w-44">
+                    <Label htmlFor="budget-month">Mois</Label>
+                    <Select
+                      value={String(month)}
+                      onValueChange={(v) => setMonth(Number(v))}
+                      disabled={Boolean(editingId)}
                     >
-                      <Trash2 className="size-4" />
-                    </button>
+                      <SelectTrigger id="budget-month" className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MONTHS_FR.map((label, i) => (
+                          <SelectItem key={label} value={String(i + 1)}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-foreground">
+                    Lignes budgétaires
+                  </p>
+                  {lines.map((row, idx) => (
+                    <div
+                      key={idx}
+                      className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-3"
+                    >
+                      <div className="min-w-[120px]">
+                        <Label className="text-xs">Catégorie</Label>
+                        <Select
+                          value={row.category}
+                          onValueChange={(v) => {
+                            const cat = v as BudgetLineCategoryDto;
+                            setLines((prev) =>
+                              prev.map((l, i) =>
+                                i === idx ? { ...l, category: cat } : l,
+                              ),
+                            );
+                          }}
+                        >
+                          <SelectTrigger className="mt-1 h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="LOYER">
+                              {CATEGORY_LABEL.LOYER}
+                            </SelectItem>
+                            <SelectItem value="SALAIRE">
+                              {CATEGORY_LABEL.SALAIRE}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="min-w-[180px] flex-1">
+                        <Label className="text-xs">Libellé</Label>
+                        <Input
+                          value={row.label}
+                          onChange={(e) =>
+                            setLines((prev) =>
+                              prev.map((l, i) =>
+                                i === idx ? { ...l, label: e.target.value } : l,
+                              ),
+                            )
+                          }
+                          placeholder="ex. Loyer local centre-ville"
+                          className="mt-1 h-9"
+                        />
+                      </div>
+                      <div className="w-36">
+                        <Label className="text-xs">Montant (FCFA)</Label>
+                        <Input
+                          inputMode="numeric"
+                          value={row.amountPlanned}
+                          onChange={(e) =>
+                            setLines((prev) =>
+                              prev.map((l, i) =>
+                                i === idx
+                                  ? { ...l, amountPlanned: e.target.value }
+                                  : l,
+                              ),
+                            )
+                          }
+                          className="mt-1 h-9 font-mono"
+                        />
+                      </div>
+                      {lines.length > 1 ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 shrink-0 text-destructive hover:text-destructive"
+                          onClick={() =>
+                            setLines((prev) => prev.filter((_, i) => i !== idx))
+                          }
+                          aria-label="Supprimer la ligne"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      ) : null}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLines((prev) => [...prev, emptyLine()])}
+                  >
+                    <Plus className="size-4" />
+                    Ajouter une ligne
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={saveMutation.isPending}>
+                    {editingId ? "Enregistrer les lignes" : "Créer le brouillon"}
+                  </Button>
+                  {editingId ? (
+                    <Button type="button" variant="outline" onClick={cancelEdit}>
+                      Annuler
+                    </Button>
                   ) : null}
                 </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => setLines((prev) => [...prev, emptyLine()])}
-                className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-              >
-                <Plus className="size-4" />
-                Ajouter une ligne
-              </button>
-            </div>
+              </form>
+            </CardContent>
+          </Card>
+        ) : null}
 
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="submit"
-                disabled={saveMutation.isPending}
-                className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
-              >
-                {editingId ? "Enregistrer les lignes" : "Créer le brouillon"}
-              </button>
-              {editingId ? (
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  Annuler
-                </button>
-              ) : null}
-            </div>
-          </form>
-        </section>
-      ) : null}
-
-      <section>
-        <h2 className="text-lg font-semibold text-gray-900">
-          Liste des budgets
-        </h2>
-        {budgetsLoading ? (
-          <p className="mt-2 text-sm text-gray-600">Chargement…</p>
-        ) : budgets.length === 0 ? (
-          <p className="mt-2 text-sm text-gray-600">Aucun budget.</p>
-        ) : (
-          <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-            <table className="w-full min-w-[880px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50/80">
-                  {isMain ? (
-                    <th className="px-4 py-3 font-semibold text-[#2D323E]">
-                      Filiale
-                    </th>
-                  ) : null}
-                  <th className="px-4 py-3 font-semibold text-[#2D323E]">
-                    Période
-                  </th>
-                  <th className="px-4 py-3 font-semibold text-[#2D323E]">
-                    Statut
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-[#2D323E]">
-                    Total (FCFA)
-                  </th>
-                  <th className="px-4 py-3 font-semibold text-[#2D323E]">
-                    Lignes
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-[#2D323E]">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {budgets.map((b) => (
-                  <tr
-                    key={b.id}
-                    className="border-b border-gray-100 last:border-0"
-                  >
-                    {isMain ? (
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {b.subsidiaryOrganization.name}
-                      </td>
-                    ) : null}
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-800">
-                      {MONTHS_FR[b.month - 1]} {b.year}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded px-2 py-0.5 text-xs font-medium ${
-                          b.status === "DRAFT"
-                            ? "bg-amber-100 text-amber-900"
-                            : "bg-emerald-100 text-emerald-900"
-                        }`}
+        <Card className="py-4">
+          <CardHeader className="px-4 sm:px-6">
+            <CardTitle className="text-lg">Liste des budgets</CardTitle>
+            <CardDescription>
+              Brouillons en attente de validation (maison mère) et budgets validés.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4 sm:px-6">
+            {budgetsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : budgets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucun budget.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="w-full min-w-[880px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      {isMain ? (
+                        <th className="px-4 py-3 font-semibold">Filiale</th>
+                      ) : null}
+                      <th className="px-4 py-3 font-semibold">Période</th>
+                      <th className="px-4 py-3 font-semibold">Statut</th>
+                      <th className="px-4 py-3 text-right font-semibold">
+                        Total (FCFA)
+                      </th>
+                      <th className="px-4 py-3 font-semibold">Lignes</th>
+                      <th className="px-4 py-3 text-right font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {budgets.map((b) => (
+                      <tr
+                        key={b.id}
+                        className="border-b border-border/60 last:border-0 hover:bg-muted/30"
                       >
-                        {STATUS_LABEL[b.status]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono font-medium text-gray-900">
-                      {formatFcfa(budgetTotalFcfa(b))}
-                    </td>
-                    <td className="max-w-md px-4 py-3 text-gray-700">
-                      <ul className="list-inside list-disc text-xs">
-                        {b.lines.map((l) => (
-                          <li key={l.id}>
-                            {CATEGORY_LABEL[l.category]} — {l.label} :{" "}
-                            {formatFcfa(parseDecimal(l.amountPlanned))}
-                          </li>
-                        ))}
-                      </ul>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {isMain && b.status === "DRAFT" ? (
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {canUpdateBudget ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => startEdit(b)}
-                                className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-800 hover:bg-gray-50"
-                              >
-                                <Pencil className="size-3.5" />
-                                Modifier
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  approveMutation.mutate(b.id)
-                                }
-                                disabled={approveMutation.isPending}
-                                className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                              >
-                                Valider
-                              </button>
-                            </>
-                          ) : null}
-                          {canDeleteBudget ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (
-                                  confirm(
-                                    "Supprimer ce brouillon de budget ?",
-                                  )
-                                ) {
-                                  deleteMutation.mutate(b.id);
-                                }
-                              }}
-                              disabled={deleteMutation.isPending}
-                              className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-800 hover:bg-red-50 disabled:opacity-50"
-                            >
-                              Supprimer
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </main>
+                        {isMain ? (
+                          <td className="px-4 py-3 font-medium">
+                            {b.subsidiaryOrganization.name}
+                          </td>
+                        ) : null}
+                        <td className="whitespace-nowrap px-4 py-3">
+                          {MONTHS_FR[b.month - 1]} {b.year}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge
+                            variant={
+                              b.status === "DRAFT" ? "secondary" : "default"
+                            }
+                            className={
+                              b.status === "APPROVED"
+                                ? "bg-emerald-600 text-white hover:bg-emerald-600/90"
+                                : undefined
+                            }
+                          >
+                            {STATUS_LABEL[b.status]}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-medium tabular-nums">
+                          {formatFcfa(budgetTotalFcfa(b))}
+                        </td>
+                        <td className="max-w-md px-4 py-3 text-muted-foreground">
+                          <ul className="list-inside list-disc text-xs">
+                            {b.lines.map((l) => (
+                              <li key={l.id}>
+                                {CATEGORY_LABEL[l.category]} — {l.label} :{" "}
+                                {formatFcfa(parseDecimal(l.amountPlanned))}
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {isMain && b.status === "DRAFT" ? (
+                            <div className="flex flex-wrap justify-end gap-2">
+                              {canUpdateBudget ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => startEdit(b)}
+                                  >
+                                    <Pencil className="size-3.5" />
+                                    Modifier
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="bg-emerald-600 hover:bg-emerald-700"
+                                    onClick={() =>
+                                      approveMutation.mutate(b.id)
+                                    }
+                                    disabled={approveMutation.isPending}
+                                  >
+                                    Valider
+                                  </Button>
+                                </>
+                              ) : null}
+                              {canDeleteBudget ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => {
+                                    if (
+                                      confirm(
+                                        "Supprimer ce brouillon de budget ?",
+                                      )
+                                    ) {
+                                      deleteMutation.mutate(b.id);
+                                    }
+                                  }}
+                                  disabled={deleteMutation.isPending}
+                                >
+                                  Supprimer
+                                </Button>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <BudgetExpensesPanel
+          budgets={budgets}
+          canViewExpenses={canReadBudget}
+          canRecordExpense={canUpdateBudget && !isMain}
+          isMain={isMain}
+        />
+      </div>
+    </PageShell>
   );
 }

@@ -49,6 +49,24 @@ services:
       db:
         condition: service_healthy
 
+  api:
+    build:
+      context: ./api
+    container_name: erp_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "3001"
+      NODE_ENV: development
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   db_data:
   redis_data:

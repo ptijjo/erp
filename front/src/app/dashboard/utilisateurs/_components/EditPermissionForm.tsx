@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "~/lib/api";
 import type { PermissionDto } from "~/lib/api-types";
 
-import { apiErrorMessage } from "../../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
 
 const schema = z.object({
   name: z.string().min(1, { message: "Le nom est requis" }).trim(),

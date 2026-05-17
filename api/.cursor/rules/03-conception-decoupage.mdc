@@ -1,0 +1,95 @@
+---
+description: "[API] Architecture cible, découpage modulaire, multi-tenant et plan de build"
+alwaysApply: true
+---
+
+# Conception et découpage (`03`)
+
+Document de **référence architecturale**. En cas d’écart avec le schéma Prisma réel, **`prisma/schema.prisma` et `02-objectif.mdc` priment** pour le métier ; ce fichier guide le **découpage** et la **vision**.
+
+## Étape 1 — Multi-tenant
+
+**Option retenue** : row-level multi-tenancy (une base, isolation par colonnes `organizationId`, périmètre pôle sur les rôles).
+
+**Cible sécurité** : politiques **RLS PostgreSQL** (filet si un `where` Nest est oublié).  
+**État actuel** : isolation applicative (Nest + `organization-scope.ts` + CASL) ; RLS à planifier — **ne pas supposer qu’elle est active**.
+
+| Concept doc historique | Code actuel |
+|------------------------|-------------|
+| `Company` / `companyId` | `Organization` / `organizationId` |
+| `isHeadquarter` | `OrganizationType` (`MAIN` \| `SUBSIDIARY`) |
+| `poleId` sur `User` | `poleId` sur `Role` ; utilisateur via `role.pole` |
+
+## Étape 2 — Modèle de données (cible fonctionnelle)
+
+Le schéma Prisma **réel** vit dans `api/prisma/schema.prisma`. L’extrait `Company` / `CatalogItem` / `Order` ci-dessous est une **vision** ; les modules existants utilisent déjà `Product`, `Stock`, `StockOrder`, `Budget`, `Supplier`, etc.
+
+Principes à respecter pour toute nouvelle table :
+
+- Clé de tenant : `organizationId` (ou table de liaison explicite).
+- Pôle : rattachement via `Role.poleId` quand pertinent (maison mère).
+- Permissions : entrée dans `casl-permission-names.ts` + seed.
+- Montants : **`Decimal`** Prisma/PostgreSQL — pas de `Float` pour l’argent (voir Étape 5).
+- Index : `@@index` sur FK fréquentes (`organizationId`, `roleId`, codes métier).
+
+## Étape 3 — Découpage modulaire Nest (DDD light)
+
+Chaque domaine = dossier module (`*.module.ts`, `*.service.ts`, `*.controller.ts`, `dto/`). **TDD** (`01-conventions-techniques.mdc`) s’applique à chaque brique.
+
+| Domaine | Modules API existants / prévus | Responsabilité |
+|---------|-------------------------------|----------------|
+| **Core — Auth** | `auth/` | JWT, refresh, cookies, session |
+| **Core — Droits** | `casl/`, `permission/`, `role/` | CASL, guards, permissions dynamiques |
+| **Core — Données** | `prisma/`, `seeder/` | Client Prisma, audit extension, seed |
+| **Core — Infra** | `redis/`, `health/`, `login-attempt/`, `audit/` | Redis, santé, tentatives login, journal |
+| **Organisation** | `organisation/`, `pole/`, `user/` | Maison mère, filiales, pôles, utilisateurs |
+| **Maison mère — Catalogue** | `category/`, `product/` | Catalogue central, prix |
+| **Filiales — Stock** | `stock/`, `supplier/` | Stock local, seuils critiques |
+| **Filiales — Finance** | `budget/` | Budgets, charges (sorties) |
+| **Inter-filiales** | `stock-order/` (évolution commandes) | Flux commandes entre orgs |
+| **Événements** (cible) | à valider avec vous | `EventEmitter2` interne avant RabbitMQ |
+
+Nouveau module : choisir la ligne du tableau, puis enchaîner **spec service → service → spec controller → controller → e2e** si route/guards.
+
+## Étape 4 — Plan de build (phases)
+
+Utiliser comme **ordre de priorité**, pas comme calendrier figé :
+
+1. **Fondations** — Auth, guards, contexte utilisateur, seed org/pôles/rôles, isolation org (fait en grande partie).
+2. **Moteur de permissions** — CASL + **tests TDD** prouvant qu’un pôle A ne lit pas le pôle B (`user`, `role` : périmètre `poleCode`).
+3. **Catalogue maison mère** — `product`, `category` ; filiales en lecture selon permissions.
+4. **Autonomie filiales** — `stock`, `budget`, alertes seuil.
+5. **Commandes inter-filiales** — machine à états sur `StockOrder` / commandes (transitions testées en TDD).
+
+## Étape 5 — Robustesse (obligatoire sur code neuf)
+
+- **Audit** : table `AuditLog` + extension Prisma (`prisma-audit.extension.ts`) — toute mutation sensible budget/stock doit passer par des chemins audités.
+- **Argent** : `Decimal`, jamais `Float` pour montants.
+- **Perf** : index sur FK de filtrage.
+- **Frontend** (rappel) : droits validés côté serveur (SSR / API), pas seulement masquage UI.
+
+## Patterns nécessitant votre accord
+
+Avant d’introduire : **RLS PostgreSQL**, **EventEmitter2** global, **RabbitMQ**, **WebSockets** stock/commandes, **monorepo TurboRepo** — demander validation explicite si non déjà présent dans le repo.
+
+## Schéma cible historique (référence uniquement)
+
+<details>
+<summary>Extrait Prisma initial (Company) — ne pas copier tel quel</summary>
+
+```prisma
+// Vision d’origine — remplacer mentalement Company → Organization
+model Company {
+  id            String    @id @default(uuid())
+  name          String
+  isHeadquarter Boolean   @default(false)
+  parentId      String?
+  poles         Pole[]
+  users         User[]
+  budgets       Budget[]
+  stocks        Stock[]
+}
+// … CatalogItem, Order, etc. — voir schema.prisma actuel
+```
+
+</details>

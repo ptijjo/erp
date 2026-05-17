@@ -5,11 +5,11 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { isAxiosError } from "axios";
 
 import { Button } from "~/components/ui/button";
 import { hasMePermission, isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
+import { apiErrorMessage } from "~/lib/api-error-message";
 import type { CategoryDto, SupplierDto } from "~/lib/api-types";
 
 import { categoryOptionsForSelect } from "../_lib/category-labels";
@@ -28,19 +28,6 @@ const schema = z.object({
 });
 
 type Schema = z.infer<typeof schema>;
-
-function apiErrorMessage(error: unknown): string {
-  if (isAxiosError(error) && error.response?.data) {
-    const data = error.response.data;
-    if (typeof data === "string" && data.trim()) return data;
-    if (data && typeof data === "object" && "message" in data) {
-      const m = (data as { message?: unknown }).message;
-      if (typeof m === "string") return m;
-      if (Array.isArray(m)) return m.join(", ");
-    }
-  }
-  return "Impossible de créer le produit";
-}
 
 export default function AddProductForm() {
   const router = useRouter();
@@ -113,7 +100,9 @@ export default function AddProductForm() {
       router.push("/dashboard/produits");
     },
     onError: (err) => {
-      setError("root", { message: apiErrorMessage(err) });
+      setError("root", {
+        message: apiErrorMessage(err, "Impossible de créer le produit"),
+      });
     },
   });
 

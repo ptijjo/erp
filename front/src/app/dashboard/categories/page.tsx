@@ -19,7 +19,7 @@ import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { CategoryDto } from "~/lib/api-types";
 
-import { apiErrorMessage } from "../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
 import {
   categoryOptionsForSelect,
   getParentId,
@@ -28,6 +28,25 @@ import {
 
 type CategorySortBy = "label" | "type";
 type SortOrder = "asc" | "desc";
+
+function CategorySortIcon({
+  column,
+  sortBy,
+  sortOrder,
+}: {
+  column: CategorySortBy;
+  sortBy: CategorySortBy;
+  sortOrder: SortOrder;
+}) {
+  if (sortBy !== column) {
+    return <ArrowUpDown className="size-3.5 text-gray-400" />;
+  }
+  return sortOrder === "asc" ? (
+    <ArrowUp className="size-3.5 text-orange-600" />
+  ) : (
+    <ArrowDown className="size-3.5 text-orange-600" />
+  );
+}
 
 export default function CategoriesPage() {
   const router = useRouter();
@@ -57,6 +76,7 @@ export default function CategoriesPage() {
       const { data } = await api.get<CategoryDto[]>("/category");
       return data;
     },
+    enabled: !mePending && canReadCategory,
   });
 
   const normalizedCategories = useMemo(
@@ -129,17 +149,6 @@ export default function CategoriesPage() {
     }
     setCategorySortBy(column);
     setCategorySortOrder("asc");
-  }
-
-  function CategorySortIcon({ column }: { column: CategorySortBy }) {
-    if (categorySortBy !== column) {
-      return <ArrowUpDown className="size-3.5 text-gray-400" />;
-    }
-    return categorySortOrder === "asc" ? (
-      <ArrowUp className="size-3.5 text-orange-600" />
-    ) : (
-      <ArrowDown className="size-3.5 text-orange-600" />
-    );
   }
 
   const deleteCategoryMutation = useMutation({
@@ -302,7 +311,11 @@ export default function CategoriesPage() {
                     aria-label="Trier par libellé"
                   >
                     Libellé
-                    <CategorySortIcon column="label" />
+                    <CategorySortIcon
+                      column="label"
+                      sortBy={categorySortBy}
+                      sortOrder={categorySortOrder}
+                    />
                   </button>
                 </th>
                 <th className="px-4 py-3 font-semibold text-gray-900">
@@ -313,7 +326,11 @@ export default function CategoriesPage() {
                     aria-label="Trier par type"
                   >
                     Type
-                    <CategorySortIcon column="type" />
+                    <CategorySortIcon
+                      column="type"
+                      sortBy={categorySortBy}
+                      sortOrder={categorySortOrder}
+                    />
                   </button>
                 </th>
                 <th className="px-4 py-3 text-right font-semibold text-gray-900">

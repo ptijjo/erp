@@ -3,30 +3,61 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { hasMePermission, isAdminUser, useMe } from "~/hooks/use-me";
+import {
+  hasMePermission,
+  isAdminUser,
+  isMainOrganization,
+  useMe,
+  type Me,
+} from "~/hooks/use-me";
 import { api } from "~/lib/api";
-import type { OrganizationDto, PermissionDto, RoleDto } from "~/lib/api-types";
+import type { OrganizationDto, PermissionDto, PoleDto, RoleDto } from "~/lib/api-types";
 
-import { apiErrorMessage } from "../../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
+import { isMainOrganizationDto } from "../_lib/user-form-roles";
 
-const schema = z.object({
-  roleName: z.string().min(1, { message: "Le nom du rôle est requis" }).trim(),
-  roleDescription: z.string().optional(),
-  organizationScopeId: z.string().optional(),
-});
+function buildSchema(organisations: OrganizationDto[], viewerIsMainOrg: boolean) {
+  return z
+    .object({
+      roleName: z
+        .string()
+        .min(1, { message: "Le nom du rôle est requis" })
+        .trim(),
+      roleDescription: z.string().optional(),
+      organizationScopeId: z.string().optional(),
+      poleId: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (!viewerIsMainOrg) return;
+      const scopeId = data.organizationScopeId?.trim();
+      if (!scopeId) return;
+      const org = organisations.find((o) => o.id === scopeId);
+      if (isMainOrganizationDto(org) && !data.poleId?.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Choisissez un pôle pour la maison mère (VIFAA)",
+          path: ["poleId"],
+        });
+      }
+    });
+}
 
-type Schema = z.infer<typeof schema>;
+type Schema = z.infer<ReturnType<typeof buildSchema>>;
 
-export default function AddRoleForm() {
-  const { data: me, isPending: mePending } = useMe();
-  const canCreateRole = me != null && hasMePermission(me, "create", "Role");
-  const canManagePermissions =
-    me != null && hasMePermission(me, "update", "Permission");
+type AddRoleFormContentProps = {
+  me: Me;
+};
+
+function AddRoleFormContent({ me }: AddRoleFormContentProps) {
+  const viewerIsMainOrg = isMainOrganization(me);
+  const canManagePermissions = hasMePermission(me, "update", "Permission");
+  const canReadPole = hasMePermission(me, "read", "Pole");
+
   const router = useRouter();
   const queryClient = useQueryClient();
   const [selectedExisting, setSelectedExisting] = useState<Set<string>>(
@@ -41,7 +72,15 @@ export default function AddRoleForm() {
       const { data } = await api.get<OrganizationDto[]>("/organisation");
       return data;
     },
-    enabled: canCreateRole,
+  });
+
+  const { data: poles = [], isLoading: polesLoading } = useQuery({
+    queryKey: ["poles"] as const,
+    queryFn: async () => {
+      const { data } = await api.get<PoleDto[]>("/poles");
+      return data;
+    },
+    enabled: canReadPole && viewerIsMainOrg,
   });
 
   const { data: allPermissions = [], isLoading: permsLoading } = useQuery({
@@ -74,9 +113,16 @@ export default function AddRoleForm() {
     );
   }, [allPermissions, permSearch]);
 
+  const schema = useMemo(
+    () => buildSchema(organisations, viewerIsMainOrg),
+    [organisations, viewerIsMainOrg],
+  );
+
   const {
     register,
     handleSubmit,
+    control,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<Schema>({
     resolver: zodResolver(schema),
@@ -84,23 +130,49 @@ export default function AddRoleForm() {
       roleName: "",
       roleDescription: "",
       organizationScopeId: "",
+      poleId: "",
     },
   });
 
+  const organizationScopeId = useWatch({ control, name: "organizationScopeId" });
+
+  const selectedScopeOrg = useMemo(
+    () => organisations.find((o) => o.id === organizationScopeId),
+    [organisations, organizationScopeId],
+  );
+
+  const scopeIsMainOrg =
+    viewerIsMainOrg &&
+    Boolean(organizationScopeId) &&
+    isMainOrganizationDto(selectedScopeOrg);
+
   const submitMutation = useMutation({
     mutationFn: async (values: Schema) => {
+      const scopeId = values.organizationScopeId?.trim();
+      const scopedOrg = scopeId
+        ? organisations.find((o) => o.id === scopeId)
+        : undefined;
+
       const rolePayload: {
         name: string;
         description?: string;
         organizationScopeId?: string;
+        poleId?: string;
       } = {
         name: values.roleName.trim(),
       };
       if (values.roleDescription?.trim()) {
         rolePayload.description = values.roleDescription.trim();
       }
-      if (values.organizationScopeId?.trim()) {
-        rolePayload.organizationScopeId = values.organizationScopeId.trim();
+      if (scopeId) {
+        rolePayload.organizationScopeId = scopeId;
+      }
+      if (
+        viewerIsMainOrg &&
+        isMainOrganizationDto(scopedOrg) &&
+        values.poleId?.trim()
+      ) {
+        rolePayload.poleId = values.poleId.trim();
       }
 
       const { data: role } = await api.post<RoleDto>("/role", rolePayload);
@@ -140,42 +212,6 @@ export default function AddRoleForm() {
     });
   }
 
-  if (mePending) {
-    return <p className="text-sm text-gray-600">Vérification des droits…</p>;
-  }
-
-  if (me == null) {
-    return (
-      <div className="max-w-lg rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-800">
-        <p className="font-semibold">Session non disponible</p>
-        <Link
-          href="/"
-          className="mt-3 inline-block font-medium text-orange-600 underline-offset-2 hover:underline"
-        >
-          Se connecter
-        </Link>
-      </div>
-    );
-  }
-
-  if (!canCreateRole) {
-    return (
-      <div
-        className="max-w-lg rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-950"
-        role="alert"
-      >
-        <p className="font-semibold">Accès refusé</p>
-        <p className="mt-2">Vous n’avez pas la permission de créer des rôles.</p>
-        <Link
-          href="/dashboard/utilisateurs/roles"
-          className="mt-4 inline-block font-medium text-orange-700 underline-offset-2 hover:underline"
-        >
-          Retour à la liste des rôles
-        </Link>
-      </div>
-    );
-  }
-
   return (
     <form
       onSubmit={handleSubmit((data) => {
@@ -194,7 +230,8 @@ export default function AddRoleForm() {
         <h2 className="text-lg font-semibold text-[#2D323E]">Rôle</h2>
         <p className="mt-1 text-sm text-gray-600">
           Le nom est normalisé en majuscules côté serveur. Périmètre optionnel
-          pour limiter le rôle à une organisation.
+          pour limiter le rôle à une organisation. Si le périmètre est la maison
+          mère (VIFAA), un pôle est obligatoire.
         </p>
         <div className="mt-4 flex flex-col gap-4">
           <div>
@@ -239,7 +276,9 @@ export default function AddRoleForm() {
             </label>
             <select
               id="role-scope"
-              {...register("organizationScopeId")}
+              {...register("organizationScopeId", {
+                onChange: () => setValue("poleId", ""),
+              })}
               disabled={orgsLoading}
               className="h-10 w-full cursor-pointer rounded-lg border border-gray-300 px-3 disabled:opacity-60"
             >
@@ -251,6 +290,40 @@ export default function AddRoleForm() {
               ))}
             </select>
           </div>
+          {scopeIsMainOrg ? (
+            <div>
+              <label
+                htmlFor="role-pole"
+                className="mb-1 block text-sm font-medium text-gray-800"
+              >
+                Pôle <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="role-pole"
+                {...register("poleId")}
+                disabled={polesLoading || !canReadPole}
+                className="h-10 w-full cursor-pointer rounded-lg border border-gray-300 px-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25 disabled:opacity-60"
+                aria-invalid={!!errors.poleId}
+              >
+                <option value="">— Choisir un pôle —</option>
+                {poles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              {errors.poleId && (
+                <p className="mt-1 text-sm text-red-600" role="alert">
+                  {errors.poleId.message}
+                </p>
+              )}
+              {!canReadPole ? (
+                <p className="mt-1 text-xs text-amber-800">
+                  Vous n’avez pas la permission de consulter les pôles.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -357,6 +430,7 @@ export default function AddRoleForm() {
           isSubmitting ||
           submitMutation.isPending ||
           orgsLoading ||
+          (scopeIsMainOrg && canReadPole && polesLoading) ||
           (canManagePermissions && permsLoading)
         }
         className="w-fit rounded-lg bg-orange-500 px-6 py-2.5 font-semibold text-white shadow-sm hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
@@ -369,4 +443,47 @@ export default function AddRoleForm() {
       </button>
     </form>
   );
+}
+
+export default function AddRoleForm() {
+  const { data: me, isPending: mePending } = useMe();
+  const canCreateRole = me != null && hasMePermission(me, "create", "Role");
+
+  if (mePending) {
+    return <p className="text-sm text-gray-600">Vérification des droits…</p>;
+  }
+
+  if (me == null) {
+    return (
+      <div className="max-w-lg rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-800">
+        <p className="font-semibold">Session non disponible</p>
+        <Link
+          href="/"
+          className="mt-3 inline-block font-medium text-orange-600 underline-offset-2 hover:underline"
+        >
+          Se connecter
+        </Link>
+      </div>
+    );
+  }
+
+  if (!canCreateRole) {
+    return (
+      <div
+        className="max-w-lg rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-950"
+        role="alert"
+      >
+        <p className="font-semibold">Accès refusé</p>
+        <p className="mt-2">Vous n’avez pas la permission de créer des rôles.</p>
+        <Link
+          href="/dashboard/utilisateurs/roles"
+          className="mt-4 inline-block font-medium text-orange-700 underline-offset-2 hover:underline"
+        >
+          Retour à la liste des rôles
+        </Link>
+      </div>
+    );
+  }
+
+  return <AddRoleFormContent me={me} />;
 }

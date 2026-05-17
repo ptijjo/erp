@@ -1,0 +1,37 @@
+---
+description: '[API] Lecture obligatoire avant toute modification — checklist et priorité des règles'
+alwaysApply: true
+---
+
+# Avant toute action dans `api/`
+
+**Lire et appliquer à la lettre** les fichiers de ce dossier, dans l'ordre :
+
+1. Ce fichier (`00-obligatoire-avant-action.mdc`)
+2. `01-conventions-techniques.mdc` — **TDD** (tests → service → tests → contrôleur)
+3. `02-objectif.mdc` — **métier** VIFAA, pôles, rôles, RBAC
+4. `03-conception-decoupage.mdc` — **architecture**, modules, multi-tenant, phases
+
+**Priorité en cas de conflit** : sécurité (RBAC, périmètre org/pôle) > `02-objectif` > schéma Prisma réel > `03` (vision) > `01` (process).
+
+## Checklist (ne pas démarrer sans l'avoir parcourue)
+
+- [ ] J'ai lu les quatre fichiers ci-dessus.
+- [ ] **TDD** : `*.service.spec.ts` → service → `*.controller.spec.ts` → contrôleur ; mettre à jour le test **avant** d’implémenter la fonction visée (`01-conventions-techniques.mdc`).
+- [ ] **Découpage** : le module concerné est identifié dans le tableau de `03-conception-decoupage.mdc`.
+- [ ] Je connais le périmètre : maison mère VIFAA vs filiale, pôle, impact sur les requêtes (`02-objectif`).
+- [ ] Toute nouvelle table : migration Prisma + permissions CASL + `casl-permission-names.ts` + seeder.
+- [ ] Pas de `Float` pour l’argent ; audit sur mutations budget/stock si applicable (`03`).
+- [ ] Je n'introduis **aucun** pattern non utilisé (RLS, EventEmitter2, RabbitMQ, etc.) sans **votre approbation explicite**.
+- [ ] Je réponds en **français** à l'utilisateur.
+
+## Référence projet (résumé)
+
+- Logique métier dans les **services** ; contrôleurs fins.
+- Exceptions NestJS natives en code métier.
+- Tests unitaires : mocks BDD, Arrange-Act-Assert.
+- Tests e2e : **Supertest** pour routes, guards, cookies.
+- Typage strict : pas de **`any`**.
+- Swagger en dev uniquement.
+
+Détail TDD : `01-conventions-techniques.mdc` — détail architecture : `03-conception-decoupage.mdc`.

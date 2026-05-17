@@ -10,7 +10,8 @@ import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { UserDetailDto } from "~/lib/api-types";
 
-import { apiErrorMessage } from "../../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
+import { rolePoleLabel } from "../_lib/pole-label";
 
 export default function UserDetailPage() {
   const router = useRouter();
@@ -135,6 +136,19 @@ export default function UserDetailPage() {
           <p>
             <span className="font-semibold text-gray-900">Rôle :</span>{" "}
             {user.role.name}
+          </p>
+          <p>
+            <span className="font-semibold text-gray-900">Pôle :</span>{" "}
+            {user.role.pole ? (
+              <>
+                {rolePoleLabel(user.role.pole)}
+                <span className="ml-2 font-mono text-xs text-gray-500">
+                  ({user.role.pole.code})
+                </span>
+              </>
+            ) : (
+              <span className="text-gray-500">{rolePoleLabel(null)}</span>
+            )}
           </p>
           {user.role.description ? (
             <p className="text-sm text-gray-600">{user.role.description}</p>

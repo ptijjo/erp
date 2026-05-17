@@ -1,0 +1,42 @@
+---
+description: '[FRONT] Lecture obligatoire avant toute modification — checklist et priorité des règles'
+alwaysApply: true
+---
+
+# Avant toute action dans `front/`
+
+**Lire et appliquer à la lettre** les **quatre** fichiers de `front/.cursor/rules/`, dans l'ordre :
+
+1. Ce fichier (`00-obligatoire-avant-action.mdc`)
+2. `01-conventions-techniques.mdc` — **DX**, stack, colocation, Query, formulaires, design system
+3. `02-objectif.mdc` — **métier** VIFAA, pôles, rôles, RBAC (affichage et périmètre)
+4. `03-conception-decoupage.mdc` — **UX polymorphe**, routes, mapping API, phases (aligné `api/.cursor/rules/03-conception-decoupage.mdc`)
+
+**Priorité en cas de conflit** : sécurité (RBAC, périmètre org/pôle) > `02-objectif` > contrat API (`api/`) > `03` (UX / cible) > `01` (process et DX).
+
+## Checklist (ne pas démarrer sans l'avoir parcourue)
+
+- [ ] J'ai lu les **quatre** fichiers listés ci-dessus.
+- [ ] **DX** : colocation `dashboard/<domaine>/{_components,_lib}`, clés React Query alignées API, `npm run check` avant fin de tâche (`01`).
+- [ ] **Permissions** : `hasMePermission` / `useMe` sur nav, boutons et formulaires — l'API tranche toujours (`01`, `02`).
+- [ ] **Découpage** : ligne du tableau domaines + phase dans `03` (miroir `api/03`).
+- [ ] Périmètre : maison mère vs filiale, pôle, impact affichage (`02`).
+- [ ] Nouvelle ressource : sujet CASL + `NavBar` + types dans `~/lib/api-types.ts` si besoin.
+- [ ] Montants : `format-fcfa` / `parse-decimal` — pas de flottants pour l'argent.
+- [ ] Aucun pattern hors repo (middleware, state global, nouvelle lib UI) sans **votre accord** (`01`, `03`).
+- [ ] Réponse utilisateur en **français**.
+
+## Référence projet (résumé)
+
+| Sujet | Emplacement |
+|-------|-------------|
+| HTTP + refresh | `~/lib/api.ts` |
+| Session / droits | `~/hooks/use-me.ts`, `GET /auth/me` |
+| DTO | `~/lib/api-types.ts` |
+| Erreurs API | `~/lib/api-error-message.ts` |
+| UI | `~/components/ui` (Shadcn), Lucide, Geist |
+| Données | `QueryProvider`, TanStack Query |
+| Env | `src/env.js`, `NEXT_PUBLIC_BASE_URL` |
+| API métier | dossier `api/` |
+
+Détail DX et patterns : `01-conventions-techniques.mdc` — UX et routes : `03-conception-decoupage.mdc`.

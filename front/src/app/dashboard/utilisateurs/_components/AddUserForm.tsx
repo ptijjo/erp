@@ -9,10 +9,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "~/lib/api";
-import type { OrganizationDto, RoleDto } from "~/lib/api-types";
-import { hasMePermission, useMe } from "~/hooks/use-me";
+import type { OrganizationDto, PoleDto, RoleDto } from "~/lib/api-types";
+import { hasMePermission, isMainOrganization, useMe } from "~/hooks/use-me";
 
-import { apiErrorMessage } from "../../produits/_lib/api-error-message";
+import { apiErrorMessage } from "~/lib/api-error-message";
+import {
+  isMainOrganizationDto,
+  rolesForOrganization,
+} from "../_lib/user-form-roles";
 
 const passwordSchema = z
   .string()
@@ -22,36 +26,35 @@ const passwordSchema = z
   .regex(/[0-9]/, { message: "Au moins un chiffre" })
   .regex(/[^a-zA-Z0-9]/, { message: "Au moins un symbole" });
 
-const schema = z.object({
-  email: z.string().email({ message: "Email invalide" }).trim(),
-  password: passwordSchema,
-  organizationId: z.string().uuid({ message: "Choisissez une organisation" }),
-  roleId: z.string().uuid({ message: "Choisissez un rôle" }),
-});
-
-type Schema = z.infer<typeof schema>;
-
-/** Rôle réservé au seeder : jamais proposé à la création manuelle. */
-const EXCLUDED_ROLE_NAMES = new Set(["ADMIN"]);
-
-function rolesForOrganization(
-  roles: RoleDto[],
-  organizationId: string,
-): RoleDto[] {
-  if (!organizationId) return [];
-  return roles.filter(
-    (r) =>
-      !EXCLUDED_ROLE_NAMES.has(r.name) &&
-      (r.organizationScopeId === null ||
-        r.organizationScopeId === organizationId),
-  );
+function buildSchema(organisations: OrganizationDto[]) {
+  return z
+    .object({
+      email: z.string().email({ message: "Email invalide" }).trim(),
+      password: passwordSchema,
+      organizationId: z.string().uuid({ message: "Choisissez une organisation" }),
+      poleId: z.string().optional(),
+      roleId: z.string().uuid({ message: "Choisissez un rôle" }),
+    })
+    .superRefine((data, ctx) => {
+      const org = organisations.find((o) => o.id === data.organizationId);
+      if (isMainOrganizationDto(org) && !data.poleId) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Choisissez un pôle pour la maison mère (VIFAA)",
+          path: ["poleId"],
+        });
+      }
+    });
 }
+
+type Schema = z.infer<ReturnType<typeof buildSchema>>;
 
 export default function AddUserForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: me, isPending: mePending } = useMe();
   const canCreateUser = me != null && hasMePermission(me, "create", "User");
+  const canReadPole = me != null && hasMePermission(me, "read", "Pole");
 
   const { data: organisations = [], isLoading: orgsLoading } = useQuery({
     queryKey: ["organisation"] as const,
@@ -69,11 +72,22 @@ export default function AddUserForm() {
     },
   });
 
+  const { data: poles = [], isLoading: polesLoading } = useQuery({
+    queryKey: ["poles"] as const,
+    queryFn: async () => {
+      const { data } = await api.get<PoleDto[]>("/poles");
+      return data;
+    },
+    enabled: canReadPole && me != null && isMainOrganization(me),
+  });
+
   const orgsSorted = useMemo(
     () =>
       [...organisations].sort((a, b) => a.name.localeCompare(b.name, "fr")),
     [organisations],
   );
+
+  const schema = useMemo(() => buildSchema(organisations), [organisations]);
 
   const {
     register,
@@ -88,15 +102,25 @@ export default function AddUserForm() {
       email: "",
       password: "",
       organizationId: "",
+      poleId: "",
       roleId: "",
     },
   });
 
   const organizationId = useWatch({ control, name: "organizationId" });
+  const poleId = useWatch({ control, name: "poleId" });
+
+  const selectedOrg = useMemo(
+    () => organisations.find((o) => o.id === organizationId),
+    [organisations, organizationId],
+  );
+
+  const isMainOrg = isMainOrganizationDto(selectedOrg);
 
   const roleOptions = useMemo(
-    () => rolesForOrganization(roles, organizationId),
-    [roles, organizationId],
+    () =>
+      rolesForOrganization(roles, organizationId, selectedOrg, poleId || undefined),
+    [roles, organizationId, selectedOrg, poleId],
   );
 
   const createMutation = useMutation({
@@ -167,6 +191,13 @@ export default function AddUserForm() {
         minimum, majuscule, minuscule, chiffre, symbole). Si le compte est en
         première connexion, l’utilisateur devra le changer à la prochaine
         ouverture de session.
+        {isMainOrg ? (
+          <>
+            {" "}
+            Pour la maison mère <strong>VIFAA</strong>, sélectionnez d’abord un{" "}
+            <strong>pôle</strong>, puis un rôle rattaché à ce pôle.
+          </>
+        ) : null}
       </p>
 
       {errors.root && (
@@ -229,7 +260,10 @@ export default function AddUserForm() {
         <select
           id="user-org"
           {...register("organizationId", {
-            onChange: () => setValue("roleId", ""),
+            onChange: () => {
+              setValue("poleId", "");
+              setValue("roleId", "");
+            },
           })}
           disabled={orgsLoading}
           className="h-10 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25 disabled:opacity-60"
@@ -249,6 +283,43 @@ export default function AddUserForm() {
         )}
       </div>
 
+      {isMainOrg ? (
+        <div>
+          <label
+            htmlFor="user-pole"
+            className="mb-1 block text-sm font-medium text-gray-800"
+          >
+            Pôle <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="user-pole"
+            {...register("poleId", {
+              onChange: () => setValue("roleId", ""),
+            })}
+            disabled={polesLoading || !canReadPole}
+            className="h-10 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25 disabled:opacity-60"
+            aria-invalid={!!errors.poleId}
+          >
+            <option value="">— Choisir un pôle —</option>
+            {poles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          {errors.poleId && (
+            <p className="mt-1 text-sm text-red-600" role="alert">
+              {errors.poleId.message}
+            </p>
+          )}
+          {!canReadPole ? (
+            <p className="mt-1 text-xs text-amber-800">
+              Vous n’avez pas la permission de consulter les pôles.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div>
         <label
           htmlFor="user-role"
@@ -259,16 +330,23 @@ export default function AddUserForm() {
         <select
           id="user-role"
           {...register("roleId")}
-          disabled={rolesLoading || !organizationId || roleOptions.length === 0}
+          disabled={
+            rolesLoading ||
+            !organizationId ||
+            roleOptions.length === 0 ||
+            (isMainOrg && !poleId)
+          }
           className="h-10 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25 disabled:opacity-60"
           aria-invalid={!!errors.roleId}
         >
           <option value="">
             {!organizationId
               ? "— Choisissez d’abord une organisation —"
-              : roleOptions.length === 0
-                ? "— Aucun rôle compatible —"
-                : "— Choisir —"}
+              : isMainOrg && !poleId
+                ? "— Choisissez d’abord un pôle —"
+                : roleOptions.length === 0
+                  ? "— Aucun rôle compatible —"
+                  : "— Choisir —"}
           </option>
           {roleOptions.map((r) => (
             <option key={r.id} value={r.id} title={r.description ?? undefined}>
@@ -281,12 +359,16 @@ export default function AddUserForm() {
             {errors.roleId.message}
           </p>
         )}
-        {organizationId && roleOptions.length === 0 && !rolesLoading && (
-          <p className="mt-1 text-xs text-amber-800">
-            Aucun rôle global ou rattaché à cette organisation. Vérifiez les
-            rôles en base.
-          </p>
-        )}
+        {organizationId &&
+          (!isMainOrg || poleId) &&
+          roleOptions.length === 0 &&
+          !rolesLoading && (
+            <p className="mt-1 text-xs text-amber-800">
+              {isMainOrg
+                ? "Aucun rôle rattaché à ce pôle. Créez un rôle pour ce pôle ou choisissez un autre pôle."
+                : "Aucun rôle compatible pour cette filiale."}
+            </p>
+          )}
       </div>
 
       <button
@@ -295,7 +377,8 @@ export default function AddUserForm() {
           isSubmitting ||
           createMutation.isPending ||
           orgsLoading ||
-          rolesLoading
+          rolesLoading ||
+          (isMainOrg && polesLoading)
         }
         className="w-fit rounded-lg bg-orange-500 px-5 py-2.5 font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
       >

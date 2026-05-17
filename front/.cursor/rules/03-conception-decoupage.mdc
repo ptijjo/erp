@@ -1,0 +1,161 @@
+---
+description: '[FRONT] UX polymorphe, App Router, mapping API et plan de build (aligné api/03)'
+alwaysApply: true
+---
+
+# Conception et découpage frontend (`03`)
+
+Référence **UX + architecture UI**, alignée sur `api/.cursor/rules/03-conception-decoupage.mdc`.
+
+Priorités en cas d’écart : `02-objectif.mdc` > contrôleurs `api/` > code existant `front/src/` > cible ci-dessous.
+
+---
+
+## Stratégie UX — expérience polymorphe
+
+Une seule app Next.js, **plusieurs visages** selon `GET /auth/me` (rôle, `organizationType`, `permissions`, `permissionMode`).
+
+### Tableau de bord DG / ADMIN / directeur opérations
+
+- Vue **macro** maison mère : KPIs consolidés (budgets, stocks filiales) — **cible** `hq/overview`.
+- **Sélecteur de filiale** en lecture pour « se glisser » dans une filiale sans changer de compte — cible UX, pas encore route dédiée.
+- Accès élargi : `permissionMode === "FULL_ACCESS"` ou permissions `manage:all`.
+
+### Tableau de bord directeur de pôle
+
+- Modules **limités au pôle** du rôle (`role.pole` côté API).
+- Onglet **supervision filiales** : tableaux catalogue / stocks en **lecture** ; boutons modifier/supprimer masqués **et** refusés par l’API.
+- `read` large pour les directeurs de pôle ; périmètre pôle appliqué côté Nest sur les écritures.
+
+### Tableau de bord filiale (manager / employé)
+
+- UI centrée sur **son** `organizationSlug` — entrée « Mon organisation » dans la NavBar.
+- **Alertes prioritaires** (cible) : bandeau si budget dépassé ou stock sous seuil critique.
+- **Commandes inter-filiales** (cible) : UI type boîte mail — reçues / envoyées (`subsidiary/b2b-orders`).
+
+### Implémentation actuelle
+
+- Filtrage menu : `NavBar` + `hasMePermission` + `mainOnly` + `isMainOrganization`.
+- Pas encore de layouts séparés `hq/` vs `subsidiary/` — tout passe par `dashboard/*`.
+
+---
+
+## Étape 1 — Multi-tenant (impact UI)
+
+| Concept API | Affichage front |
+|-------------|-----------------|
+| `Organization` / `MAIN` \| `SUBSIDIARY` | `Me.organizationType`, `isMainOrganization(me)` |
+| Filiale | pas de liste orgs globale ; lien `subsidiaryOrganizationPath` |
+| Pôle sur le rôle | menus et données filtrés côté API ; UI à affiner par pôle |
+
+**Sécurité** : validation API obligatoire ; le masquage UI est un complément (`01-conventions-techniques.mdc`).
+
+---
+
+## Étape 2 — Données affichées
+
+- Montants : `format-fcfa` / `parse-decimal`.
+- Nouvelle ressource : sujet CASL + `NavBar` + boutons `hasMePermission`.
+- Listes : pattern actuel = tables HTML + état local ; **cible** = TanStack Table pour gros volumes.
+
+---
+
+## Étape 3 — Mapping domaines API → écrans
+
+| Domaine (api/03) | Modules API | Front actuel (`dashboard/`) | Cible route groups |
+|------------------|-------------|----------------------------|-------------------|
+| **Core — Auth** | `auth/` | `/`, `first-login`, `~/lib/api.ts` | `(auth)/login` |
+| **Core — Droits** | `casl/`, `permission/`, `role/` | `utilisateurs/` (+ rôles, permissions) | idem |
+| **Core — Infra** | `audit/` | `audit/` | idem |
+| **Organisation** | `organisation/`, `pole/`, `user/` | `organisations/`, `utilisateurs/` | `hq/` + filiale |
+| **Catalogue HQ** | `category/`, `product/` | `produits/`, `categories/` | `hq/catalog` |
+| **Stock filiale** | `stock/`, `supplier/` | `stocks/`, `fournisseurs/` (`mainOnly`) | `subsidiary/stock` |
+| **Finance** | `budget/` | `budgets/` (sorties) ; `comptabilite/` = **Synthèse commandes** (`StockOrder`) | `subsidiary/finance` |
+| **Inter-filiales** | `stock-order/` | partiel dans `stocks/` (commandes) | `subsidiary/b2b-orders` |
+| **Transverse** | — | `gestion/` (placeholder) | à définir avec vous |
+
+Avant un nouvel écran : une ligne du tableau + permission API vérifiée.
+
+---
+
+## Étape 4 — Plan de build (phases, aligné API)
+
+1. **Fondations** — auth cookies, refresh, `useMe`, NavBar — **en cours**.
+2. **Permissions UI** — cohérence `hasMePermission` / sujets CASL sur chaque action.
+3. **Catalogue HQ** — produits, catégories, catalogue org (`OrganisationCatalogPanel`).
+4. **Autonomie filiales** — stocks, budgets, alertes seuil.
+5. **Commandes inter-filiales** — flux `StockOrder`, UI boîte mail.
+
+---
+
+## Étape 5 — Robustesse UI
+
+- Erreurs mutations : `apiErrorMessage`, pas de contournement API.
+- SSR : pas de données hors périmètre utilisateur.
+- Audit : `read:AuditLog` + règles spéciales dans `use-me.ts`.
+
+---
+
+## App Router — actuel vs cible
+
+**Actuel**
+
+```
+src/app/
+├── layout.tsx                 # Geist, QueryProvider
+├── page.tsx                   # Login
+└── dashboard/
+    ├── layout.tsx             # useMe, first-login, Header, NavBar
+    ├── _components/
+    └── <domaine>/…            # voir 01 — colocation _components / _lib
+```
+
+**Cible** (route groups — migration progressive)
+
+```
+src/app/
+├── (auth)/login/
+├── (dashboard)/layout.tsx
+├── (dashboard)/hq/overview | catalog | budgets
+├── (dashboard)/subsidiary/stock | finance | b2b-orders
+└── unauthorized/
+```
+
+### Middleware (cible)
+
+`middleware.ts` à la racine : intercepter les URLs hors périmètre (ex. filiale → `/hq/budgets`), rediriger vers `/unauthorized`. **Aujourd’hui** : garde dans `dashboard/layout.tsx` uniquement (session + first-login).
+
+---
+
+## Design B2B (SaaS professionnel)
+
+Inspiré Stripe / Linear / Vercel — pas d’animations lourdes ni dégradés « marketing ».
+
+| Aspect | Règle |
+|--------|------|
+| Typo | Geist, lisible, compacte |
+| Fond | clair / gris dashboard existant |
+| Primaire institutionnelle | orange actif `#FF8C00` (sidebar active) |
+| Alertes | rouge = critique (stock, budget) ; orange = attente ; vert = validé |
+| Densité | listes **denses** par défaut ; éviter grands espaces vides |
+| Accessibilité | composants Radix via Shadcn |
+
+---
+
+## Stack graphique (référence 03 + code réel)
+
+| Besoin | Choix projet |
+|--------|----------------|
+| Composants | Shadcn (new-york) + Tailwind v4 |
+| Tableaux complexes | TanStack Table — **cible** ; tables manuelles aujourd’hui |
+| Charts | Recharts |
+| Formulaires | React Hook Form + Zod |
+| État serveur | TanStack Query |
+
+---
+
+## Patterns nécessitant votre accord
+
+Middleware multi-rôles, Zustand/Redux, Tremor, i18n, PWA, WebSockets stock/commandes, adoption globale TanStack Table, refonte route groups — validation explicite avant mise en œuvre.
+
+Côté API (voir `api/03`) : RLS, EventEmitter2, RabbitMQ, TurboRepo.

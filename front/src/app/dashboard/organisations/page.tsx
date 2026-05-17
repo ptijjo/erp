@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, ArrowUpDown, SquarePlus } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Layers, SquarePlus } from "lucide-react";
 
 import { api } from "~/lib/api";
 import type { OrganizationDto } from "~/lib/api-types";
@@ -15,6 +15,23 @@ import {
   useMe,
 } from "~/hooks/use-me";
 
+function OrganisationSortIcon({
+  column,
+  sortBy,
+  sortOrder,
+}: {
+  column: "name" | "slug";
+  sortBy: "name" | "slug";
+  sortOrder: "asc" | "desc";
+}) {
+  if (sortBy !== column) return <ArrowUpDown className="size-3.5 text-gray-400" />;
+  return sortOrder === "asc" ? (
+    <ArrowUp className="size-3.5 text-orange-600" />
+  ) : (
+    <ArrowDown className="size-3.5 text-orange-600" />
+  );
+}
+
 export default function OrganisationsPage() {
   const router = useRouter();
   const [sortBy, setSortBy] = useState<"name" | "slug">("name");
@@ -24,6 +41,8 @@ export default function OrganisationsPage() {
     me != null && hasMePermission(me, "read", "Organization");
   const canCreateOrganization =
     me != null && hasMePermission(me, "create", "Organization");
+  const canCreatePole =
+    me != null && hasMePermission(me, "create", "Pole");
 
   useEffect(() => {
     if (!me) return;
@@ -58,15 +77,6 @@ export default function OrganisationsPage() {
     setSortOrder("asc");
   }
 
-  function SortIcon({ column }: { column: "name" | "slug" }) {
-    if (sortBy !== column) return <ArrowUpDown className="size-3.5 text-gray-400" />;
-    return sortOrder === "asc" ? (
-      <ArrowUp className="size-3.5 text-orange-600" />
-    ) : (
-      <ArrowDown className="size-3.5 text-orange-600" />
-    );
-  }
-
   if (me && !isMainOrganization(me)) {
     return (
       <main className="flex flex-1 items-center justify-center bg-white p-6 text-gray-600">
@@ -78,13 +88,21 @@ export default function OrganisationsPage() {
   return (
     <main className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-4 overflow-auto bg-white p-6">
       <div className="flex w-full items-center">
-        <div className="flex flex-1 justify-start">
+        <div className="flex flex-1 flex-wrap justify-start gap-3">
           {canCreateOrganization && (
             <Link
               href="/dashboard/organisations/add"
               className="flex w-fit cursor-pointer items-center gap-2 rounded-md bg-gray-100 p-4 transition-all duration-300 hover:bg-gray-200"
             >
               <SquarePlus className="size-4" /> Nouvelle filiale
+            </Link>
+          )}
+          {canCreatePole && (
+            <Link
+              href="/dashboard/organisations/poles/add"
+              className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50/80 p-4 font-medium text-orange-900 transition-all duration-300 hover:bg-orange-100"
+            >
+              <Layers className="size-4" /> Nouveau pôle
             </Link>
           )}
         </div>
@@ -133,7 +151,11 @@ export default function OrganisationsPage() {
                     aria-label="Trier par nom"
                   >
                     Nom
-                    <SortIcon column="name" />
+                    <OrganisationSortIcon
+                      column="name"
+                      sortBy={sortBy}
+                      sortOrder={sortOrder}
+                    />
                   </button>
                 </th>
                 <th className="px-4 py-3 font-semibold text-gray-900">
@@ -144,7 +166,11 @@ export default function OrganisationsPage() {
                     aria-label="Trier par slug"
                   >
                     Slug
-                    <SortIcon column="slug" />
+                    <OrganisationSortIcon
+                      column="slug"
+                      sortBy={sortBy}
+                      sortOrder={sortOrder}
+                    />
                   </button>
                 </th>
                 <th className="px-4 py-3 font-semibold text-gray-900">Actions</th>

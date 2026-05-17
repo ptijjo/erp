@@ -2,8 +2,18 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Truck } from "lucide-react";
+import { Pencil, Truck } from "lucide-react";
 
+import { PageHeader } from "~/components/layout/page-header";
+import { PageShell } from "~/components/layout/page-shell";
+import { Button } from "~/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { Skeleton } from "~/components/ui/skeleton";
 import {
   hasMePermission,
   isMainOrganization,
@@ -13,10 +23,7 @@ import { api } from "~/lib/api";
 import type { SupplierDto } from "~/lib/api-types";
 import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
-
-import { apiErrorMessage } from "../produits/_lib/api-error-message";
-
-const ORANGE = "#FF8C00";
+import { apiErrorMessage } from "~/lib/api-error-message";
 
 export default function FournisseursPage() {
   const queryClient = useQueryClient();
@@ -28,7 +35,10 @@ export default function FournisseursPage() {
     me != null && hasMePermission(me, "create", "Supplier");
   const canDelete =
     me != null && hasMePermission(me, "delete", "Supplier");
+  const canUpdate =
+    me != null && hasMePermission(me, "update", "Supplier");
 
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [email, setEmail] = useState("");
@@ -79,52 +89,89 @@ export default function FournisseursPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingId) return;
+      const p = Number(price);
+      await api.patch(`/supplier/${editingId}`, {
+        name: name.trim(),
+        price: p,
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        note: note.trim() || null,
+      });
+    },
+    onSuccess: async () => {
+      setEditingId(null);
+      setName("");
+      setPrice("");
+      setEmail("");
+      setPhone("");
+      setNote("");
+      await queryClient.invalidateQueries({ queryKey: ["supplier"] });
+    },
+    onError: (e) => {
+      alert(apiErrorMessage(e, "Impossible de modifier le fournisseur"));
+    },
+  });
+
+  function startEdit(s: SupplierDto) {
+    setEditingId(s.id);
+    setName(s.name);
+    setPrice(String(parseDecimal(s.price)));
+    setEmail(s.email ?? "");
+    setPhone(s.phone ?? "");
+    setNote(s.note ?? "");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setName("");
+    setPrice("");
+    setEmail("");
+    setPhone("");
+    setNote("");
+  }
+
   if (mePending) {
     return (
-      <main className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto bg-[#F3F4F6] p-6">
-        <p className="text-sm text-gray-600">Chargement…</p>
-      </main>
+      <PageShell>
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="mt-4 h-32 w-full rounded-xl" />
+      </PageShell>
     );
   }
 
   if (!me || !isMain || !canRead) {
     return (
-      <main className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto bg-[#F3F4F6] p-6">
+      <PageShell>
+        <PageHeader title="Fournisseurs" />
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           Réservé à la maison mère avec la permission{" "}
           <span className="font-mono">read:Supplier</span>.
         </p>
-      </main>
+      </PageShell>
     );
   }
 
   return (
-    <main className="flex min-h-0 min-w-0 w-full flex-1 flex-col gap-8 overflow-auto bg-[#F3F4F6] p-6">
-      <header className="flex flex-wrap items-center gap-3">
-        <div
-          className="flex size-11 items-center justify-center rounded-xl bg-white shadow-sm"
-          style={{ color: ORANGE }}
-          aria-hidden
-        >
-          <Truck className="size-6" strokeWidth={1.75} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold tracking-wide text-[#2D323E]">
-            Fournisseurs
-          </h1>
-          <p className="text-sm text-gray-600">
-            Fiches fournisseur pour les commandes de réapprovisionnement des
-            filiales. Affectez un fournisseur sur chaque produit modifiable par
-            la maison mère.
-          </p>
-        </div>
-      </header>
+    <PageShell>
+      <PageHeader
+        title="Fournisseurs"
+        description="Fiches fournisseur pour le réapprovisionnement des filiales."
+        actions={<Truck className="size-8 shrink-0 text-primary" aria-hidden />}
+      />
 
-      {canCreate ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold text-[#2D323E]">
-            Nouveau fournisseur
-          </h2>
+      <div className="mt-6 flex flex-col gap-6">
+
+      {canCreate || (canUpdate && editingId) ? (
+        <Card className="py-4">
+          <CardHeader className="px-4 sm:px-6">
+            <CardTitle className="text-lg">
+              {editingId ? "Modifier le fournisseur" : "Nouveau fournisseur"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 sm:px-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="sm:col-span-2">
               <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -188,8 +235,13 @@ export default function FournisseursPage() {
               />
             </div>
           </div>
-          <div className="mt-4 flex justify-end">
-            <button
+          <div className="mt-4 flex justify-end gap-2">
+            {editingId ? (
+              <Button type="button" variant="outline" onClick={cancelEdit}>
+                Annuler
+              </Button>
+            ) : null}
+            <Button
               type="button"
               onClick={() => {
                 if (!name.trim()) {
@@ -201,16 +253,27 @@ export default function FournisseursPage() {
                   alert("Indiquez un prix de référence valide (≥ 0 FCFA)");
                   return;
                 }
-                createMutation.mutate();
+                if (editingId) {
+                  updateMutation.mutate();
+                } else {
+                  createMutation.mutate();
+                }
               }}
-              disabled={createMutation.isPending}
-              className="h-10 rounded-lg px-4 text-sm font-semibold text-white disabled:opacity-50"
-              style={{ backgroundColor: ORANGE }}
+              disabled={
+                createMutation.isPending || updateMutation.isPending
+              }
             >
-              {createMutation.isPending ? "Création…" : "Créer"}
-            </button>
+              {editingId
+                ? updateMutation.isPending
+                  ? "Enregistrement…"
+                  : "Enregistrer"
+                : createMutation.isPending
+                  ? "Création…"
+                  : "Créer"}
+            </Button>
           </div>
-        </section>
+          </CardContent>
+        </Card>
       ) : null}
 
       {isLoading ? (
@@ -218,21 +281,15 @@ export default function FournisseursPage() {
       ) : suppliers.length === 0 ? (
         <p className="text-sm text-gray-600">Aucun fournisseur.</p>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <Card className="overflow-hidden py-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50/80">
-                  <th className="px-4 py-3 font-semibold text-[#2D323E]">Nom</th>
-                  <th className="px-4 py-3 font-semibold text-[#2D323E]">
-                    Prix ref.
-                  </th>
-                  <th className="px-4 py-3 font-semibold text-[#2D323E]">
-                    Contact
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-[#2D323E]">
-                    Actions
-                  </th>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-4 py-3 font-semibold">Nom</th>
+                  <th className="px-4 py-3 font-semibold">Prix ref.</th>
+                  <th className="px-4 py-3 font-semibold">Contact</th>
+                  <th className="px-4 py-3 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -251,35 +308,52 @@ export default function FournisseursPage() {
                       {[s.email, s.phone].filter(Boolean).join(" · ") || "—"}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {canDelete ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Supprimer le fournisseur « ${s.name} » ?`,
-                              )
-                            ) {
-                              return;
-                            }
-                            deleteMutation.mutate(s.id);
-                          }}
-                          disabled={deleteMutation.isPending}
-                          className="text-xs font-semibold text-red-700 hover:underline disabled:opacity-50"
-                        >
-                          Supprimer
-                        </button>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
+                      <div className="flex flex-wrap justify-end gap-3">
+                        {canUpdate ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => startEdit(s)}
+                          >
+                            <Pencil className="size-3.5" />
+                            Modifier
+                          </Button>
+                        ) : null}
+                        {canDelete ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  `Supprimer le fournisseur « ${s.name} » ?`,
+                                )
+                              ) {
+                                return;
+                              }
+                              deleteMutation.mutate(s.id);
+                            }}
+                            disabled={deleteMutation.isPending}
+                          >
+                            Supprimer
+                          </Button>
+                        ) : null}
+                        {!canUpdate && !canDelete ? (
+                          <span className="text-gray-400">—</span>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
-    </main>
+      </div>
+    </PageShell>
   );
 }

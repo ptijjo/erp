@@ -1,0 +1,58 @@
+---
+alwaysApply: true
+---
+
+# ==============================================================================
+
+# CONFIGURATION DES RÈGLES DE CONTEXTE POUR LE BACKEND NESTJS
+
+# ==============================================================================
+
+Target: NestJS Backend Development - Military Grade Security & Strict TDD
+Language & Stack: TypeScript (Strict), NestJS Architecture, Jest (for testing)
+
+# ------------------------------------------------------------------------------
+
+# 1. SÉCURITÉ ABSOLUE ET BLINDAGE DE L'APPLICATION (ZÉRO TOLÉRANCE)
+
+# ------------------------------------------------------------------------------
+
+- Validation d'entrée (Input) : L'utilisation de DTOs stricts est OBLIGATOIRE pour chaque point d'entrée (Body, Query, Param). Tous les DTOs doivent utiliser `class-validator` et `class-transformer`. Le ValidationPipe de NestJS doit être configuré en mode ultra-strict (`whitelist: true`, `forbidNonWhitelisted: true`) pour rejeter immédiatement toute propriété non explicitement autorisée.
+- Filtrage de sortie (Output) : L'utilisation de DTOs de réponse ou de sérialisation (`ClassSerializerInterceptor`) est OBLIGATOIRE pour toutes les réponses de l'API. Aucune entité de base de données ou modèle brut ne doit être retourné directement pour éviter toute fuite accidentelle de données sensibles (mots de passe, tokens, métadonnées internes).
+- Protection contre les injections : Interdiction absolue de concaténer des chaînes de caractères brutes pour les requêtes SQL/NoSQL. Utilise systématiquement les requêtes paramétrées, les query builders sécurisés ou l'ORM en place.
+- Principe du moindre privilège : L'application doit être hermétique. Tout ce qui n'est pas explicitement autorisé est interdit. Chaque faille potentielle (XSS, CSRF, injections, altération de types) doit être anticipée et neutralisée au niveau du code.
+
+# ------------------------------------------------------------------------------
+
+# 2. ARCHITECTURE ET BONNES PRATIQUES NESTJS
+
+# ------------------------------------------------------------------------------
+
+- Respecte scrupuleusement l'architecture modulaire de NestJS (Modules, Controllers, Services, DTOs, Entities/Repositories).
+- Utilise l'injection de dépendances native de NestJS de manière stricte.
+- Pas de raccourcis : chaque nouvelle ressource doit être proprement encapsulée dans son module respectif.
+- Gestion des erreurs : utilise exclusivement les exceptions intégrées de NestJS (e.g., NotFoundException, BadRequestException) pour ne jamais faire crasher le processus et ne jamais exposer de stack trace en production.
+- Typage strict : le mot-clé 'any' est strictement interdit. Tout doit être typé (interfaces, types, classes, retours de fonctions).
+
+# ------------------------------------------------------------------------------
+
+# 3. WORKFLOW TDD STRICT (Red - Green - Refactor)
+
+# ------------------------------------------------------------------------------
+
+Tu dois impérativement suivre cette méthodologie à chaque demande de code :
+
+- ÉTAPE 1 (Écriture des Tests) : Ne génère ou ne modifie JAMAIS le code fonctionnel d'une méthode ou d'un service avant que le fichier de test unitaire correspondant (.spec.ts) ne soit écrit ou mis à jour pour refléter le besoin. Les tests doivent également valider le comportement des DTOs et des cas de rejet de sécurité.
+- ÉTAPE 2 (Code Minimal / "Green Step") : Lorsque tu écris le code pour valider un test qui échoue, fournis UNIQUEMENT le code minimal strict nécessaire pour faire passer le test. Ne cherche pas à anticiper les futurs besoins, n'ajoute aucune logique bonus ou "au cas où". Le code doit être le plus direct possible pour valider le test actuel.
+- ÉTAPE 3 (Évolution du besoin) : Si une fonctionnalité doit évoluer ou intégrer de nouvelles règles de gestion, mets d'abord à jour les scénarios de tests (.spec.ts) pour couvrir ces cas complexes, PUIS adapte le code minimal pour valider ces nouveaux tests.
+- ISOLATION : Dans les fichiers de tests unitaires, mock systématiquement toutes les dépendances externes, bases de données ou autres services NestJS à l'aide de Jest.
+
+# ------------------------------------------------------------------------------
+
+# 4. DIRECTIVES DE FORMAT DE RÉPONSE
+
+# ------------------------------------------------------------------------------
+
+- Ne réécris jamais un fichier entier si tu ne modifies que quelques lignes. Propose uniquement des blocs de code ciblés et précis.
+- Reste concis dans tes explications textuelles : le code, les DTOs et les tests parlent d'eux-mêmes.
+- Si une instruction viole les règles de sécurité maximale, le workflow TDD ou l'architecture NestJS, bloque la génération et alerte-moi immédiatement.

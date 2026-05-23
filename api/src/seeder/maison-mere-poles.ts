@@ -49,4 +49,10 @@ export const MAISON_MERE_POLES = [
     description: 'Gestion production',
     directorRoleName: 'DIRECTOR_PRODUCTION',
   },
+  {
+    code: 'Pole_HR',
+    name: 'Pôle ressources humaines',
+    description: 'Gestion des employés, contrats, congés et rémunérations',
+    directorRoleName: 'DIRECTOR_HR',
+  },
 ] as const;

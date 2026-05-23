@@ -23,6 +23,7 @@ import { StockOrderModule } from './stock-order/stock-order.module';
 import { SupplierModule } from './supplier/supplier.module';
 import { BudgetModule } from './budget/budget.module';
 import { PoleModule } from './pole/pole.module';
+import { HrModule } from './hr/hr.module';
 import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
 
 @Module({
@@ -48,6 +49,7 @@ import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
     StockOrderModule,
     SupplierModule,
     BudgetModule,
+    HrModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

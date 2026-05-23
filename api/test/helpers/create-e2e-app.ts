@@ -11,6 +11,7 @@ import { UserModuleAuthE2e } from './user-module-auth-e2e';
 import { PoleModule } from '../../src/pole/pole.module';
 import { BudgetModule } from '../../src/budget/budget.module';
 import { StockOrderModule } from '../../src/stock-order/stock-order.module';
+import { HrModule } from '../../src/hr/hr.module';
 import { InMemoryRedisService } from './in-memory-redis.service';
 import type { AuthPrismaMock } from './auth-prisma.mock';
 
@@ -45,6 +46,7 @@ export async function createAuthE2eApp(
       PoleModule,
       BudgetModule,
       StockOrderModule,
+      HrModule,
     ],
   })
     .overrideModule(UserModule)

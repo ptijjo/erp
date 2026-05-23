@@ -12,6 +12,8 @@ import type { UserDetailDto } from "~/lib/api-types";
 
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { rolePoleLabel } from "../_lib/pole-label";
+import { userDisplayName } from "../_lib/user-display";
+import { UserProfileAvatar } from "../_components/UserProfileAvatar";
 
 export default function UserDetailPage() {
   const router = useRouter();
@@ -128,7 +130,37 @@ export default function UserDetailPage() {
       {isLoading ? (
         <p className="mt-8 text-gray-600">Chargement…</p>
       ) : user ? (
-        <div className="mt-8 max-w-xl space-y-3 text-gray-800">
+        <div className="mt-8 max-w-2xl">
+          <div className="flex flex-col gap-6 border-b border-gray-200 pb-8 sm:flex-row sm:items-center">
+            <UserProfileAvatar
+              email={user.email}
+              firstName={user.firstName}
+              lastName={user.lastName}
+              profilePhotoUrl={user.profilePhotoUrl}
+              size="lg"
+            />
+            <div className="min-w-0 flex-1 space-y-1">
+              <h2 className="text-2xl font-semibold text-gray-900">
+                {userDisplayName(user)}
+              </h2>
+              <p className="text-sm text-gray-600">{user.email}</p>
+              <p className="text-sm text-gray-500">
+                {user.role.name}
+                {user.role.pole
+                  ? ` · ${rolePoleLabel(user.role.pole)}`
+                  : ` · ${rolePoleLabel(null)}`}
+              </p>
+              {canUpdateUser ? (
+                <p className="pt-1 text-xs text-muted-foreground">
+                  {user.profilePhotoUrl?.trim()
+                    ? "Photo définie via une URL — modifiable depuis l’édition du profil."
+                    : "Aucune photo : initiales affichées — vous pouvez ajouter une URL depuis l’édition."}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-3 text-gray-800">
           <p>
             <span className="font-semibold text-gray-900">Email :</span>{" "}
             {user.email}
@@ -191,6 +223,7 @@ export default function UserDetailPage() {
             <span className="font-medium text-gray-700">Id :</span>{" "}
             <code className="font-mono">{user.id}</code>
           </p>
+          </div>
         </div>
       ) : null}
     </main>

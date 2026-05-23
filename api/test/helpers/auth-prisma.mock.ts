@@ -29,6 +29,50 @@ export type AuthPrismaMock = {
     delete?: jest.Mock;
   };
   stockOrder?: { findMany?: jest.Mock };
+  department?: {
+    findMany?: jest.Mock;
+    count?: jest.Mock;
+    findUnique?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
+  employee?: {
+    findMany?: jest.Mock;
+    count?: jest.Mock;
+    findUnique?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
+  leaveRequest?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
+  leaveBalance?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
+  employmentContract?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
+  employeeSalary?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
 };
 
 export function createAuthPrismaMock(

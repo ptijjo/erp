@@ -19,6 +19,10 @@ import { api } from "~/lib/api";
 import type { OrganizationDto, PermissionDto, PoleDto, RoleDto } from "~/lib/api-types";
 
 import { apiErrorMessage } from "~/lib/api-error-message";
+import {
+  groupLabelForPermissionName,
+  POLICY_SUBJECT_GROUPS,
+} from "~/lib/me-ability";
 import { isMainOrganizationDto } from "../_lib/user-form-roles";
 
 function buildSchema(organisations: OrganizationDto[], viewerIsMainOrg: boolean) {
@@ -109,9 +113,31 @@ function AddRoleFormContent({ me }: AddRoleFormContentProps) {
     return list.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
-        (p.description?.toLowerCase().includes(q) ?? false),
+        (p.description?.toLowerCase().includes(q) ?? false) ||
+        groupLabelForPermissionName(p.name).toLowerCase().includes(q),
     );
   }, [allPermissions, permSearch]);
+
+  const permissionsByGroup = useMemo(() => {
+    const order = [
+      ...POLICY_SUBJECT_GROUPS.map((g) => g.label),
+      "Wildcards",
+      "Autre",
+    ];
+    const buckets = new Map<string, PermissionDto[]>();
+    for (const p of permissionsFiltered) {
+      const label = groupLabelForPermissionName(p.name);
+      const list = buckets.get(label) ?? [];
+      list.push(p);
+      buckets.set(label, list);
+    }
+    return order
+      .filter((label) => buckets.has(label))
+      .map((label) => ({
+        label,
+        items: buckets.get(label) ?? [],
+      }));
+  }, [permissionsFiltered]);
 
   const schema = useMemo(
     () => buildSchema(organisations, viewerIsMainOrg),
@@ -393,32 +419,44 @@ function AddRoleFormContent({ me }: AddRoleFormContentProps) {
                 )}
               </div>
             ) : (
-              <ul className="divide-y divide-gray-100">
-                {permissionsFiltered.map((p) => (
-                  <li key={p.id} className="flex items-start gap-3 px-3 py-2">
-                    <input
-                      type="checkbox"
-                      id={`perm-${p.id}`}
-                      checked={selectedExisting.has(p.id)}
-                      onChange={() => toggleExisting(p.id)}
-                      className="mt-1 size-4 cursor-pointer rounded border-gray-300"
-                    />
-                    <label
-                      htmlFor={`perm-${p.id}`}
-                      className="min-w-0 flex-1 cursor-pointer text-sm"
-                    >
-                      <span className="font-mono font-medium text-[#2D323E]">
-                        {p.name}
-                      </span>
-                      {p.description && (
-                        <span className="mt-0.5 block text-gray-600">
-                          {p.description}
-                        </span>
-                      )}
-                    </label>
-                  </li>
+              <div className="divide-y divide-gray-100">
+                {permissionsByGroup.map((group) => (
+                  <section key={group.label}>
+                    <h4 className="sticky top-0 z-10 bg-gray-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600">
+                      {group.label}
+                    </h4>
+                    <ul>
+                      {group.items.map((p) => (
+                        <li
+                          key={p.id}
+                          className="flex items-start gap-3 px-3 py-2"
+                        >
+                          <input
+                            type="checkbox"
+                            id={`perm-${p.id}`}
+                            checked={selectedExisting.has(p.id)}
+                            onChange={() => toggleExisting(p.id)}
+                            className="mt-1 size-4 cursor-pointer rounded border-gray-300"
+                          />
+                          <label
+                            htmlFor={`perm-${p.id}`}
+                            className="min-w-0 flex-1 cursor-pointer text-sm"
+                          >
+                            <span className="font-mono font-medium text-[#2D323E]">
+                              {p.name}
+                            </span>
+                            {p.description && (
+                              <span className="mt-0.5 block text-gray-600">
+                                {p.description}
+                              </span>
+                            )}
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
                 ))}
-              </ul>
+              </div>
             )}
           </div>
         </section>

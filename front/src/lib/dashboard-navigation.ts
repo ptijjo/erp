@@ -8,6 +8,7 @@ import {
   Receipt,
   ScrollText,
   Truck,
+  UserCircle,
   Users,
   Wallet,
 } from "lucide-react";
@@ -41,6 +42,12 @@ const baseNavItems: NavItem[] = [
     href: "/dashboard/utilisateurs",
     icon: Users,
     requiredPermission: { action: "read", subject: "User" },
+  },
+  {
+    label: "Ressources humaines",
+    href: "/dashboard/rh",
+    icon: UserCircle,
+    requiredPermission: { action: "read", subject: "Employee" },
   },
   {
     label: "Organisations",
@@ -96,6 +103,7 @@ const baseNavItems: NavItem[] = [
 const SECTION_BY_HREF: Record<string, string> = {
   "/dashboard": "accueil",
   "/dashboard/utilisateurs": "organisation",
+  "/dashboard/rh": "rh",
   "/dashboard/organisations": "organisation",
   "/dashboard/produits": "catalogue",
   "/dashboard/fournisseurs": "catalogue",
@@ -177,6 +185,7 @@ export function buildNavSections(me: Me | null | undefined): NavSection[] {
   const order = [
     "accueil",
     "organisation",
+    "rh",
     "catalogue",
     "operations",
     "finance",
@@ -221,6 +230,13 @@ export const HQ_MODULE_TILES: ModuleTile[] = [
     href: "/dashboard/utilisateurs",
     icon: Users,
     subject: "User",
+  },
+  {
+    title: "Ressources humaines",
+    description: "Employés, congés et contrats",
+    href: "/dashboard/rh",
+    icon: UserCircle,
+    subject: "Employee",
   },
   {
     title: "Catalogue produits",

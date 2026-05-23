@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, LogOut } from "lucide-react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { UserProfileAvatar } from "~/app/dashboard/utilisateurs/_components/UserProfileAvatar";
+import { userDisplayName } from "~/app/dashboard/utilisateurs/_lib/user-display";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -18,14 +19,22 @@ import {
 import { meQueryKey } from "~/hooks/use-me";
 import { isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
-
-const AVATAR_URL =
-  "https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png";
+import type { UserDetailDto } from "~/lib/api-types";
 
 export function AppHeader() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
+
+  const { data: profile } = useQuery({
+    queryKey: ["user", me?.sub] as const,
+    queryFn: async () => {
+      const { data } = await api.get<UserDetailDto>(`/user/${me!.sub}`);
+      return data;
+    },
+    enabled: Boolean(me?.sub),
+    staleTime: 60_000,
+  });
 
   async function handleLogout() {
     try {
@@ -40,9 +49,9 @@ export function AppHeader() {
 
   if (!me) return null;
 
-  const initials =
-    me.email?.slice(0, 2).toUpperCase() ??
-    me.organisationName.slice(0, 2).toUpperCase();
+  const displayName = profile
+    ? userDisplayName(profile)
+    : me.email.split("@")[0] ?? me.email;
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4 shadow-sm">
@@ -69,13 +78,17 @@ export function AppHeader() {
               variant="ghost"
               className="h-10 gap-2 px-2 hover:bg-accent"
             >
-              <Avatar className="size-8">
-                <AvatarImage src={AVATAR_URL} alt="" />
-                <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-              </Avatar>
+              <UserProfileAvatar
+                email={profile?.email ?? me.email}
+                firstName={profile?.firstName}
+                lastName={profile?.lastName}
+                profilePhotoUrl={profile?.profilePhotoUrl}
+                size="md"
+                className="size-8 ring-0 ring-offset-0"
+              />
               <div className="hidden min-w-0 text-left md:block">
                 <p className="truncate text-sm font-medium leading-none">
-                  {me.email.split("@")[0]}
+                  {displayName}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {me.email}

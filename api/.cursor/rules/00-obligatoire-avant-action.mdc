@@ -11,6 +11,7 @@ alwaysApply: true
 2. `01-conventions-techniques.mdc` — **TDD** (tests → service → tests → contrôleur)
 3. `02-objectif.mdc` — **métier** VIFAA, pôles, rôles, RBAC
 4. `03-conception-decoupage.mdc` — **architecture**, modules, multi-tenant, phases
+5. `04-regles.mdc`
 
 **Priorité en cas de conflit** : sécurité (RBAC, périmètre org/pôle) > `02-objectif` > schéma Prisma réel > `03` (vision) > `01` (process).
 

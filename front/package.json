@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "next build && next start",
-    "start": "next start",
+    "start": "next start -p 3011",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

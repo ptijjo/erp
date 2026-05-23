@@ -7,7 +7,12 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { useMe, hasMePermission, isMainOrganization } from "~/hooks/use-me";
+import {
+  useMe,
+  hasMePermission,
+  isMainOrganization,
+  meQueryKey,
+} from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { OrganizationDto, PoleDto, RoleDto, UserDetailDto } from "~/lib/api-types";
 
@@ -16,6 +21,10 @@ import {
   isMainOrganizationDto,
   rolesForOrganization,
 } from "../_lib/user-form-roles";
+import {
+  optionalUserNameField,
+  profilePhotoUrlField,
+} from "../_lib/user-form-schema";
 
 const passwordSchema = z
   .string()
@@ -28,6 +37,9 @@ const passwordSchema = z
 function buildSchema(organisations: OrganizationDto[]) {
   return z
     .object({
+      firstName: optionalUserNameField,
+      lastName: optionalUserNameField,
+      profilePhotoUrl: profilePhotoUrlField,
       organizationId: z.string().uuid({ message: "Choisissez une organisation" }),
       poleId: z.string().optional(),
       roleId: z.string().uuid({ message: "Choisissez un rôle" }),
@@ -123,6 +135,9 @@ export default function EditUserForm({ userId }: Props) {
   } = useForm<Schema>({
     resolver: zodResolver(schema),
     defaultValues: {
+      firstName: "",
+      lastName: "",
+      profilePhotoUrl: "",
       organizationId: "",
       poleId: "",
       roleId: "",
@@ -149,6 +164,9 @@ export default function EditUserForm({ userId }: Props) {
   useEffect(() => {
     if (!user) return;
     reset({
+      firstName: user.firstName ?? "",
+      lastName: user.lastName ?? "",
+      profilePhotoUrl: user.profilePhotoUrl?.trim() ?? "",
       organizationId: user.organizationId,
       poleId: user.role.pole?.id ?? "",
       roleId: user.roleId,
@@ -160,10 +178,27 @@ export default function EditUserForm({ userId }: Props) {
     mutationFn: async (data: Schema) => {
       if (!user) return;
       const payload: {
+        firstName?: string;
+        lastName?: string;
+        profilePhotoUrl?: string | null;
         organizationId?: string;
         roleId?: string;
         password?: string;
       } = {};
+
+      const first = data.firstName?.trim() ?? "";
+      const last = data.lastName?.trim() ?? "";
+      if (first !== (user.firstName?.trim() ?? "")) {
+        payload.firstName = first;
+      }
+      if (last !== (user.lastName?.trim() ?? "")) {
+        payload.lastName = last;
+      }
+      const photo = data.profilePhotoUrl.trim();
+      const prevPhoto = user.profilePhotoUrl?.trim() ?? "";
+      if (photo !== prevPhoto) {
+        payload.profilePhotoUrl = photo === "" ? null : photo;
+      }
       if (canChangeOrg && data.organizationId !== user.organizationId) {
         payload.organizationId = data.organizationId;
       }
@@ -178,6 +213,9 @@ export default function EditUserForm({ userId }: Props) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["user"] });
+      if (me?.sub === userId) {
+        await queryClient.invalidateQueries({ queryKey: meQueryKey });
+      }
       router.push(`/dashboard/utilisateurs/${userId}`);
     },
     onError: (err) => {
@@ -248,6 +286,78 @@ export default function EditUserForm({ userId }: Props) {
         <p className="mt-1 text-xs text-gray-500">
           L’adresse email ne peut pas être modifiée depuis cette interface.
         </p>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label
+            htmlFor="edit-user-first-name"
+            className="mb-1 block text-sm font-medium text-gray-800"
+          >
+            Prénom
+          </label>
+          <input
+            id="edit-user-first-name"
+            type="text"
+            autoComplete="given-name"
+            {...register("firstName")}
+            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
+            aria-invalid={!!errors.firstName}
+          />
+          {errors.firstName && (
+            <p className="mt-1 text-sm text-red-600" role="alert">
+              {errors.firstName.message}
+            </p>
+          )}
+        </div>
+        <div>
+          <label
+            htmlFor="edit-user-last-name"
+            className="mb-1 block text-sm font-medium text-gray-800"
+          >
+            Nom
+          </label>
+          <input
+            id="edit-user-last-name"
+            type="text"
+            autoComplete="family-name"
+            {...register("lastName")}
+            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
+            aria-invalid={!!errors.lastName}
+          />
+          {errors.lastName && (
+            <p className="mt-1 text-sm text-red-600" role="alert">
+              {errors.lastName.message}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <label
+          htmlFor="edit-user-photo-url"
+          className="mb-1 block text-sm font-medium text-gray-800"
+        >
+          Photo de profil (URL)
+        </label>
+        <input
+          id="edit-user-photo-url"
+          type="url"
+          inputMode="url"
+          placeholder="https://…"
+          {...register("profilePhotoUrl")}
+          className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
+          aria-invalid={!!errors.profilePhotoUrl}
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Laissez vide pour afficher les initiales. L’URL doit être accessible
+          publiquement (https).
+        </p>
+        {errors.profilePhotoUrl && (
+          <p className="mt-1 text-sm text-red-600" role="alert">
+            {errors.profilePhotoUrl.message}
+          </p>
+        )}
       </div>
 
       <div>

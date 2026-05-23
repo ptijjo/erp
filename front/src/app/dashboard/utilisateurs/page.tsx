@@ -9,7 +9,6 @@ import {
   ArrowUp,
   ArrowUpDown,
   KeyRound,
-  Layers,
   ListChecks,
   Plus,
   ShieldPlus,
@@ -21,6 +20,9 @@ import { api } from "~/lib/api";
 import type { PoleDto, UserListItemDto } from "~/lib/api-types";
 
 import { rolePoleLabel } from "./_lib/pole-label";
+import { userDisplayName } from "./_lib/user-display";
+import { PolesWithUsersSection } from "./_components/PolesWithUsersSection";
+import { UserProfileAvatar } from "./_components/UserProfileAvatar";
 
 type UserSortColumn = "organization" | "role" | "pole";
 
@@ -55,6 +57,8 @@ export default function UtilisateursPage() {
   const canReadPole = me != null && hasMePermission(me, "read", "Pole");
   const canCreatePole = me != null && hasMePermission(me, "create", "Pole");
   const catalogPermissionsAdmin = me != null && isAdminUser(me);
+  const showPolesSection =
+    canReadPole && me != null && isMainOrganization(me);
 
   const { data: users = [], isLoading, isError } = useQuery({
     queryKey: ["user"] as const,
@@ -158,6 +162,16 @@ export default function UtilisateursPage() {
         <div className="flex-1" />
       </div>
 
+      {showPolesSection ? (
+        <PolesWithUsersSection
+          poles={poles}
+          users={users}
+          polesLoading={polesLoading}
+          polesError={polesError}
+          canCreatePole={canCreatePole}
+        />
+      ) : null}
+
       {isError ? (
         <p className="text-center text-red-600">
           Impossible de charger les utilisateurs.
@@ -173,10 +187,19 @@ export default function UtilisateursPage() {
           Aucun utilisateur.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full min-w-[860px] text-left text-sm">
+        <div className="space-y-3">
+          {showPolesSection ? (
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+              Tous les utilisateurs
+            </h2>
+          ) : null}
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <table className="w-full min-w-[960px] text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
+                <th className="px-4 py-3 font-semibold text-gray-900">
+                  Utilisateur
+                </th>
                 <th className="px-4 py-3 font-semibold text-gray-900">Email</th>
                 <th className="px-4 py-3 font-semibold text-gray-900">
                   <button
@@ -241,9 +264,22 @@ export default function UtilisateursPage() {
                   role="link"
                   aria-label={`Voir les détails de ${u.email}`}
                 >
-                  <td className="px-4 py-3 font-medium text-gray-900">
-                    {u.email}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <UserProfileAvatar
+                        email={u.email}
+                        firstName={u.firstName}
+                        lastName={u.lastName}
+                        profilePhotoUrl={u.profilePhotoUrl}
+                        size="md"
+                        className="size-10 ring-1"
+                      />
+                      <span className="font-medium text-gray-900">
+                        {userDisplayName(u)}
+                      </span>
+                    </div>
                   </td>
+                  <td className="px-4 py-3 text-gray-700">{u.email}</td>
                   <td className="px-4 py-3 text-gray-700">{u.role.name}</td>
                   <td className="px-4 py-3 text-gray-700">
                     {u.role.pole ? (
@@ -263,77 +299,9 @@ export default function UtilisateursPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
-
-      {canReadPole && me != null && isMainOrganization(me) ? (
-        <section className="rounded-xl border border-orange-200 bg-orange-50/30 p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-                <Layers className="size-5 text-orange-500" />
-                Pôles maison mère
-              </h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Structure organisationnelle VIFAA. Les rôles de direction y sont
-                rattachés ; ADMIN et directeur général restent hors pôle.
-              </p>
-            </div>
-            {canCreatePole ? (
-              <Link
-                href="/dashboard/organisations/poles/add"
-                className="flex w-fit shrink-0 cursor-pointer items-center gap-2 rounded-md border border-orange-300 bg-white px-4 py-2 text-sm font-medium text-orange-900 transition-colors hover:bg-orange-50"
-              >
-                <Layers className="size-4" />
-                Nouveau pôle
-              </Link>
-            ) : null}
-          </div>
-          {polesLoading ? (
-            <p className="mt-4 text-sm text-gray-600">Chargement des pôles…</p>
-          ) : polesError ? (
-            <p className="mt-4 text-sm text-red-600">
-              Impossible de charger la liste des pôles.
-            </p>
-          ) : poles.length === 0 ? (
-            <p className="mt-4 text-sm text-gray-600">Aucun pôle enregistré.</p>
-          ) : (
-            <div className="mt-4 overflow-x-auto rounded-lg border border-orange-100 bg-white">
-              <table className="w-full min-w-[520px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="px-4 py-3 font-semibold text-gray-900">Code</th>
-                    <th className="px-4 py-3 font-semibold text-gray-900">Nom</th>
-                    <th className="px-4 py-3 font-semibold text-gray-900">
-                      Description
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {poles.map((p) => (
-                    <tr
-                      key={p.id}
-                      className="border-b border-gray-100 last:border-0"
-                    >
-                      <td className="px-4 py-3 font-mono text-xs text-gray-700">
-                        {p.code}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {p.name}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {p.description ?? (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ) : null}
     </main>
   );
 }

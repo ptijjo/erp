@@ -354,6 +354,62 @@ export class SeederService implements OnModuleInit {
           );
         }
       }
+
+      const hrDirectorRole = await this.prisma.role.findUnique({
+        where: { name: 'DIRECTOR_HR' },
+        select: { id: true },
+      });
+      if (hrDirectorRole) {
+        const hrPermissionNames = [
+          'read:all',
+          'read:Department',
+          'create:Department',
+          'update:Department',
+          'delete:Department',
+          'read:Employee',
+          'create:Employee',
+          'update:Employee',
+          'delete:Employee',
+          'read:LeaveRequest',
+          'create:LeaveRequest',
+          'update:LeaveRequest',
+          'delete:LeaveRequest',
+          'read:LeaveBalance',
+          'create:LeaveBalance',
+          'update:LeaveBalance',
+          'delete:LeaveBalance',
+          'read:EmploymentContract',
+          'create:EmploymentContract',
+          'update:EmploymentContract',
+          'delete:EmploymentContract',
+          'read:EmployeeSalary',
+          'create:EmployeeSalary',
+          'update:EmployeeSalary',
+          'delete:EmployeeSalary',
+        ] as const;
+        for (const permName of hrPermissionNames) {
+          const perm = await this.prisma.permission.findUnique({
+            where: { name: permName },
+          });
+          if (!perm) continue;
+          await this.prisma.permissionRole.upsert({
+            where: {
+              permissionId_roleId: {
+                permissionId: perm.id,
+                roleId: hrDirectorRole.id,
+              },
+            },
+            create: {
+              permissionId: perm.id,
+              roleId: hrDirectorRole.id,
+            },
+            update: {},
+          });
+        }
+        Logger.log(
+          'Permissions RH (read:all + CRUD métier) liées à DIRECTOR_HR',
+        );
+      }
     } catch (error) {
       Logger.error(error);
       throw error;

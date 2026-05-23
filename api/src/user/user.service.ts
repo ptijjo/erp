@@ -375,6 +375,13 @@ export class UserService {
         : user.lastName.trim() === ''
           ? null
           : user.lastName.trim();
+    const nextProfilePhotoUrl =
+      user.profilePhotoUrl === undefined
+        ? undefined
+        : user.profilePhotoUrl === null ||
+            user.profilePhotoUrl.trim() === ''
+          ? null
+          : user.profilePhotoUrl.trim();
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: {
@@ -388,6 +395,7 @@ export class UserService {
         roleId: user.roleId ?? undefined,
         firstName: nextFirstName,
         lastName: nextLastName,
+        profilePhotoUrl: nextProfilePhotoUrl,
       },
       include: { role: true },
     });

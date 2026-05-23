@@ -17,6 +17,7 @@ import {
   isMainOrganizationDto,
   rolesForOrganization,
 } from "../_lib/user-form-roles";
+import { optionalUserNameField } from "../_lib/user-form-schema";
 
 const passwordSchema = z
   .string()
@@ -30,6 +31,8 @@ function buildSchema(organisations: OrganizationDto[]) {
   return z
     .object({
       email: z.string().email({ message: "Email invalide" }).trim(),
+      firstName: optionalUserNameField,
+      lastName: optionalUserNameField,
       password: passwordSchema,
       organizationId: z.string().uuid({ message: "Choisissez une organisation" }),
       poleId: z.string().optional(),
@@ -100,6 +103,8 @@ export default function AddUserForm() {
     resolver: zodResolver(schema),
     defaultValues: {
       email: "",
+      firstName: "",
+      lastName: "",
       password: "",
       organizationId: "",
       poleId: "",
@@ -125,12 +130,24 @@ export default function AddUserForm() {
 
   const createMutation = useMutation({
     mutationFn: async (body: Schema) => {
-      await api.post("/user", {
+      const payload: {
+        email: string;
+        password: string;
+        organizationId: string;
+        roleId: string;
+        firstName?: string;
+        lastName?: string;
+      } = {
         email: body.email,
         password: body.password,
         organizationId: body.organizationId,
         roleId: body.roleId,
-      });
+      };
+      const first = body.firstName?.trim();
+      const last = body.lastName?.trim();
+      if (first) payload.firstName = first;
+      if (last) payload.lastName = last;
+      await api.post("/user", payload);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["user"] });
@@ -226,6 +243,51 @@ export default function AddUserForm() {
             {errors.email.message}
           </p>
         )}
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label
+            htmlFor="user-first-name"
+            className="mb-1 block text-sm font-medium text-gray-800"
+          >
+            Prénom
+          </label>
+          <input
+            id="user-first-name"
+            type="text"
+            autoComplete="off"
+            {...register("firstName")}
+            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
+            aria-invalid={!!errors.firstName}
+          />
+          {errors.firstName && (
+            <p className="mt-1 text-sm text-red-600" role="alert">
+              {errors.firstName.message}
+            </p>
+          )}
+        </div>
+        <div>
+          <label
+            htmlFor="user-last-name"
+            className="mb-1 block text-sm font-medium text-gray-800"
+          >
+            Nom
+          </label>
+          <input
+            id="user-last-name"
+            type="text"
+            autoComplete="off"
+            {...register("lastName")}
+            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
+            aria-invalid={!!errors.lastName}
+          />
+          {errors.lastName && (
+            <p className="mt-1 text-sm text-red-600" role="alert">
+              {errors.lastName.message}
+            </p>
+          )}
+        </div>
       </div>
 
       <div>

@@ -13,6 +13,7 @@ import { api } from "~/lib/api";
 import type { PermissionDto } from "~/lib/api-types";
 
 import { apiErrorMessage } from "~/lib/api-error-message";
+import { CASL_PERMISSION_NAMES } from "~/lib/me-ability";
 
 const schema = z.object({
   name: z.string().min(1, { message: "Le nom est requis" }).trim(),
@@ -127,7 +128,8 @@ export default function AddPermissionForm() {
           Format conseillé pour les droits effectifs :{" "}
           <span className="font-mono">action:Sujet</span> (ex.{" "}
           <span className="font-mono">read:Product</span>,{" "}
-          <span className="font-mono">manage:Stock</span>).
+          <span className="font-mono">read:Employee</span>,{" "}
+          <span className="font-mono">manage:all</span>).
         </p>
         <div className="mt-4 flex flex-col gap-4">
           <div>
@@ -139,11 +141,17 @@ export default function AddPermissionForm() {
             </label>
             <input
               id="perm-name"
+              list="casl-permission-catalog"
               {...register("name")}
               className="h-10 w-full rounded-lg border border-gray-300 px-3 font-mono text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
-              placeholder="ex. read:Stock"
+              placeholder="ex. read:Employee"
               aria-invalid={!!errors.name}
             />
+            <datalist id="casl-permission-catalog">
+              {CASL_PERMISSION_NAMES.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
             {errors.name && (
               <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
             )}

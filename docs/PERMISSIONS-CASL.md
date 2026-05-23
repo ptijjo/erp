@@ -1,6 +1,6 @@
 # Référence des permissions (CASL / Prisma)
 
-Ce document liste les **noms de permissions** utilisables en base (`Permission.name`), alignés sur les contrôleurs Nest et le module CASL (`back/src/casl/define-ability.ts`). Tu peux t’en servir pour créer les entrées en base et pour refléter les droits côté front (menu, boutons).
+Ce document liste les **noms de permissions** utilisables en base (`Permission.name`), alignés sur les contrôleurs Nest et le module CASL (`api/src/casl/define-ability.ts`). Tu peux t’en servir pour créer les entrées en base et pour refléter les droits côté front (menu, boutons).
 
 ---
 
@@ -47,9 +47,110 @@ read | create | update | delete | manage
 
 ## Sujets connus (`KNOWN_POLICY_SUBJECTS`)
 
-Ordre aligné sur `define-ability.ts` :
+Ordre aligné sur `api/src/casl/define-ability.ts` :
 
-`User`, `Organization`, `Role`, `Permission`, `AuditLog`, `LoginAttempt`, `Category`, `Product`, `Stock`, `Vente`, `VenteLine`, `VentePaiement`, `SessionCaisse`, `Contrat`, `PlanningShift`, `Pointage`, `Absence`, `BulletinPaie`, `BulletinPaieLigne`
+`User`, `Organization`, `Role`, `Pole`, `Permission`, `AuditLog`, `LoginAttempt`, `Category`, `Product`, `Stock`, `StockOrder`, `Supplier`, `Budget`, `BudgetExpense`, `Department`, `Employee`, `LeaveRequest`, `LeaveBalance`, `EmploymentContract`, `EmployeeSalary`
+
+---
+
+## Ressources humaines (`HrController`, préfixe `/hr`)
+
+Auth / rôles / permissions restent sur **`User`**. Les employés métier sont dans **`Employee`** (lien optionnel `Employee.userId`).
+
+### Rôle `DIRECTOR_HR` (pôle `Pole_HR`)
+
+Au démarrage (seeder) : **`read:all`** + CRUD explicite sur tous les sujets RH ci‑dessous.
+
+### Department
+
+| Permission | Route HTTP (indicative) |
+|------------|-------------------------|
+| `read:Department` | `GET /hr/departments`, `GET /hr/departments/:id` |
+| `create:Department` | `POST /hr/departments` |
+| `update:Department` | `PATCH /hr/departments/:id` |
+| `delete:Department` | `DELETE /hr/departments/:id` |
+
+Corps `POST` : `{ "name": string, "organizationId"?: uuid }` — `organizationId` **obligatoire** pour un utilisateur maison mère ; imposé au JWT pour une filiale.
+
+### Employee
+
+| Permission | Route HTTP |
+|------------|------------|
+| `read:Employee` | `GET /hr/employees`, `GET /hr/employees/:id` |
+| `create:Employee` | `POST /hr/employees` |
+| `update:Employee` | `PATCH /hr/employees/:id` |
+| `delete:Employee` | `DELETE /hr/employees/:id` |
+
+Champs principaux : `firstName`, `lastName`, `hireDate`, `status` (`ACTIVE` \| `INACTIVE` \| `SUSPENDED` \| `TERMINATED`), `departmentId`, `managerId`, `userId` (lien compte), `organizationId` (maison mère).
+
+### LeaveRequest
+
+| Permission | Route HTTP |
+|------------|------------|
+| `read:LeaveRequest` | `GET /hr/leave-requests`, `GET /hr/leave-requests/:id` |
+| `create:LeaveRequest` | `POST /hr/leave-requests` |
+| `update:LeaveRequest` | `PATCH /hr/leave-requests/:id/status` |
+| `delete:LeaveRequest` | `DELETE /hr/leave-requests/:id` |
+
+`PATCH …/status` : `{ "status": "APPROVED" \| "REJECTED" \| "CANCELLED" }` (uniquement si demande `PENDING`).
+
+### LeaveBalance
+
+| Permission | Route HTTP |
+|------------|------------|
+| `read:LeaveBalance` | `GET /hr/leave-balances`, `GET /hr/leave-balances/:id` |
+| `create:LeaveBalance` | `POST /hr/leave-balances` |
+| `update:LeaveBalance` | `PATCH /hr/leave-balances/:id` |
+| `delete:LeaveBalance` | `DELETE /hr/leave-balances/:id` |
+
+### EmploymentContract
+
+| Permission | Route HTTP |
+|------------|------------|
+| `read:EmploymentContract` | `GET /hr/contracts`, `GET /hr/contracts/:id` (`?employeeId=`) |
+| `create:EmploymentContract` | `POST /hr/contracts` |
+| `update:EmploymentContract` | `PATCH /hr/contracts/:id` |
+| `delete:EmploymentContract` | `DELETE /hr/contracts/:id` |
+
+Types contrat : `CDI`, `CDD`, `STAGE`, `INTERIM`, `OTHER`. Statuts : `ACTIVE`, `EXPIRED`, `TERMINATED`.
+
+### EmployeeSalary
+
+| Permission | Route HTTP |
+|------------|------------|
+| `read:EmployeeSalary` | `GET /hr/salaries`, `GET /hr/salaries/:id` (`?employeeId=`) |
+| `create:EmployeeSalary` | `POST /hr/salaries` |
+| `update:EmployeeSalary` | `PATCH /hr/salaries/:id` |
+| `delete:EmployeeSalary` | `DELETE /hr/salaries/:id` |
+
+Montants en **`Decimal`** (FCFA), champs `amount`, `effectiveFrom`, `effectiveTo?`.
+
+### Périmètre organisation (RH)
+
+| Utilisateur | Liste / lecture | Création |
+|-------------|-----------------|----------|
+| Maison mère | Toutes orgs (filtre vide) | `organizationId` requis dans le body |
+| Filiale | Uniquement `organisationId` du JWT | `organizationId` = org du JWT |
+
+### Pagination (listes GET `/hr/*`)
+
+Toutes les routes **liste** renvoient :
+
+```json
+{
+  "items": [ /* … */ ],
+  "meta": { "page": 1, "limit": 20, "total": 42, "totalPages": 3 }
+}
+```
+
+| Query | Défaut | Max | Description |
+|-------|--------|-----|-------------|
+| `page` | `1` | — | Numéro de page (≥ 1) |
+| `limit` | `20` | **20** | Éléments par page |
+| `search` | — | — | Uniquement `GET /hr/employees` (nom, prénom, email) |
+| `employeeId` | — | — | `GET /hr/contracts`, `GET /hr/salaries` |
+
+Exemples : `GET /hr/employees?page=2&limit=20&search=dupont`, `GET /hr/departments?page=1`.
 
 ---
 
@@ -259,49 +360,51 @@ read:Stock
 create:Stock
 update:Stock
 delete:Stock
-read:Vente
-create:Vente
-update:Vente
-delete:Vente
-read:VenteLine
-create:VenteLine
-update:VenteLine
-delete:VenteLine
-read:VentePaiement
-create:VentePaiement
-update:VentePaiement
-delete:VentePaiement
-read:SessionCaisse
-create:SessionCaisse
-update:SessionCaisse
-delete:SessionCaisse
-read:Contrat
-create:Contrat
-update:Contrat
-delete:Contrat
-read:PlanningShift
-create:PlanningShift
-update:PlanningShift
-delete:PlanningShift
-read:Pointage
-create:Pointage
-update:Pointage
-delete:Pointage
-read:Absence
-create:Absence
-update:Absence
-delete:Absence
-read:BulletinPaie
-create:BulletinPaie
-update:BulletinPaie
-delete:BulletinPaie
-read:BulletinPaieLigne
-create:BulletinPaieLigne
-update:BulletinPaieLigne
-delete:BulletinPaieLigne
+read:StockOrder
+create:StockOrder
+update:StockOrder
+delete:StockOrder
+read:Supplier
+create:Supplier
+update:Supplier
+delete:Supplier
+read:Budget
+create:Budget
+update:Budget
+delete:Budget
+read:BudgetExpense
+create:BudgetExpense
+update:BudgetExpense
+delete:BudgetExpense
+read:Department
+create:Department
+update:Department
+delete:Department
+read:Employee
+create:Employee
+update:Employee
+delete:Employee
+read:LeaveRequest
+create:LeaveRequest
+update:LeaveRequest
+delete:LeaveRequest
+read:LeaveBalance
+create:LeaveBalance
+update:LeaveBalance
+delete:LeaveBalance
+read:EmploymentContract
+create:EmploymentContract
+update:EmploymentContract
+delete:EmploymentContract
+read:EmployeeSalary
+create:EmployeeSalary
+update:EmployeeSalary
+delete:EmployeeSalary
 read:all
 manage:all
 ```
+
+*(Liste canonique du seed : `api/src/seeder/casl-permission-names.ts`.)*
 
 *(Tu n’es pas obligé de tout créer en base : seules les permissions réellement liées aux rôles sont appliquées.)*
 
@@ -325,13 +428,17 @@ Même avec la permission, le service peut refuser l’action :
 | Maison mère seule | Création / MAJ / suppression **produits** et **catégories** ; gestion **catalogue filiale** (`PUT /organisation/:id/catalog`) |
 | Catalogue produits filiale | Produits visibles = `offeredToSubsidiaries` + éventuellement **catalogue par org** (catégories / produits liés) |
 | Rôles full access | `ADMIN`, `DIRECTOR_GENERAL`, `DIRECTOR_OPERATIONS` → tout voir / tout faire côté API métier (sauf garde spécifique type `FullAccessRoleGuard` sur les permissions) |
+| Directeur RH | `DIRECTOR_HR` → `read:all` + CRUD RH (seeder) ; pôle `Pole_HR` |
 
 ---
 
 ## Fichiers source à jour
 
-- Sujets et parsing : `back/src/casl/define-ability.ts` (`KNOWN_POLICY_SUBJECTS`, `parsePermissionName`)
-- Décorateurs sur les routes : `back/src/**/*.controller.ts` (`@CheckPolicies`)
-- Profil exposé au front : `back/src/auth/auth.service.ts` (`getMeProfile`)
+- Catalogue seed : `api/src/seeder/casl-permission-names.ts`
+- Sujets et parsing : `api/src/casl/define-ability.ts` (`KNOWN_POLICY_SUBJECTS`, `parsePermissionName`)
+- Décorateurs sur les routes : `api/src/**/*.controller.ts` (`@CheckPolicies`)
+- RH : `api/src/hr/hr.controller.ts`
+- Profil exposé au front : `api/src/auth/auth.service.ts` (`getMeProfile`)
+- Tests e2e RH : `api/test/hr.e2e-spec.ts`
 
 En cas de nouveau contrôleur sécurisé par CASL, ajoute le **Subject** dans `KNOWN_POLICY_SUBJECTS` et complète ce document.

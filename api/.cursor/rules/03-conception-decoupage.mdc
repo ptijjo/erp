@@ -46,6 +46,7 @@ Chaque domaine = dossier module (`*.module.ts`, `*.service.ts`, `*.controller.ts
 | **Maison mère — Catalogue** | `category/`, `product/` | Catalogue central, prix |
 | **Filiales — Stock** | `stock/`, `supplier/` | Stock local, seuils critiques |
 | **Filiales — Finance** | `budget/` | Budgets, charges (sorties) |
+| **RH (toutes orgs)** | `hr/` | Départements, employés, congés, contrats, salaires (`User` pour auth uniquement) |
 | **Inter-filiales** | `stock-order/` (évolution commandes) | Flux commandes entre orgs |
 | **Événements** (cible) | à valider avec vous | `EventEmitter2` interne avant RabbitMQ |
 

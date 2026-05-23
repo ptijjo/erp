@@ -19,6 +19,7 @@ Il y'aura les poles suivants :
  - Pole_ARCHITECTURE_HERITAGE : Gestion de l'architecture et du patrimoine.
  - Pole_MARKETING_COMMUNICATION : Gestion du marketing, du développement et de la communication.
  - Pole_PRODUCTION : Gestion production.
+ - Pole_HR : Gestion des ressources humaines (employés, contrats, congés, salaires).
 
 Dans y'aura un role directeur dans chaque pole qui pilotera entièrement son pole ainsi que d'autres roles qu'on pourra crée pour assister le directeur du pole avec des roles bien définis. Ce qui veut dire qu'on aura : 
 
@@ -30,6 +31,7 @@ Dans y'aura un role directeur dans chaque pole qui pilotera entièrement son pol
  - DIRECTOR_ARCHITECTURE_HERITAGE : Directrice de l'architecture et du patrimoine.
  - DIRECTOR_MARKETING_COMMUNICATION : Directrice du marketing, du développement et de la communication.
  - DIRECTOR_PRODUCTION : Directeur production.
+ - DIRECTOR_HR : Directeur des ressources humaines (`read:all` + CRUD RH).
 
  Il existera un role d'ADMIN et également un role de DIRECTOR_GENERAL : Directeur général, qui auront tous les droits et n'appartiendront à aucun pole.
 

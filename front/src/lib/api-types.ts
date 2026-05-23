@@ -79,6 +79,9 @@ export type RolePoleSummaryDto = {
 export type UserListItemDto = {
   id: string;
   email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  profilePhotoUrl?: string | null;
   organizationId: string;
   roleId: string;
   createdAt: string;
@@ -95,6 +98,9 @@ export type UserListItemDto = {
 export type UserDetailDto = {
   id: string;
   email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  profilePhotoUrl?: string | null;
   organizationId: string;
   roleId: string;
   createdAt: string;
@@ -219,6 +225,120 @@ export type BudgetDto = {
 };
 
 /** GET `/budget/:budgetId/expenses` */
+export type EmployeeStatusDto =
+  | "ACTIVE"
+  | "INACTIVE"
+  | "SUSPENDED"
+  | "TERMINATED";
+
+export type LeaveStatusDto = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+
+export type EmploymentContractTypeDto =
+  | "CDI"
+  | "CDD"
+  | "STAGE"
+  | "INTERIM"
+  | "OTHER";
+
+export type EmploymentContractStatusDto = "ACTIVE" | "EXPIRED" | "TERMINATED";
+
+export type HrEmployeeSummaryDto = {
+  id: string;
+  firstName: string;
+  lastName: string;
+};
+
+export type DepartmentDto = {
+  id: string;
+  name: string;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EmployeeDto = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  position: string | null;
+  status: EmployeeStatusDto;
+  hireDate: string;
+  terminationDate: string | null;
+  organizationId: string;
+  departmentId: string | null;
+  managerId: string | null;
+  userId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  department: { id: string; name: string } | null;
+  manager: HrEmployeeSummaryDto | null;
+  user: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+};
+
+export type LeaveRequestDto = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason: string | null;
+  status: LeaveStatusDto;
+  employeeId: string;
+  approvedById: string | null;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+  employee: HrEmployeeSummaryDto & { organizationId: string };
+  approvedBy: HrEmployeeSummaryDto | null;
+};
+
+export type LeaveBalanceDto = {
+  id: string;
+  year: number;
+  totalDays: number;
+  usedDays: number;
+  remainingDays: number;
+  carriedOverDays: number;
+  periodLabel: string;
+  employeeId: string;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+  employee: HrEmployeeSummaryDto;
+};
+
+export type EmploymentContractDto = {
+  id: string;
+  type: EmploymentContractTypeDto;
+  status: EmploymentContractStatusDto;
+  startDate: string;
+  endDate: string | null;
+  note: string | null;
+  employeeId: string;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+  employee: HrEmployeeSummaryDto;
+};
+
+export type EmployeeSalaryDto = {
+  id: string;
+  amount: string | number;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  label: string | null;
+  employeeId: string;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+  employee: HrEmployeeSummaryDto;
+};
+
 export type BudgetExpenseDto = {
   id: string;
   createdAt: string;

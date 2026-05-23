@@ -25,4 +25,8 @@ export const MAISON_MERE_DIRECTOR_ROLES = [
       'Directrice du marketing, du développement et de la communication',
   },
   { name: 'DIRECTOR_PRODUCTION', description: 'Directeur production' },
+  {
+    name: 'DIRECTOR_HR',
+    description: 'Directeur des ressources humaines',
+  },
 ] as const;

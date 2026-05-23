@@ -84,4 +84,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString({ message: 'Le nom doit être une chaîne' })
   public lastName?: string;
+
+  @IsOptional()
+  @IsString({ message: 'L’URL de la photo doit être une chaîne' })
+  public profilePhotoUrl?: string | null;
 }

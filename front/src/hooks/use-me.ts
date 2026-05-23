@@ -3,6 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { api } from "~/lib/api";
+import type { PermissionAction, PolicySubject } from "~/lib/me-ability";
+
+export type { PermissionAction, PolicySubject } from "~/lib/me-ability";
 
 /** Rôle renvoyé par `GET /auth/me` (claims JWT). */
 export type MeRole = {
@@ -29,8 +32,6 @@ export type Me = {
   permissions: string[];
 };
 
-type PermissionAction = "read" | "create" | "update" | "delete" | "manage";
-
 /** Aligné sur le backend `FULL_ACCESS_ROLE_NAMES` — accès total incl. journal d’audit. */
 const AUDIT_FULL_ACCESS_ROLE_NAMES = new Set([
   "ADMIN",
@@ -45,7 +46,7 @@ function normalizePermissionName(name: string): string {
 export function hasMePermission(
   me: Me,
   action: PermissionAction,
-  subject: string,
+  subject: PolicySubject | (string & {}),
 ): boolean {
   if (me.permissionMode === "FULL_ACCESS") {
     return true;

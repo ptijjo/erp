@@ -6,9 +6,10 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { LeaveRequestService } from './leave-request.service';
 import { LeaveBalanceService } from './leave-balance.service';
+import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { LeaveStatus } from '../generated/prisma/client';
+import { LeaveStatus, LeaveType } from '../generated/prisma/client';
 
 const viewer: AuthenticatedUser = {
   sub: 'u-hr',
@@ -52,6 +53,10 @@ describe('LeaveRequestService', () => {
           },
         },
         {
+          provide: NotificationService,
+          useValue: { create: jest.fn() },
+        },
+        {
           provide: PrismaService,
           useValue: {
             leaveRequest: { findMany, findUnique, create, update },
@@ -87,7 +92,7 @@ describe('LeaveRequestService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('crée une demande en statut PENDING', async () => {
+  it('crée une demande en statut PENDING avec type CP par défaut', async () => {
     employeeFindUnique.mockResolvedValue({
       id: 'e1',
       organizationId: 'org-sub',
@@ -105,8 +110,59 @@ describe('LeaveRequestService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           status: LeaveStatus.PENDING,
+          type: LeaveType.PAID_LEAVE,
           organizationId: 'org-sub',
         }),
+      }),
+    );
+  });
+
+  it('crée une demande maladie sans contrôle de solde CP', async () => {
+    const leaveBalanceFindUnique = jest.fn();
+    employeeFindUnique.mockResolvedValue({
+      id: 'e1',
+      organizationId: 'org-sub',
+    });
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        LeaveRequestService,
+        {
+          provide: LeaveBalanceService,
+          useValue: {
+            ensureForEmployee: jest.fn(),
+            reserveLeaveDays: jest.fn(),
+            releaseLeaveDays: jest.fn(),
+          },
+        },
+        {
+          provide: PrismaService,
+          useValue: {
+            leaveRequest: { findMany, findUnique, create, update },
+            employee: { findUnique: employeeFindUnique },
+            leaveBalance: { findUnique: leaveBalanceFindUnique },
+          },
+        },
+        {
+          provide: NotificationService,
+          useValue: { create: jest.fn() },
+        },
+      ],
+    }).compile();
+    const sickService = moduleRef.get(LeaveRequestService);
+    create.mockResolvedValue({ id: 'lr2', status: LeaveStatus.PENDING });
+    await sickService.create(
+      {
+        employeeId: 'e1',
+        startDate: new Date('2026-06-01'),
+        endDate: new Date('2026-06-02'),
+        type: 'SICK_LEAVE',
+      },
+      viewer,
+    );
+    expect(leaveBalanceFindUnique).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ type: LeaveType.SICK_LEAVE }),
       }),
     );
   });

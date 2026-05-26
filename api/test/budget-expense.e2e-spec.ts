@@ -49,7 +49,9 @@ describe('BudgetExpense (e2e)', () => {
       permissionRolesByRoleId: {
         [E2E_SUBSIDIARY_ROLE_ID]: [
           { permission: { name: 'read:Budget' } },
-          { permission: { name: 'update:Budget' } },
+          { permission: { name: 'read:BudgetExpense' } },
+          { permission: { name: 'create:BudgetExpense' } },
+          { permission: { name: 'delete:BudgetExpense' } },
         ],
       },
     });
@@ -59,6 +61,7 @@ describe('BudgetExpense (e2e)', () => {
         id: lineId,
         budgetId,
         category: 'LOYER',
+        nature: 'FIXED',
         label: 'Loyer siège',
         amountPlanned: 1000,
         budget: {
@@ -72,6 +75,9 @@ describe('BudgetExpense (e2e)', () => {
     prismaMock.budgetExpense = {
       create: jest.fn().mockResolvedValue(expenseFixture),
       findMany: jest.fn().mockResolvedValue([expenseFixture]),
+      findUnique: jest.fn(),
+      delete: jest.fn().mockResolvedValue({ id: 'e2e-expense-1' }),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
     };
 
     prismaMock.budget = {
@@ -135,5 +141,62 @@ describe('BudgetExpense (e2e)', () => {
       label: 'Loyer mai',
     });
     expect(res.body[0].spentAt).toBe(spentAt.toISOString());
+  });
+
+  it('DELETE /budget/expenses/:id refuse une sortie liée à une commande stock', async () => {
+    const stockLinkedExpense = {
+      ...expenseFixture,
+      id: 'e2e-expense-stock',
+      stockOrderId: 'e2e-order-1',
+    };
+    ctx.prisma.budgetExpense!.findUnique = jest
+      .fn()
+      .mockResolvedValue({
+        id: stockLinkedExpense.id,
+        stockOrderId: stockLinkedExpense.stockOrderId,
+        budgetLine: {
+          budget: {
+            subsidiaryOrganizationId: E2E_SUBSIDIARY_ORG_ID,
+            status: BudgetStatus.APPROVED,
+          },
+        },
+      });
+
+    const agent = request.agent(app.getHttpServer());
+    await agent
+      .post('/auth/login')
+      .send({ email: E2E_SUBSIDIARY_EMAIL, password: E2E_TEST_PASSWORD })
+      .expect(200);
+
+    const res = await agent
+      .delete(`/budget/expenses/${stockLinkedExpense.id}`)
+      .expect(400);
+
+    expect(res.body.message).toContain('commande stock');
+    expect(ctx.prisma.budgetExpense?.delete).not.toHaveBeenCalled();
+  });
+
+  it('DELETE /budget/expenses/:id supprime une sortie manuelle', async () => {
+    ctx.prisma.budgetExpense!.findUnique = jest.fn().mockResolvedValue({
+      id: expenseFixture.id,
+      stockOrderId: null,
+      budgetLine: {
+        budget: {
+          subsidiaryOrganizationId: E2E_SUBSIDIARY_ORG_ID,
+          status: BudgetStatus.APPROVED,
+        },
+      },
+    });
+
+    const agent = request.agent(app.getHttpServer());
+    await agent
+      .post('/auth/login')
+      .send({ email: E2E_SUBSIDIARY_EMAIL, password: E2E_TEST_PASSWORD })
+      .expect(200);
+
+    await agent.delete(`/budget/expenses/${expenseFixture.id}`).expect(200);
+    expect(ctx.prisma.budgetExpense?.delete).toHaveBeenCalledWith({
+      where: { id: expenseFixture.id },
+    });
   });
 });

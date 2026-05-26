@@ -24,6 +24,15 @@ import { SupplierModule } from './supplier/supplier.module';
 import { BudgetModule } from './budget/budget.module';
 import { PoleModule } from './pole/pole.module';
 import { HrModule } from './hr/hr.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { VenteModule } from './vente/vente.module';
+import { SessionCaisseModule } from './session-caisse/session-caisse.module';
+import { NotificationModule } from './notification/notification.module';
+import { TreasuryModule } from './treasury/treasury.module';
+import { MailModule } from './mail/mail.module';
+import { CronModule } from './cron/cron.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { MessagingModule } from './messaging/messaging.module';
 import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
 
 @Module({
@@ -50,6 +59,15 @@ import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
     SupplierModule,
     BudgetModule,
     HrModule,
+    AnalyticsModule,
+    VenteModule,
+    SessionCaisseModule,
+    NotificationModule,
+    TreasuryModule,
+    MailModule,
+    CronModule,
+    RealtimeModule,
+    MessagingModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

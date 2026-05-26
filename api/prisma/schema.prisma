@@ -32,13 +32,37 @@ enum StockOrderStatus {
 
 enum BudgetStatus {
   DRAFT
+  PENDING_APPROVAL
   APPROVED
+  REJECTED
+}
+
+/// Charges fixes (loyer, salaires…) vs variables (stock, maintenance…).
+enum BudgetLineNature {
+  FIXED
+  VARIABLE
 }
 
 /// Lignes budgétaires (prévision) ; sorties réelles via `BudgetExpense`.
 enum BudgetLineCategory {
   LOYER
   SALAIRE
+  ELECTRICITE
+  EAU
+  INTERNET
+  ASSURANCE
+  STOCK
+  MAINTENANCE
+  MATERIEL
+  TRANSPORT
+  AUTRE
+}
+
+enum BudgetSupplementStatus {
+  PENDING_FINANCE
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
 }
 
 enum EmployeeStatus {
@@ -69,19 +93,43 @@ enum EmploymentContractStatus {
   TERMINATED
 }
 
+enum LeaveType {
+  PAID_LEAVE // Congés Payés
+  RTT
+  SICK_LEAVE // Maladie
+  UNPAID_LEAVE // Sans solde
+}
+
+enum VenteStatut {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum ModePaiement {
+  ESPECES
+  CARTE
+  MOBILE_MONEY
+}
+
+enum SessionCaisseStatut {
+  OUVERTE
+  CLOTUREE
+}
+
 model User {
-  id         String    @id @default(uuid())
-  email      String    @unique
-  password   String
-  firstName  String?
-  lastName   String?
+  id              String    @id @default(uuid())
+  email           String    @unique
+  password        String
+  firstName       String?
+  lastName        String?
   /// URL publique de la photo de profil (stockage objet à brancher côté upload).
   profilePhotoUrl String?
   /// Tant que `true`, l’utilisateur doit définir son mot de passe (première connexion).
-  firstLogin Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
+  firstLogin      Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -89,10 +137,23 @@ model User {
   roleId String
   role   Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
-  loginAttempts LoginAttempt[]
-  auditLogs     AuditLog[]
-  stockOrders   StockOrder[]
-  budgetExpenses BudgetExpense[]
+  loginAttempts  LoginAttempt[]
+  auditLogs      AuditLog[]
+  stockOrders    StockOrder[]
+  ventes         Vente[]
+  sessionsCaisseOpened SessionCaisse[] @relation("SessionCaisseOpenedBy")
+  sessionsCaisseClosed SessionCaisse[] @relation("SessionCaisseClosedBy")
+  budgetExpenses              BudgetExpense[]
+  budgetsSubmitted            Budget[]                  @relation("BudgetSubmittedBy")
+  budgetsApproved             Budget[]                  @relation("BudgetApprovedBy")
+  budgetsRejected             Budget[]                  @relation("BudgetRejectedBy")
+  budgetSupplementsRequested  BudgetSupplementRequest[] @relation("BudgetSupplementRequestedBy")
+  budgetSupplementsReviewed   BudgetSupplementRequest[] @relation("BudgetSupplementReviewedBy")
+  budgetSupplementsDecided    BudgetSupplementRequest[] @relation("BudgetSupplementDecidedBy")
+  notifications               Notification[]
+  accountingPeriodClosures    AccountingPeriodClosure[] @relation("AccountingPeriodClosedBy")
+  messageThreadParticipants   MessageThreadParticipant[]
+  messagesSent                Message[]
 
   /// Fiche RH optionnelle (auth / rôles / permissions restent sur `User`).
   employee Employee?
@@ -155,13 +216,17 @@ model Organization {
   /// Produits supplémentaires attribués à cette filiale (en plus de ceux des catégories).
   catalogProducts   OrganizationCatalogProduct[]
   stockOrders       StockOrder[]
+  ventes            Vente[]
+  sessionsCaisse    SessionCaisse[]
   /// Budgets où cette organisation est la filiale concernée.
   budgets           Budget[]
 
   departments   Department[]
-  employees       Employee[]
-  leaveRequests   LeaveRequest[]
-  leaveBalances   LeaveBalance[]
+  employees     Employee[]
+  leaveRequests LeaveRequest[]
+  leaveBalances LeaveBalance[]
+  notifications Notification[]
+  accountingPeriodClosures AccountingPeriodClosure[]
 
   @@index([organizationType])
 }
@@ -321,8 +386,110 @@ model Product {
   stocks                     Stock[]
   organizationCatalogEntries OrganizationCatalogProduct[]
   stockOrders                StockOrder[]
+  venteLines                 VenteLine[]
 
   @@index([offeredToSubsidiaries])
+}
+
+/// Session de caisse : fond d’ouverture, ventes du service, clôture avec écart.
+model SessionCaisse {
+  id        String             @id @default(uuid())
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  statut    SessionCaisseStatut @default(OUVERTE)
+  openedAt  DateTime           @default(now())
+  closedAt  DateTime?
+
+  fondOuverture Decimal
+  fondCloture   Decimal?
+  /// Écart à la clôture : fond déclaré − (fond ouverture + encaissements espèces).
+  ecartCloture  Decimal?
+  commentaireCloture String?
+
+  /// Totaux figés à la clôture.
+  totalVentesFcfa      Decimal?
+  totalEspecesFcfa     Decimal?
+  totalCarteFcfa       Decimal?
+  totalMobileMoneyFcfa Decimal?
+  nombreVentes         Int?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  userId String
+  user   User   @relation("SessionCaisseOpenedBy", fields: [userId], references: [id], onDelete: Restrict)
+
+  closedByUserId String?
+  closedBy       User?   @relation("SessionCaisseClosedBy", fields: [closedByUserId], references: [id], onDelete: SetNull)
+
+  ventes Vente[]
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([statut])
+  @@index([openedAt])
+}
+
+/// Vente en point de vente (filiale) — brouillon puis confirmation avec décrément stock.
+model Vente {
+  id        String      @id @default(uuid())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  status    VenteStatut @default(DRAFT)
+  totalAmount Decimal   @default(0)
+  numeroTicket Int?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  sessionCaisseId String?
+  sessionCaisse   SessionCaisse? @relation(fields: [sessionCaisseId], references: [id], onDelete: Restrict)
+
+  lines     VenteLine[]
+  paiements VentePaiement[]
+
+  @@unique([sessionCaisseId, numeroTicket])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([sessionCaisseId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model VenteLine {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  quantity  Int
+  /// Prix unitaire FCFA figé à l’ajout de la ligne (copie du catalogue).
+  unitPrice Decimal
+
+  venteId String
+  vente   Vente  @relation(fields: [venteId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([venteId, productId])
+  @@index([venteId])
+  @@index([productId])
+}
+
+/// Paiements enregistrés à la confirmation (plusieurs modes possibles).
+model VentePaiement {
+  id        String       @id @default(uuid())
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  modePaiement ModePaiement
+  amount    Decimal
+
+  venteId String
+  vente   Vente  @relation(fields: [venteId], references: [id], onDelete: Cascade)
+
+  @@index([venteId])
 }
 
 /// Commande de réapprovisionnement (filiale → fournisseur désigné par la maison mère sur le produit).
@@ -351,6 +518,8 @@ model StockOrder {
   requestedByUserId String?
   requestedBy       User?   @relation(fields: [requestedByUserId], references: [id], onDelete: SetNull)
 
+  budgetExpense BudgetExpense?
+
   @@index([subsidiaryOrganizationId])
   @@index([status])
   @@index([productId])
@@ -377,7 +546,7 @@ model Stock {
   @@index([productId])
 }
 
-/// Budget mensuel pour une filiale — créé et validé par la maison mère uniquement.
+/// Budget mensuel pour une filiale — proposition pôle finance, validation DG / opérations.
 model Budget {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
@@ -391,10 +560,28 @@ model Budget {
 
   status BudgetStatus @default(DRAFT)
 
-  lines BudgetLine[]
+  /// Note du pôle finance lors de la soumission pour validation.
+  financeNote String?
+
+  submittedAt       DateTime?
+  submittedByUserId String?
+  submittedBy       User?     @relation("BudgetSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+
+  approvedAt       DateTime?
+  approvedByUserId String?
+  approvedBy       User?     @relation("BudgetApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  rejectedAt        DateTime?
+  rejectedByUserId  String?
+  rejectedBy        User?     @relation("BudgetRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  rejectionReason   String?
+
+  lines               BudgetLine[]
+  supplementRequests  BudgetSupplementRequest[]
 
   @@unique([subsidiaryOrganizationId, year, month])
   @@index([subsidiaryOrganizationId])
+  @@index([status])
 }
 
 model BudgetLine {
@@ -405,6 +592,7 @@ model BudgetLine {
   budgetId String
   budget   Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 
+  nature        BudgetLineNature @default(FIXED)
   category      BudgetLineCategory
   /// Libellé métier (ex. « Loyer siège »).
   label         String
@@ -413,6 +601,38 @@ model BudgetLine {
   expenses BudgetExpense[]
 
   @@index([budgetId])
+}
+
+/// Demande de rallonge budgétaire (filiale → finance → DG / opérations).
+model BudgetSupplementRequest {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  budgetId String
+  budget   Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  amountRequested Decimal
+  reason          String
+  status          BudgetSupplementStatus @default(PENDING_FINANCE)
+
+  financeNote String?
+
+  requestedByUserId String
+  requestedBy       User   @relation("BudgetSupplementRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+  reviewedBy       User?     @relation("BudgetSupplementReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  decidedAt       DateTime?
+  decidedByUserId String?
+  decidedBy       User?     @relation("BudgetSupplementDecidedBy", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+
+  rejectionReason String?
+
+  @@index([budgetId])
+  @@index([status])
 }
 
 /// Sortie réelle saisie sur une ligne budgétaire validée (filiale).
@@ -424,15 +644,20 @@ model BudgetExpense {
   budgetLineId String
   budgetLine   BudgetLine @relation(fields: [budgetLineId], references: [id], onDelete: Cascade)
 
-  amount Decimal
+  amount  Decimal
   /// Détail optionnel (ex. « Acompte janvier »).
-  label  String?
+  label   String?
   spentAt DateTime @default(now())
 
   recordedByUserId String?
   recordedBy       User?   @relation(fields: [recordedByUserId], references: [id], onDelete: SetNull)
 
+  /// Renseigné lorsque la sortie provient d’une commande stock confirmée.
+  stockOrderId String?    @unique
+  stockOrder   StockOrder? @relation(fields: [stockOrderId], references: [id], onDelete: SetNull)
+
   @@index([budgetLineId])
+  @@index([stockOrderId])
 }
 
 /// Service / unité organisationnelle (tenant = `organizationId`).
@@ -470,15 +695,15 @@ model Employee {
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
-  managerId String?
-  manager   Employee?  @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  managerId    String?
+  manager      Employee?  @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
   subordinates Employee[] @relation("EmployeeManager")
 
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   leaveRequests  LeaveRequest[]
-  leaveApprovals LeaveRequest[] @relation("LeaveApprovedBy")
+  leaveApprovals LeaveRequest[]       @relation("LeaveApprovedBy")
   leaveBalances  LeaveBalance[]
   contracts      EmploymentContract[]
   salaries       EmployeeSalary[]
@@ -496,6 +721,7 @@ model LeaveRequest {
   startDate DateTime
   endDate   DateTime
   reason    String?
+  type      LeaveType @default(PAID_LEAVE)
   status    LeaveStatus @default(PENDING)
 
   employeeId String
@@ -517,12 +743,12 @@ model LeaveRequest {
 
 /// Solde de congés par exercice (renouvellement en mai : `year` = année du mois de mai).
 model LeaveBalance {
-  id        String   @id @default(uuid())
+  id        String @id @default(uuid())
   /// Exercice mai N → avril N+1 (ex. `year = 2026` pour mai 2026 – avril 2027).
   year      Int
   /// Quota = 30 j/an + jours reportés des exercices précédents (cumul).
   totalDays Int
-  usedDays  Int      @default(0)
+  usedDays  Int    @default(0)
 
   employeeId String
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -539,7 +765,7 @@ model LeaveBalance {
 
 /// Contrat de travail (historique possible par employé).
 model EmploymentContract {
-  id        String   @id @default(uuid())
+  id        String                   @id @default(uuid())
   type      EmploymentContractType
   status    EmploymentContractStatus @default(ACTIVE)
   startDate DateTime
@@ -560,7 +786,7 @@ model EmploymentContract {
 
 /// Rémunération (montants en Decimal, pas de Float).
 model EmployeeSalary {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   amount        Decimal
   /// Début de période de validité du salaire.
   effectiveFrom DateTime
@@ -577,4 +803,99 @@ model EmployeeSalary {
 
   @@index([employeeId])
   @@index([organizationId])
+}
+
+enum NotificationType {
+  LEAVE_REQUEST_PENDING
+  STOCK_LOW_AFTER_SALE
+  BUDGET_PENDING_APPROVAL
+  BUDGET_UTILIZATION_WARNING
+}
+
+/// Alerte in-app pour l’utilisateur connecté.
+model Notification {
+  id        String           @id @default(uuid())
+  createdAt DateTime         @default(now())
+  readAt    DateTime?
+  type      NotificationType
+  title     String
+  body      String
+  metadata  Json?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt])
+  @@index([organizationId])
+  @@index([createdAt])
+}
+
+/// Clôture comptable mensuelle : verrouille les écritures sur la période.
+model AccountingPeriodClosure {
+  id       String   @id @default(uuid())
+  year     Int
+  month    Int
+  closedAt DateTime @default(now())
+
+  /// `null` = clôture groupe (toutes les organisations).
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  closedByUserId String
+  closedBy       User   @relation("AccountingPeriodClosedBy", fields: [closedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([year, month, organizationId])
+  @@index([year, month])
+}
+
+enum MessageThreadScope {
+  SUBSIDIARY_TO_SUBSIDIARY
+  SUBSIDIARY_TO_MAIN
+  MAIN_INTRA_POLE
+  MAIN_CROSS_POLE
+}
+
+/// Fil de messagerie interne (deux interlocuteurs).
+model MessageThread {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  scope    MessageThreadScope
+  poleCode String?
+
+  participants MessageThreadParticipant[]
+  messages     Message[]
+
+  @@index([updatedAt])
+}
+
+model MessageThreadParticipant {
+  id         String    @id @default(uuid())
+  threadId   String
+  thread     MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt DateTime?
+
+  @@unique([threadId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  body      String
+
+  threadId String
+  thread   MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  senderId String
+  sender   User   @relation(fields: [senderId], references: [id], onDelete: Restrict)
+
+  @@index([threadId, createdAt])
+  @@index([senderId])
 }

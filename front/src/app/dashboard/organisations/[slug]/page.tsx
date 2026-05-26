@@ -1,11 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
-
+import { DashboardSubpageHeader } from "~/components/layout/dashboard-subpage-header";
 import { api } from "~/lib/api";
 import type { OrganizationDto } from "~/lib/api-types";
 import {
@@ -14,6 +12,7 @@ import {
   isMainOrganization,
   useMe,
 } from "~/hooks/use-me";
+import { dashboardMainCenteredClass } from "~/lib/dashboard-styles";
 
 import OrganisationCatalogPanel from "../_components/OrganisationCatalogPanel";
 
@@ -50,24 +49,12 @@ export default function OrganisationDetailPage() {
     me != null && hasMePermission(me, "update", "Organization");
 
   return (
-    <main className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto bg-white p-6">
-      <div className="flex w-full items-center">
-        <div className="flex flex-1 justify-start">
-          {showBackToOrgList ? (
-            <Link
-              href="/dashboard/organisations"
-              className="flex w-fit cursor-pointer items-center gap-2 rounded-md p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-orange-500"
-            >
-              <ArrowLeft className="size-4" />
-              Retour
-            </Link>
-          ) : null}
-        </div>
-        <h1 className="shrink-0 text-4xl font-extrabold text-orange-500">
-          {me && !isMainOrganization(me) ? "Mon organisation" : "Organisation"}
-        </h1>
-        <div className="flex-1" />
-      </div>
+    <main className={dashboardMainCenteredClass}>
+      <DashboardSubpageHeader
+        title={me && !isMainOrganization(me) ? "Mon organisation" : "Organisation"}
+        backHref={showBackToOrgList ? "/dashboard/organisations" : "/dashboard"}
+        backLabel={showBackToOrgList ? "Retour" : "Tableau de bord"}
+      />
 
       {isError && (
         <p className="mt-6 text-red-600">Impossible de charger l’organisation.</p>

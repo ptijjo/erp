@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BudgetController } from './budget.controller';
 import { BudgetService } from './budget.service';
 import { BudgetExpenseService } from './budget-expense.service';
+import { BudgetSupplementService } from './budget-supplement.service';
+import { BudgetOverviewService } from './budget-overview.service';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
 import { PoliciesGuard } from '../casl/policies.guard';
 import { allowAllGuard } from '../test/mocks/guards.mock';
@@ -34,9 +36,18 @@ describe('BudgetController', () => {
   };
   let budgetExpenseService: {
     findByBudget: jest.Mock;
+    findExpenseLedger: jest.Mock;
     recordExpense: jest.Mock;
     remove: jest.Mock;
   };
+  let budgetSupplementService: {
+    findAll: jest.Mock;
+    create: jest.Mock;
+    submitToDirectors: jest.Mock;
+    approve: jest.Mock;
+    reject: jest.Mock;
+  };
+  let budgetOverviewService: { getOverview: jest.Mock };
 
   beforeEach(async () => {
     budgetService = {
@@ -49,8 +60,19 @@ describe('BudgetController', () => {
     };
     budgetExpenseService = {
       findByBudget: jest.fn().mockResolvedValue([]),
+      findExpenseLedger: jest.fn().mockResolvedValue([]),
       recordExpense: jest.fn().mockResolvedValue({ id: 'exp-1' }),
       remove: jest.fn().mockResolvedValue({ id: 'exp-1' }),
+    };
+    budgetSupplementService = {
+      findAll: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({ id: 'sup-1' }),
+      submitToDirectors: jest.fn().mockResolvedValue({ id: 'sup-1' }),
+      approve: jest.fn().mockResolvedValue({ id: 'sup-1' }),
+      reject: jest.fn().mockResolvedValue({ id: 'sup-1' }),
+    };
+    budgetOverviewService = {
+      getOverview: jest.fn().mockResolvedValue({ year: 2026 }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -58,6 +80,8 @@ describe('BudgetController', () => {
       providers: [
         { provide: BudgetService, useValue: budgetService },
         { provide: BudgetExpenseService, useValue: budgetExpenseService },
+        { provide: BudgetSupplementService, useValue: budgetSupplementService },
+        { provide: BudgetOverviewService, useValue: budgetOverviewService },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -70,8 +94,15 @@ describe('BudgetController', () => {
   });
 
   it('délègue findAll au service', async () => {
-    await controller.findAll(viewer);
-    expect(budgetService.findAll).toHaveBeenCalledWith(viewer);
+    const query = { page: 1 };
+    await controller.findAll(query, viewer);
+    expect(budgetService.findAll).toHaveBeenCalledWith(viewer, query);
+  });
+
+  it('délègue getOverview au service', async () => {
+    const query = { year: 2026 };
+    await controller.getOverview(query, viewer);
+    expect(budgetOverviewService.getOverview).toHaveBeenCalledWith(viewer, query);
   });
 
   it('délègue findOne au service', async () => {

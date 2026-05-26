@@ -49,6 +49,8 @@ import type { OrganizationDto, StockOrderDto } from "~/lib/api-types";
 import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
 
+import { StockOrderBudgetBadge } from "~/app/dashboard/stocks/_components/StockOrderBudgetBadge";
+
 import { OrderSummaryStatCard } from "./_components/OrderSummaryStatCard";
 
 const ALL_SUBSIDIARIES = "all";
@@ -563,6 +565,7 @@ export default function ComptabilitePage() {
                             Montant
                           </th>
                           <th className="px-3 py-2 font-semibold">Statut</th>
+                          <th className="px-3 py-2 font-semibold">Budget</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -592,6 +595,9 @@ export default function ComptabilitePage() {
                             </td>
                             <td className="px-3 py-2">
                               {STATUS_LABEL[o.status]}
+                            </td>
+                            <td className="px-3 py-2">
+                              <StockOrderBudgetBadge budgetLink={o.budgetLink} />
                             </td>
                           </tr>
                         ))}

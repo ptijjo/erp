@@ -1,8 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Package } from "lucide-react";
+import { Building2, History, ScanLine } from "lucide-react";
 
+import { GroupAnalyticsDashboard } from "~/app/dashboard/_components/GroupAnalyticsDashboard";
+import {
+  canOperateCaisse,
+  canReadSessionCaisseHistory,
+  canSeeCaisseNav,
+  filterSubsidiaryModuleTiles,
+  hasAnalyticsAccess,
+} from "~/lib/dashboard-navigation";
 import { ModuleTile } from "~/components/layout/module-tile";
 import { PageHeader } from "~/components/layout/page-header";
 import { PageShell } from "~/components/layout/page-shell";
@@ -33,7 +41,11 @@ export default function DashboardPage() {
 
   const main = isMainOrganization(me);
   const orgHref = subsidiaryOrganizationPath(me);
-  const modules = filterModuleTiles(me);
+  const modules = main ? filterModuleTiles(me) : filterSubsidiaryModuleTiles(me);
+  const showAnalytics = hasAnalyticsAccess(me);
+  const canUseCaisse = canOperateCaisse(me);
+  const canViewCaisse = canSeeCaisseNav(me);
+  const canViewSessions = canReadSessionCaisseHistory(me);
 
   return (
     <PageShell>
@@ -71,6 +83,9 @@ export default function DashboardPage() {
       <section className="mt-8 space-y-8">
         {main ? (
           <>
+            {showAnalytics ? (
+              <GroupAnalyticsDashboard variant="compact" />
+            ) : null}
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {modules.map((tile) => (
                 <ModuleTile key={tile.href} {...tile} />
@@ -91,21 +106,52 @@ export default function DashboardPage() {
             ) : null}
           </>
         ) : (
-          <section className="grid gap-6 lg:grid-cols-2">
+          <section className="space-y-6">
+            {showAnalytics ? (
+              <GroupAnalyticsDashboard variant="compact" />
+            ) : null}
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {modules.map((tile) => (
+                <ModuleTile key={tile.href} {...tile} />
+              ))}
+            </section>
+            {modules.length === 0 ? (
+              <Card className="border-dashed">
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Aucun module accessible
+                  </CardTitle>
+                  <CardDescription>
+                    Votre rôle ne permet pas encore d’accéder aux espaces métier.
+                    Contactez un administrateur.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            ) : null}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Démarrage rapide</CardTitle>
+                <CardTitle className="text-base">Raccourcis</CardTitle>
                 <CardDescription>
-                  Consultez le catalogue et la fiche de votre point de vente.
+                  Accès direct à la caisse et à l’historique de vos sessions.
                 </CardDescription>
               </CardHeader>
               <section className="flex flex-wrap gap-2 px-6 pb-6">
-                <Button variant="default" size="sm" asChild>
-                  <Link href="/dashboard/produits">
-                    <Package className="size-4" />
-                    Produits
-                  </Link>
-                </Button>
+                {canViewCaisse ? (
+                  <Button variant="default" size="sm" asChild>
+                    <Link href="/dashboard/caisse">
+                      <ScanLine className="size-4" />
+                      {canUseCaisse ? "Caisse" : "Caisse (consultation)"}
+                    </Link>
+                  </Button>
+                ) : null}
+                {canViewSessions ? (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/dashboard/compte">
+                      <History className="size-4" />
+                      Mes sessions caisse
+                    </Link>
+                  </Button>
+                ) : null}
                 {orgHref ? (
                   <Button variant="outline" size="sm" asChild>
                     <Link href={orgHref}>
@@ -115,15 +161,6 @@ export default function DashboardPage() {
                   </Button>
                 ) : null}
               </section>
-            </Card>
-            <Card className="bg-muted/40">
-              <CardHeader>
-                <CardTitle className="text-base">Besoin d’aide ?</CardTitle>
-                <CardDescription>
-                  Les alertes stocks et budgets apparaîtront ici lorsque les
-                  données seront disponibles pour votre filiale.
-                </CardDescription>
-              </CardHeader>
             </Card>
           </section>
         )}

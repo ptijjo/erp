@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -15,8 +16,24 @@ import { CheckPolicies } from '../casl/check-policies.decorator';
 import { PoliciesGuard } from '../casl/policies.guard';
 import { BudgetService } from './budget.service';
 import { BudgetExpenseService } from './budget-expense.service';
-import { CreateBudgetDto, UpdateBudgetDto } from './dto/budget.dto';
+import { BudgetSupplementService } from './budget-supplement.service';
+import { BudgetOverviewService } from './budget-overview.service';
+import {
+  BudgetOverviewQueryDto,
+  ListBudgetQueryDto,
+} from './dto/budget-query.dto';
+import {
+  CreateBudgetDto,
+  RejectBudgetDto,
+  SubmitBudgetDto,
+  UpdateBudgetDto,
+} from './dto/budget.dto';
 import { CreateBudgetExpenseDto } from './dto/budget-expense.dto';
+import {
+  CreateBudgetSupplementDto,
+  RejectBudgetSupplementDto,
+  ReviewBudgetSupplementDto,
+} from './dto/budget-supplement.dto';
 
 @Controller('budget')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
@@ -24,12 +41,38 @@ export class BudgetController {
   constructor(
     private readonly budgetService: BudgetService,
     private readonly budgetExpenseService: BudgetExpenseService,
+    private readonly budgetSupplementService: BudgetSupplementService,
+    private readonly budgetOverviewService: BudgetOverviewService,
   ) {}
+
+  @Get('overview')
+  @CheckPolicies({ action: 'read', subject: 'Budget' })
+  getOverview(
+    @Query() query: BudgetOverviewQueryDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.budgetOverviewService.getOverview(viewer, query);
+  }
+
+  @Get('expenses/ledger')
+  @CheckPolicies({ action: 'read', subject: 'BudgetExpense' })
+  findExpenseLedger(@CurrentUser() viewer: AuthenticatedUser) {
+    return this.budgetExpenseService.findExpenseLedger(viewer);
+  }
+
+  @Get('supplement-requests')
+  @CheckPolicies({ action: 'read', subject: 'BudgetSupplementRequest' })
+  findAllSupplements(@CurrentUser() viewer: AuthenticatedUser) {
+    return this.budgetSupplementService.findAll(viewer);
+  }
 
   @Get()
   @CheckPolicies({ action: 'read', subject: 'Budget' })
-  findAll(@CurrentUser() viewer: AuthenticatedUser) {
-    return this.budgetService.findAll(viewer);
+  findAll(
+    @Query() query: ListBudgetQueryDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.budgetService.findAll(viewer, query);
   }
 
   @Get(':id')
@@ -60,6 +103,16 @@ export class BudgetController {
     return this.budgetService.update(id, dto, viewer);
   }
 
+  @Post(':id/submit')
+  @CheckPolicies({ action: 'update', subject: 'Budget' })
+  submit(
+    @Param('id') id: string,
+    @Body() dto: SubmitBudgetDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.budgetService.submitForApproval(id, dto, viewer);
+  }
+
   @Post(':id/approve')
   @CheckPolicies({ action: 'update', subject: 'Budget' })
   approve(
@@ -67,6 +120,16 @@ export class BudgetController {
     @CurrentUser() viewer: AuthenticatedUser,
   ) {
     return this.budgetService.approve(id, viewer);
+  }
+
+  @Post(':id/reject')
+  @CheckPolicies({ action: 'update', subject: 'Budget' })
+  reject(
+    @Param('id') id: string,
+    @Body() dto: RejectBudgetDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.budgetService.reject(id, dto, viewer);
   }
 
   @Delete(':id')
@@ -79,7 +142,7 @@ export class BudgetController {
   }
 
   @Get(':budgetId/expenses')
-  @CheckPolicies({ action: 'read', subject: 'Budget' })
+  @CheckPolicies({ action: 'read', subject: 'BudgetExpense' })
   findExpenses(
     @Param('budgetId') budgetId: string,
     @CurrentUser() viewer: AuthenticatedUser,
@@ -87,8 +150,18 @@ export class BudgetController {
     return this.budgetExpenseService.findByBudget(budgetId, viewer);
   }
 
+  @Post(':budgetId/supplement-requests')
+  @CheckPolicies({ action: 'create', subject: 'BudgetSupplementRequest' })
+  createSupplement(
+    @Param('budgetId') budgetId: string,
+    @Body() dto: CreateBudgetSupplementDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.budgetSupplementService.create(budgetId, dto, viewer);
+  }
+
   @Post(':budgetId/lines/:lineId/expenses')
-  @CheckPolicies({ action: 'update', subject: 'Budget' })
+  @CheckPolicies({ action: 'create', subject: 'BudgetExpense' })
   recordExpense(
     @Param('budgetId') budgetId: string,
     @Param('lineId') lineId: string,
@@ -103,8 +176,37 @@ export class BudgetController {
     );
   }
 
+  @Post('supplement-requests/:id/submit')
+  @CheckPolicies({ action: 'update', subject: 'BudgetSupplementRequest' })
+  submitSupplement(
+    @Param('id') id: string,
+    @Body() dto: ReviewBudgetSupplementDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.budgetSupplementService.submitToDirectors(id, dto, viewer);
+  }
+
+  @Post('supplement-requests/:id/approve')
+  @CheckPolicies({ action: 'update', subject: 'BudgetSupplementRequest' })
+  approveSupplement(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.budgetSupplementService.approve(id, viewer);
+  }
+
+  @Post('supplement-requests/:id/reject')
+  @CheckPolicies({ action: 'update', subject: 'BudgetSupplementRequest' })
+  rejectSupplement(
+    @Param('id') id: string,
+    @Body() dto: RejectBudgetSupplementDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.budgetSupplementService.reject(id, dto, viewer);
+  }
+
   @Delete('expenses/:expenseId')
-  @CheckPolicies({ action: 'update', subject: 'Budget' })
+  @CheckPolicies({ action: 'delete', subject: 'BudgetExpense' })
   removeExpense(
     @Param('expenseId') expenseId: string,
     @CurrentUser() viewer: AuthenticatedUser,

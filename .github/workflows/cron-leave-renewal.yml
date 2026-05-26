@@ -1,0 +1,23 @@
+name: Cron — renouvellement congés
+
+on:
+  schedule:
+    # 1er mai à 06:00 UTC (ajuster selon fuseau métier)
+    - cron: "0 6 1 5 *"
+  workflow_dispatch:
+
+jobs:
+  renew-leave-balances:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appel API renouvellement exercice
+        env:
+          ERP_API_URL: ${{ secrets.ERP_API_URL }}
+          ERP_CRON_SECRET: ${{ secrets.ERP_CRON_SECRET }}
+        run: |
+          if [ -z "$ERP_API_URL" ] || [ -z "$ERP_CRON_SECRET" ]; then
+            echo "Secrets ERP_API_URL et ERP_CRON_SECRET requis."
+            exit 1
+          fi
+          curl -fsS -X POST "${ERP_API_URL%/}/cron/leave-renew-exercise" \
+            -H "X-Cron-Secret: ${ERP_CRON_SECRET}"

@@ -4,12 +4,22 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2, Wallet } from "lucide-react";
 
+import { BudgetExpenseLedger } from "~/app/dashboard/budgets/_components/BudgetExpenseLedger";
 import { BudgetExpensesPanel } from "~/app/dashboard/budgets/_components/BudgetExpensesPanel";
+import { BudgetSupplementPanel } from "~/app/dashboard/budgets/_components/BudgetSupplementPanel";
 import {
   CATEGORY_LABEL,
+  CATEGORY_OPTIONS,
+  defaultNatureForCategory,
   MONTHS_FR,
+  NATURE_LABEL,
+  NATURE_OPTIONS,
   STATUS_LABEL,
 } from "~/app/dashboard/budgets/_lib/budget-constants";
+import {
+  canProposeBudget,
+  isBudgetFinalApprover,
+} from "~/app/dashboard/budgets/_lib/budget-workflow";
 import { PageHeader } from "~/components/layout/page-header";
 import { PageShell } from "~/components/layout/page-shell";
 import { Badge } from "~/components/ui/badge";
@@ -40,20 +50,24 @@ import { api } from "~/lib/api";
 import type {
   BudgetDto,
   BudgetLineCategoryDto,
+  BudgetLineNatureDto,
+  BudgetUserSummaryDto,
   OrganizationDto,
+  PaginatedBudgetsDto,
 } from "~/lib/api-types";
 import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
 import { apiErrorMessage } from "~/lib/api-error-message";
 
 type LineForm = {
+  nature: BudgetLineNatureDto;
   category: BudgetLineCategoryDto;
   label: string;
   amountPlanned: string;
 };
 
 function emptyLine(): LineForm {
-  return { category: "LOYER", label: "", amountPlanned: "" };
+  return { nature: "FIXED", category: "LOYER", label: "", amountPlanned: "" };
 }
 
 function budgetTotalFcfa(b: BudgetDto): number {
@@ -61,6 +75,12 @@ function budgetTotalFcfa(b: BudgetDto): number {
     (s, l) => s + parseDecimal(l.amountPlanned),
     0,
   );
+}
+
+function budgetActorLabel(user: BudgetUserSummaryDto | null): string {
+  if (!user) return "";
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  return name || user.email;
 }
 
 export default function BudgetsPage() {
@@ -75,8 +95,13 @@ export default function BudgetsPage() {
   const canDeleteBudget =
     me != null && hasMePermission(me, "delete", "Budget");
   const isMain = me != null && isMainOrganization(me);
+  const canPropose =
+    me != null && canProposeBudget(me, isMain) && (canCreateBudget || canUpdateBudget);
+  const canApproveDir =
+    me != null && isBudgetFinalApprover(me) && canUpdateBudget;
 
   const [subsidiaryId, setSubsidiaryId] = useState<string | null>(null);
+  const [financeNote, setFinanceNote] = useState("");
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -86,8 +111,8 @@ export default function BudgetsPage() {
   const { data: budgets = [], isLoading: budgetsLoading } = useQuery({
     queryKey: ["budget"] as const,
     queryFn: async () => {
-      const { data } = await api.get<BudgetDto[]>("/budget");
-      return data;
+      const { data } = await api.get<PaginatedBudgetsDto>("/budget");
+      return data.items;
     },
     enabled: Boolean(me && canReadBudget),
   });
@@ -118,6 +143,7 @@ export default function BudgetsPage() {
     year: number;
     month: number;
     lines: {
+      nature: BudgetLineNatureDto;
       category: BudgetLineCategoryDto;
       label: string;
       amountPlanned: number;
@@ -150,6 +176,21 @@ export default function BudgetsPage() {
     },
   });
 
+  const submitMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.post(`/budget/${id}/submit`, {
+        financeNote: financeNote.trim() || undefined,
+      });
+    },
+    onSuccess: async () => {
+      setFinanceNote("");
+      await queryClient.invalidateQueries({ queryKey: ["budget"] });
+    },
+    onError: (e) => {
+      alert(apiErrorMessage(e, "Soumission impossible"));
+    },
+  });
+
   const approveMutation = useMutation({
     mutationFn: async (id: string) => {
       await api.post(`/budget/${id}/approve`);
@@ -159,6 +200,24 @@ export default function BudgetsPage() {
     },
     onError: (e) => {
       alert(apiErrorMessage(e, "Validation impossible"));
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const rejectionReason = window.prompt("Motif du refus :");
+      if (!rejectionReason?.trim()) {
+        throw new Error("Motif requis");
+      }
+      await api.post(`/budget/${id}/reject`, {
+        rejectionReason: rejectionReason.trim(),
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["budget"] });
+    },
+    onError: (e) => {
+      alert(apiErrorMessage(e, "Refus impossible"));
     },
   });
 
@@ -181,6 +240,7 @@ export default function BudgetsPage() {
     setMonth(b.month);
     setLines(
       b.lines.map((l) => ({
+        nature: l.nature,
         category: l.category,
         label: l.label,
         amountPlanned: String(parseDecimal(l.amountPlanned)),
@@ -211,6 +271,7 @@ export default function BudgetsPage() {
         return;
       }
       parsedLines.push({
+        nature: row.nature,
         category: row.category,
         label: row.label.trim(),
         amountPlanned: amt,
@@ -259,8 +320,8 @@ export default function BudgetsPage() {
         title="Budgets filiales"
         description={
           isMain
-            ? "Création et validation des budgets mensuels par filiale. Les graphiques de consommation apparaissent une fois le budget validé et des sorties saisies."
-            : "Consultez votre budget validé, suivez vos dépenses en graphiques et enregistrez vos sorties réelles."
+            ? "Le pôle finance propose les budgets filiales ; le DG ou le directeur des opérations valide. Suivi des dépenses et demandes de rallonge."
+            : "Gérez vos charges fixes et variables sur le budget validé, ou demandez une rallonge à la maison mère."
         }
         actions={
           <Wallet className="size-8 shrink-0 text-primary" aria-hidden />
@@ -268,16 +329,15 @@ export default function BudgetsPage() {
       />
 
       <div className="mt-6 flex flex-col gap-6">
-        {isMain &&
-        (canCreateBudget || (editingId && canUpdateBudget)) ? (
+        {canPropose ? (
           <Card className="py-4">
             <CardHeader className="px-4 sm:px-6">
               <CardTitle className="text-lg">
-                {editingId ? "Modifier le brouillon" : "Nouveau budget (brouillon)"}
+                {editingId ? "Modifier le brouillon" : "Proposition budgétaire (pôle finance)"}
               </CardTitle>
               <CardDescription>
-                Définissez les lignes (loyer, salaires…) pour une filiale et une
-                période mensuelle.
+                Définissez les lignes fixes (loyer, salaires, énergie…) et variables
+                (stock, maintenance, matériel…) pour une filiale et une période mensuelle.
               </CardDescription>
             </CardHeader>
             <CardContent className="px-4 sm:px-6">
@@ -350,14 +410,14 @@ export default function BudgetsPage() {
                       className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-3"
                     >
                       <div className="min-w-[120px]">
-                        <Label className="text-xs">Catégorie</Label>
+                        <Label className="text-xs">Nature</Label>
                         <Select
-                          value={row.category}
+                          value={row.nature}
                           onValueChange={(v) => {
-                            const cat = v as BudgetLineCategoryDto;
+                            const nature = v as BudgetLineNatureDto;
                             setLines((prev) =>
                               prev.map((l, i) =>
-                                i === idx ? { ...l, category: cat } : l,
+                                i === idx ? { ...l, nature } : l,
                               ),
                             );
                           }}
@@ -366,12 +426,42 @@ export default function BudgetsPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="LOYER">
-                              {CATEGORY_LABEL.LOYER}
-                            </SelectItem>
-                            <SelectItem value="SALAIRE">
-                              {CATEGORY_LABEL.SALAIRE}
-                            </SelectItem>
+                            {NATURE_OPTIONS.map(([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="min-w-[140px]">
+                        <Label className="text-xs">Catégorie</Label>
+                        <Select
+                          value={row.category}
+                          onValueChange={(v) => {
+                            const cat = v as BudgetLineCategoryDto;
+                            setLines((prev) =>
+                              prev.map((l, i) =>
+                                i === idx
+                                  ? {
+                                      ...l,
+                                      category: cat,
+                                      nature: defaultNatureForCategory(cat),
+                                    }
+                                  : l,
+                              ),
+                            );
+                          }}
+                        >
+                          <SelectTrigger className="mt-1 h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CATEGORY_OPTIONS.map(([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -453,10 +543,24 @@ export default function BudgetsPage() {
           <CardHeader className="px-4 sm:px-6">
             <CardTitle className="text-lg">Liste des budgets</CardTitle>
             <CardDescription>
-              Brouillons en attente de validation (maison mère) et budgets validés.
+              Brouillons finance, propositions en attente DG / opérations, budgets validés.
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 sm:px-6">
+            {canPropose ? (
+              <div className="mb-4 max-w-xl">
+                <Label htmlFor="budget-finance-note">
+                  Note finance (optionnelle, envoyée à la direction)
+                </Label>
+                <Input
+                  id="budget-finance-note"
+                  value={financeNote}
+                  onChange={(e) => setFinanceNote(e.target.value)}
+                  placeholder="Contexte ou recommandation pour la validation"
+                  className="mt-1"
+                />
+              </div>
+            ) : null}
             {budgetsLoading ? (
               <div className="space-y-2">
                 <Skeleton className="h-10 w-full" />
@@ -498,18 +602,39 @@ export default function BudgetsPage() {
                           {MONTHS_FR[b.month - 1]} {b.year}
                         </td>
                         <td className="px-4 py-3">
-                          <Badge
-                            variant={
-                              b.status === "DRAFT" ? "secondary" : "default"
-                            }
-                            className={
-                              b.status === "APPROVED"
-                                ? "bg-emerald-600 text-white hover:bg-emerald-600/90"
-                                : undefined
-                            }
-                          >
-                            {STATUS_LABEL[b.status]}
-                          </Badge>
+                          <div className="space-y-1">
+                            <Badge
+                              variant={
+                                b.status === "APPROVED"
+                                  ? "default"
+                                  : b.status === "REJECTED"
+                                    ? "destructive"
+                                    : "secondary"
+                              }
+                              className={
+                                b.status === "APPROVED"
+                                  ? "bg-emerald-600 text-white hover:bg-emerald-600/90"
+                                  : undefined
+                              }
+                            >
+                              {STATUS_LABEL[b.status]}
+                            </Badge>
+                            {b.financeNote ? (
+                              <p className="text-xs text-muted-foreground">
+                                Note : {b.financeNote}
+                              </p>
+                            ) : null}
+                            {b.status === "REJECTED" && b.rejectionReason ? (
+                              <p className="text-xs text-destructive">
+                                {b.rejectionReason}
+                              </p>
+                            ) : null}
+                            {b.submittedBy ? (
+                              <p className="text-xs text-muted-foreground">
+                                Soumis par {budgetActorLabel(b.submittedBy)}
+                              </p>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right font-mono font-medium tabular-nums">
                           {formatFcfa(budgetTotalFcfa(b))}
@@ -518,39 +643,34 @@ export default function BudgetsPage() {
                           <ul className="list-inside list-disc text-xs">
                             {b.lines.map((l) => (
                               <li key={l.id}>
-                                {CATEGORY_LABEL[l.category]} — {l.label} :{" "}
-                                {formatFcfa(parseDecimal(l.amountPlanned))}
+                                {NATURE_LABEL[l.nature]} · {CATEGORY_LABEL[l.category]} —{" "}
+                                {l.label} : {formatFcfa(parseDecimal(l.amountPlanned))}
                               </li>
                             ))}
                           </ul>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {isMain && b.status === "DRAFT" ? (
+                          {isMain &&
+                          (b.status === "DRAFT" || b.status === "REJECTED") &&
+                          canPropose ? (
                             <div className="flex flex-wrap justify-end gap-2">
-                              {canUpdateBudget ? (
-                                <>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => startEdit(b)}
-                                  >
-                                    <Pencil className="size-3.5" />
-                                    Modifier
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700"
-                                    onClick={() =>
-                                      approveMutation.mutate(b.id)
-                                    }
-                                    disabled={approveMutation.isPending}
-                                  >
-                                    Valider
-                                  </Button>
-                                </>
-                              ) : null}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => startEdit(b)}
+                              >
+                                <Pencil className="size-3.5" />
+                                Modifier
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => submitMutation.mutate(b.id)}
+                                disabled={submitMutation.isPending}
+                              >
+                                Soumettre à la direction
+                              </Button>
                               {canDeleteBudget ? (
                                 <Button
                                   type="button"
@@ -572,6 +692,30 @@ export default function BudgetsPage() {
                                 </Button>
                               ) : null}
                             </div>
+                          ) : isMain &&
+                            b.status === "PENDING_APPROVAL" &&
+                            canApproveDir ? (
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700"
+                                onClick={() => approveMutation.mutate(b.id)}
+                                disabled={approveMutation.isPending}
+                              >
+                                Approuver
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive"
+                                onClick={() => rejectMutation.mutate(b.id)}
+                                disabled={rejectMutation.isPending}
+                              >
+                                Refuser
+                              </Button>
+                            </div>
                           ) : (
                             <span className="text-xs text-muted-foreground">
                               —
@@ -590,9 +734,17 @@ export default function BudgetsPage() {
         <BudgetExpensesPanel
           budgets={budgets}
           canViewExpenses={canReadBudget}
-          canRecordExpense={canUpdateBudget && !isMain}
+          canRecordExpense={
+            me != null &&
+            hasMePermission(me, "create", "BudgetExpense") &&
+            !isMain
+          }
           isMain={isMain}
         />
+
+        <BudgetSupplementPanel budgets={budgets} />
+
+        <BudgetExpenseLedger />
       </div>
     </PageShell>
   );

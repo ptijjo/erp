@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BudgetService } from './budget.service';
+import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { BudgetStatus } from '../generated/prisma/client';
@@ -58,6 +59,7 @@ const budgetRow = {
       id: 'line-1',
       budgetId: 'budget-1',
       category: 'LOYER' as const,
+      nature: 'FIXED' as const,
       label: 'Loyer siège',
       amountPlanned: 1500,
       createdAt: new Date(),
@@ -79,6 +81,8 @@ describe('BudgetService', () => {
   let findUnique: jest.Mock;
   let update: jest.Mock;
   let deleteBudget: jest.Mock;
+  let count: jest.Mock;
+  let budgetExpenseAggregate: jest.Mock;
   let organizationFindUnique: jest.Mock;
   let transactionCreate: jest.Mock;
   let transaction: jest.Mock;
@@ -94,6 +98,10 @@ describe('BudgetService', () => {
       }),
     );
     deleteBudget = jest.fn().mockResolvedValue(budgetRow);
+    count = jest.fn().mockResolvedValue(1);
+    budgetExpenseAggregate = jest
+      .fn()
+      .mockResolvedValue({ _sum: { amount: 0 } });
     organizationFindUnique = jest.fn().mockResolvedValue({
       organizationType: 'SUBSIDIARY',
     });
@@ -117,10 +125,16 @@ describe('BudgetService', () => {
               findUnique,
               update,
               delete: deleteBudget,
+              count,
             },
+            budgetExpense: { aggregate: budgetExpenseAggregate },
             organization: { findUnique: organizationFindUnique },
             $transaction: transaction,
           },
+        },
+        {
+          provide: NotificationService,
+          useValue: { notifyMainUsersWithPermission: jest.fn() },
         },
       ],
     }).compile();
@@ -129,17 +143,17 @@ describe('BudgetService', () => {
   });
 
   describe('findAll', () => {
-    it('liste tous les budgets pour la maison mère', async () => {
-      const rows = await service.findAll(mainViewer);
-      expect(rows).toEqual([budgetRow]);
-      expect(findMany).toHaveBeenCalledWith({
-        where: {},
-        orderBy: [{ year: 'desc' }, { month: 'desc' }],
-        include: expect.objectContaining({
-          subsidiaryOrganization: expect.any(Object),
-          lines: true,
+    it('liste tous les budgets pour la maison mère (paginé)', async () => {
+      const result = await service.findAll(mainViewer);
+      expect(result.items).toEqual([budgetRow]);
+      expect(result.meta.total).toBe(1);
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {},
+          skip: 0,
+          take: 20,
         }),
-      });
+      );
     });
 
     it('ne retourne que les budgets APPROVED de la filiale pour un viewer filiale', async () => {
@@ -185,6 +199,21 @@ describe('BudgetService', () => {
   });
 
   describe('create', () => {
+    it('refuse un directeur hors pôle finance', async () => {
+      const hrViewer: AuthenticatedUser = {
+        ...mainViewer,
+        role: {
+          id: 'r-hr',
+          name: 'DIRECTOR_HR',
+          description: null,
+          poleCode: 'Pole_HR',
+        },
+      };
+      await expect(service.create(createDto, hrViewer)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
     it('refuse les utilisateurs hors maison mère', async () => {
       await expect(service.create(createDto, subsidiaryViewer)).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -213,6 +242,7 @@ describe('BudgetService', () => {
               create: [
                 {
                   category: 'LOYER',
+                  nature: 'FIXED',
                   label: 'Loyer',
                   amountPlanned: 2000,
                 },
@@ -260,38 +290,61 @@ describe('BudgetService', () => {
       expect(update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'budget-1' },
-          data: {
+          data: expect.objectContaining({
             lines: {
               deleteMany: {},
               create: [
                 {
                   category: 'LOYER',
+                  nature: 'FIXED',
                   label: 'Loyer révisé',
                   amountPlanned: 1800,
                 },
               ],
             },
-          },
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('submitForApproval', () => {
+    it('soumet un brouillon au statut PENDING_APPROVAL', async () => {
+      findUnique.mockResolvedValueOnce({ ...budgetRow, lines: budgetRow.lines });
+      await service.submitForApproval(
+        'budget-1',
+        { financeNote: 'Proposition Q2' },
+        mainViewer,
+      );
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: BudgetStatus.PENDING_APPROVAL,
+            financeNote: 'Proposition Q2',
+          }),
         }),
       );
     });
   });
 
   describe('approve', () => {
-    it('passe un brouillon en APPROVED', async () => {
-      await service.approve('budget-1', mainViewer);
-      expect(update).toHaveBeenCalledWith({
-        where: { id: 'budget-1' },
-        data: { status: BudgetStatus.APPROVED },
-        include: expect.any(Object),
-      });
-    });
-
-    it('refuse d’approuver un budget déjà validé', async () => {
+    it('valide un budget en attente', async () => {
       findUnique.mockResolvedValueOnce({
         ...budgetRow,
-        status: BudgetStatus.APPROVED,
+        status: BudgetStatus.PENDING_APPROVAL,
       });
+      await service.approve('budget-1', mainViewer);
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: BudgetStatus.APPROVED,
+            approvedByUserId: 'u-main',
+          }),
+        }),
+      );
+    });
+
+    it('refuse d’approuver un brouillon directement', async () => {
       await expect(service.approve('budget-1', mainViewer)).rejects.toBeInstanceOf(
         BadRequestException,
       );

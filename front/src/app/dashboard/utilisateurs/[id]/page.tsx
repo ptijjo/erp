@@ -4,11 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
+import { DashboardTitleBar } from "~/components/layout/dashboard-title-bar";
 import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { UserDetailDto } from "~/lib/api-types";
+import { dashboardBackLinkClass, dashboardMainClass } from "~/lib/dashboard-styles";
 
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { rolePoleLabel } from "../_lib/pole-label";
@@ -58,62 +60,56 @@ export default function UserDetailPage() {
   });
 
   return (
-    <main className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto bg-white p-6">
-      <div className="flex w-full flex-wrap items-center gap-3">
-        <div className="flex min-w-0 flex-1 justify-start">
-          <Link
-            href="/dashboard/utilisateurs"
-            className="flex w-fit cursor-pointer items-center gap-2 rounded-md p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-orange-500"
-          >
-            <ArrowLeft className="size-4" />
-            Retour
-          </Link>
-        </div>
-        <h1 className="shrink-0 text-4xl font-extrabold text-orange-500">
-          Utilisateur
-        </h1>
-        <div className="flex min-w-0 flex-1 justify-end">
-          {user && !isLoading && !isError ? (
-            <div className="flex flex-wrap items-center justify-end gap-3">
-              {canUpdateUser && (
-                <Link
-                  href={`/dashboard/utilisateurs/${id}/edit`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
-                >
-                  <Pencil className="size-4" />
-                  Modifier
-                </Link>
-              )}
-              {canDeleteUser && (
-                <button
-                  type="button"
-                  title={
-                    isSelf
-                      ? "Vous ne pouvez pas supprimer votre propre compte"
-                      : undefined
-                  }
-                  disabled={deleteMutation.isPending || isSelf}
-                  onClick={() => {
-                    if (
-                      !window.confirm(
-                        `Supprimer définitivement l’utilisateur « ${user.email} » ? Cette action est irréversible.`,
-                      )
-                    ) {
-                      return;
+    <main className={`${dashboardMainClass} gap-4`}>
+      <DashboardTitleBar
+        title="Utilisateur"
+        actions={
+          <>
+            <Link href="/dashboard/utilisateurs" className={dashboardBackLinkClass}>
+              Retour
+            </Link>
+            {user && !isLoading && !isError ? (
+              <>
+                {canUpdateUser ? (
+                  <Link
+                    href={`/dashboard/utilisateurs/${id}/edit`}
+                    className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100 sm:w-fit"
+                  >
+                    <Pencil className="size-4 shrink-0" />
+                    Modifier
+                  </Link>
+                ) : null}
+                {canDeleteUser ? (
+                  <button
+                    type="button"
+                    title={
+                      isSelf
+                        ? "Vous ne pouvez pas supprimer votre propre compte"
+                        : undefined
                     }
-                    setDeleteError(null);
-                    deleteMutation.mutate();
-                  }}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Trash2 className="size-4" />
-                  Supprimer
-                </button>
-              )}
-            </div>
-          ) : null}
-        </div>
-      </div>
+                    disabled={deleteMutation.isPending || isSelf}
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          `Supprimer définitivement l’utilisateur « ${user.email} » ? Cette action est irréversible.`,
+                        )
+                      ) {
+                        return;
+                      }
+                      setDeleteError(null);
+                      deleteMutation.mutate();
+                    }}
+                    className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
+                  >
+                    <Trash2 className="size-4 shrink-0" />
+                    Supprimer
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+          </>
+        }
+      />
 
       {deleteError && (
         <p className="mt-4 text-sm text-red-600" role="alert">

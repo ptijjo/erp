@@ -38,15 +38,21 @@ export const KNOWN_POLICY_SUBJECTS = [
   'Product',
   'Stock',
   'StockOrder',
+  'Vente',
+  'SessionCaisse',
   'Supplier',
   'Budget',
   'BudgetExpense',
+  'BudgetSupplementRequest',
   'Department',
   'Employee',
   'LeaveRequest',
   'LeaveBalance',
   'EmploymentContract',
   'EmployeeSalary',
+  'AccountingPeriod',
+  'Notification',
+  'Message',
 ] as const;
 
 const VALID_ACTIONS = new Set(['read', 'create', 'update', 'delete', 'manage']);

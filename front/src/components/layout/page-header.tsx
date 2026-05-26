@@ -33,7 +33,7 @@ export function PageHeader({
         ) : null}
       </section>
       {actions ? (
-        <section className="flex shrink-0 flex-wrap items-center gap-2">
+        <section className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto [&_a]:w-full sm:[&_a]:w-auto [&_button]:w-full sm:[&_button]:w-auto">
           {actions}
         </section>
       ) : null}

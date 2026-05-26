@@ -9,6 +9,7 @@ import { Building2, Plus } from "lucide-react";
 
 import { PageHeader } from "~/components/layout/page-header";
 import { PageShell } from "~/components/layout/page-shell";
+import { TableScroll } from "~/components/layout/table-scroll";
 import { Button } from "~/components/ui/button";
 import {
   hasMePermission,
@@ -106,7 +107,7 @@ export default function DepartementsPage() {
             createMutation.mutate();
           }}
         >
-          <div className="min-w-[200px] flex-1">
+          <div className="w-full sm:flex-1">
             <label className="mb-1 block text-sm font-medium">Nom *</label>
             <input
               value={name}
@@ -116,7 +117,7 @@ export default function DepartementsPage() {
             />
           </div>
           {isMain ? (
-            <div className="min-w-[200px] flex-1">
+            <div className="w-full sm:flex-1">
               <label className="mb-1 block text-sm font-medium">
                 Organisation
               </label>
@@ -154,8 +155,8 @@ export default function DepartementsPage() {
           Aucun département.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[480px] text-left text-sm">
+        <TableScroll>
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 font-semibold">Nom</th>
@@ -212,7 +213,7 @@ export default function DepartementsPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
       {meta ? (
         <ListPagination meta={meta} onPageChange={setPage} className="mt-4" />

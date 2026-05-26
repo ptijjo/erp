@@ -1,11 +1,16 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  BarChart3,
   Building2,
   FolderTree,
+  History,
+  Lock,
   Layers,
   LayoutDashboard,
   Package,
   Receipt,
+  ScanLine,
+  MessageSquare,
   ScrollText,
   Truck,
   UserCircle,
@@ -19,13 +24,14 @@ import {
   subsidiaryOrganizationPath,
   type Me,
 } from "~/hooks/use-me";
+import type { PermissionAction } from "~/lib/me-ability";
 
 export type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
   exact?: boolean;
-  requiredPermission?: { action: "read"; subject: string };
+  requiredPermission?: { action: PermissionAction; subject: string };
   mainOnly?: boolean;
 };
 
@@ -35,8 +41,59 @@ export type NavSection = {
   items: NavItem[];
 };
 
+const ANALYTICS_READ_SUBJECTS = [
+  "Budget",
+  "Vente",
+  "Stock",
+  "Employee",
+  "StockOrder",
+  "Product",
+] as const;
+
+export function hasAnalyticsAccess(me: Me): boolean {
+  return ANALYTICS_READ_SUBJECTS.some((subject) =>
+    hasMePermission(me, "read", subject),
+  );
+}
+
+/** Filiale : voir l’entrée menu Caisse (lecture ou exploitation). */
+export function canSeeCaisseNav(me: Me): boolean {
+  if (isMainOrganization(me)) return false;
+  return (
+    hasMePermission(me, "read", "SessionCaisse") ||
+    hasMePermission(me, "read", "Vente") ||
+    hasMePermission(me, "create", "Vente") ||
+    hasMePermission(me, "create", "SessionCaisse")
+  );
+}
+
+/** Filiale : ouvrir une session et/ou encaisser des ventes. */
+export function canOperateCaisse(me: Me): boolean {
+  if (isMainOrganization(me)) return false;
+  return (
+    hasMePermission(me, "create", "Vente") ||
+    hasMePermission(me, "create", "SessionCaisse")
+  );
+}
+
+/** @deprecated Préférer canOperateCaisse ou canSeeCaisseNav */
+export function canAccessCaisse(me: Me): boolean {
+  return canOperateCaisse(me);
+}
+
+/** Filiale : historique des sessions de caisse. */
+export function canReadSessionCaisseHistory(me: Me): boolean {
+  if (isMainOrganization(me)) return false;
+  return hasMePermission(me, "read", "SessionCaisse");
+}
+
 const baseNavItems: NavItem[] = [
   { label: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
+  {
+    label: "Rapports & analyses",
+    href: "/dashboard/rapports",
+    icon: BarChart3,
+  },
   {
     label: "Utilisateurs",
     href: "/dashboard/utilisateurs",
@@ -81,10 +138,26 @@ const baseNavItems: NavItem[] = [
     requiredPermission: { action: "read", subject: "Stock" },
   },
   {
+    label: "Caisse",
+    href: "/dashboard/caisse",
+    icon: ScanLine,
+  },
+  {
+    label: "Mes sessions caisse",
+    href: "/dashboard/compte",
+    icon: History,
+  },
+  {
     label: "Budgets",
     href: "/dashboard/budgets",
     icon: Wallet,
     requiredPermission: { action: "read", subject: "Budget" },
+  },
+  {
+    label: "Trésorerie",
+    href: "/dashboard/tresorerie",
+    icon: Lock,
+    requiredPermission: { action: "read", subject: "AccountingPeriod" },
   },
   {
     label: "Synthèse commandes",
@@ -98,10 +171,17 @@ const baseNavItems: NavItem[] = [
     icon: ScrollText,
     requiredPermission: { action: "read", subject: "AuditLog" },
   },
+  {
+    label: "Messagerie",
+    href: "/dashboard/messages",
+    icon: MessageSquare,
+    requiredPermission: { action: "read", subject: "Message" },
+  },
 ];
 
 const SECTION_BY_HREF: Record<string, string> = {
   "/dashboard": "accueil",
+  "/dashboard/rapports": "accueil",
   "/dashboard/utilisateurs": "organisation",
   "/dashboard/rh": "rh",
   "/dashboard/organisations": "organisation",
@@ -109,14 +189,19 @@ const SECTION_BY_HREF: Record<string, string> = {
   "/dashboard/fournisseurs": "catalogue",
   "/dashboard/categories": "catalogue",
   "/dashboard/stocks": "operations",
+  "/dashboard/caisse": "operations",
+  "/dashboard/compte": "operations",
   "/dashboard/comptabilite": "operations",
   "/dashboard/budgets": "finance",
+  "/dashboard/tresorerie": "finance",
   "/dashboard/audit": "gouvernance",
+  "/dashboard/messages": "gouvernance",
 };
 
 const SECTION_LABELS: Record<string, string> = {
   accueil: "Accueil",
   organisation: "Organisation",
+  rh: "Ressources humaines",
   catalogue: "Catalogue",
   operations: "Opérations",
   finance: "Finance",
@@ -124,6 +209,15 @@ const SECTION_LABELS: Record<string, string> = {
 };
 
 function itemIsAllowed(me: Me, item: NavItem): boolean {
+  if (item.href === "/dashboard/rapports" && !hasAnalyticsAccess(me)) {
+    return false;
+  }
+  if (item.href === "/dashboard/caisse" && !canSeeCaisseNav(me)) {
+    return false;
+  }
+  if (item.href === "/dashboard/compte" && !canReadSessionCaisseHistory(me)) {
+    return false;
+  }
   if (item.mainOnly && !isMainOrganization(me)) return false;
   if (
     !isMainOrganization(me) &&
@@ -253,6 +347,12 @@ export const HQ_MODULE_TILES: ModuleTile[] = [
     subject: "Stock",
   },
   {
+    title: "Rapports & analyses",
+    description: "Synthèse budget, RH, stocks et commandes",
+    href: "/dashboard/rapports",
+    icon: BarChart3,
+  },
+  {
     title: "Budgets",
     description: "Enveloppes et lignes budgétaires",
     href: "/dashboard/budgets",
@@ -273,10 +373,84 @@ export const HQ_MODULE_TILES: ModuleTile[] = [
     icon: ScrollText,
     subject: "AuditLog",
   },
+  {
+    title: "Messagerie",
+    description: "Échanges internes maison mère et filiales",
+    href: "/dashboard/messages",
+    icon: MessageSquare,
+    subject: "Message",
+  },
 ];
 
 export function filterModuleTiles(me: Me): ModuleTile[] {
   return HQ_MODULE_TILES.filter((tile) => {
+    if (tile.href === "/dashboard/rapports") {
+      return hasAnalyticsAccess(me);
+    }
+    if (!tile.subject) return true;
+    return hasMePermission(me, "read", tile.subject);
+  });
+}
+
+/** Tuiles d’accueil pour les utilisateurs filiale. */
+export const SUBSIDIARY_MODULE_TILES: ModuleTile[] = [
+  {
+    title: "Produits",
+    description: "Catalogue et prix de vente",
+    href: "/dashboard/produits",
+    icon: Package,
+    subject: "Product",
+  },
+  {
+    title: "Stocks",
+    description: "Niveaux, commandes et réceptions",
+    href: "/dashboard/stocks",
+    icon: Layers,
+    subject: "Stock",
+  },
+  {
+    title: "Caisse",
+    description: "Sessions, scan QR et encaissement",
+    href: "/dashboard/caisse",
+    icon: ScanLine,
+  },
+  {
+    title: "Budgets",
+    description: "Enveloppe validée et sorties réelles",
+    href: "/dashboard/budgets",
+    icon: Wallet,
+    subject: "Budget",
+  },
+  {
+    title: "Ressources humaines",
+    description: "Employés, congés et contrats",
+    href: "/dashboard/rh",
+    icon: UserCircle,
+    subject: "Employee",
+  },
+  {
+    title: "Messagerie",
+    description: "Échanges avec la maison mère et les filiales",
+    href: "/dashboard/messages",
+    icon: MessageSquare,
+    subject: "Message",
+  },
+  {
+    title: "Rapports",
+    description: "Synthèse de votre filiale",
+    href: "/dashboard/rapports",
+    icon: BarChart3,
+  },
+];
+
+export function filterSubsidiaryModuleTiles(me: Me): ModuleTile[] {
+  return SUBSIDIARY_MODULE_TILES.filter((tile) => {
+    if (tile.href === "/dashboard/caisse") {
+      return canSeeCaisseNav(me);
+    }
+    if (tile.href === "/dashboard/rapports") {
+      return hasAnalyticsAccess(me);
+    }
     if (!tile.subject) return true;
     return hasMePermission(me, "read", tile.subject);
   });

@@ -10,6 +10,7 @@ import { fetchHrAllItems, fetchHrPage } from "../_lib/hr-list";
 import { LEAVE_ANNUAL_DAYS, LEAVE_POLICY_SUMMARY } from "../_lib/hr-labels";
 import { PageHeader } from "~/components/layout/page-header";
 import { PageShell } from "~/components/layout/page-shell";
+import { TableScroll } from "~/components/layout/table-scroll";
 import { Button } from "~/components/ui/button";
 import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
@@ -106,7 +107,7 @@ export default function SoldesCongesPage() {
             ensureMutation.mutate();
           }}
         >
-          <div className="min-w-[220px] flex-1">
+          <div className="w-full sm:flex-1">
             <label className="mb-1 block text-sm font-medium">Employé *</label>
             <select
               value={employeeId}
@@ -137,8 +138,8 @@ export default function SoldesCongesPage() {
       ) : balances.length === 0 ? (
         <p className="text-sm text-muted-foreground">Aucun solde enregistré.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[640px] text-left text-sm">
+        <TableScroll>
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 font-semibold">Employé</th>
@@ -214,7 +215,7 @@ export default function SoldesCongesPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
       {meta ? (
         <ListPagination meta={meta} onPageChange={setPage} className="mt-4" />

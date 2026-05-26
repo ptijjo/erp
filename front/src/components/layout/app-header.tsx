@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, Menu, Volume2, VolumeX } from "lucide-react";
 
 import { UserProfileAvatar } from "~/app/dashboard/utilisateurs/_components/UserProfileAvatar";
 import { userDisplayName } from "~/app/dashboard/utilisateurs/_lib/user-display";
@@ -16,15 +17,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { MessagesBell } from "~/components/layout/messages-bell";
+import { NotificationsBell } from "~/components/layout/notifications-bell";
+import { RealtimeBridge } from "~/components/layout/realtime-bridge";
+import { useSidebar } from "~/components/layout/sidebar-context";
 import { meQueryKey } from "~/hooks/use-me";
 import { isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { UserDetailDto } from "~/lib/api-types";
+import {
+  onSoundPreferenceChanged,
+  readSoundEnabled,
+  writeSoundEnabled,
+} from "~/lib/sound-preferences";
 
-export function AppHeader() {
+type AppHeaderProps = {
+  showMenu?: boolean;
+};
+
+export function AppHeader({ showMenu = true }: AppHeaderProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
+  const { toggleMobile } = useSidebar();
+  const [soundEnabled, setSoundEnabled] = useState(() => readSoundEnabled());
 
   const { data: profile } = useQuery({
     queryKey: ["user", me?.sub] as const,
@@ -47,6 +63,14 @@ export function AppHeader() {
     router.replace("/");
   }
 
+  useEffect(() => {
+    return onSoundPreferenceChanged(setSoundEnabled);
+  }, []);
+
+  function toggleSounds() {
+    writeSoundEnabled(!soundEnabled);
+  }
+
   if (!me) return null;
 
   const displayName = profile
@@ -54,17 +78,34 @@ export function AppHeader() {
     : me.email.split("@")[0] ?? me.email;
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4 shadow-sm">
-      <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Console ERP
-        </p>
-        <p className="truncate text-sm font-semibold text-foreground">
-          {me.organisationName}
-        </p>
+    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-3 shadow-sm sm:px-4">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {showMenu ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0 lg:hidden"
+            onClick={toggleMobile}
+            aria-label="Ouvrir le menu"
+          >
+            <Menu className="size-5" />
+          </Button>
+        ) : null}
+        <div className="min-w-0">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:text-xs">
+            Console ERP
+          </p>
+          <p className="truncate text-sm font-semibold text-foreground">
+            {me.organisationName}
+          </p>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
+        <RealtimeBridge />
+        <MessagesBell />
+        <NotificationsBell />
         <Badge
           variant="secondary"
           className="hidden font-normal sm:inline-flex"
@@ -103,6 +144,10 @@ export function AppHeader() {
               <p className="text-xs text-muted-foreground">{me.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={toggleSounds}>
+              {soundEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
+              {soundEnabled ? "Désactiver les sons" : "Activer les sons"}
+            </DropdownMenuItem>
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
               onClick={() => void handleLogout()}

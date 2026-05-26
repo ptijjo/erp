@@ -15,9 +15,18 @@ import {
   SquarePlus,
 } from "lucide-react";
 
+import { DashboardTitleBar } from "~/components/layout/dashboard-title-bar";
+import { DesktopOnly, MobileOnly } from "~/components/layout/viewport";
+import { TableScroll } from "~/components/layout/table-scroll";
 import { hasMePermission, isAdminUser, isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { PoleDto, UserListItemDto } from "~/lib/api-types";
+import {
+  dashboardActionLinkMuted,
+  dashboardActionLinkOutline,
+  dashboardActionLinkPrimary,
+  dashboardMainClass,
+} from "~/lib/dashboard-styles";
 
 import { rolePoleLabel } from "./_lib/pole-label";
 import { userDisplayName } from "./_lib/user-display";
@@ -112,55 +121,54 @@ export default function UtilisateursPage() {
   }
 
   return (
-    <main className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-6 overflow-auto bg-white p-6">
-      <div className="flex w-full items-center">
-        <div className="flex flex-1 flex-wrap justify-start gap-3">
-          {canCreateUser ? (
-            <Link
-              href="/dashboard/utilisateurs/add"
-              className="flex w-fit cursor-pointer items-center gap-2 rounded-md bg-gray-100 p-4 transition-all duration-300 hover:bg-gray-200"
-            >
-              <SquarePlus className="size-4" /> Ajouter un utilisateur
-            </Link>
-          ) : null}
-          {canOpenRoles ? (
-            <Link
-              href="/dashboard/utilisateurs/roles"
-              className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-white p-4 font-medium text-gray-800 transition-all duration-300 hover:bg-gray-50"
-            >
-              <ListChecks className="size-4" /> Rôles et permissions
-            </Link>
-          ) : null}
-          {catalogPermissionsAdmin ? (
-            <>
+    <main className={`${dashboardMainClass} gap-6`}>
+      <DashboardTitleBar
+        title="Utilisateurs"
+        actions={
+          <>
+            {canCreateUser ? (
               <Link
-                href="/dashboard/utilisateurs/permissions"
-                className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-white p-4 font-medium text-gray-800 transition-all duration-300 hover:bg-gray-50"
+                href="/dashboard/utilisateurs/add"
+                className={dashboardActionLinkMuted}
               >
-                <KeyRound className="size-4" /> Catalogue permissions
+                <SquarePlus className="size-4 shrink-0" /> Ajouter un utilisateur
               </Link>
+            ) : null}
+            {canOpenRoles ? (
               <Link
-                href="/dashboard/utilisateurs/permissions/add"
-                className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50 p-4 font-medium text-orange-900 transition-all duration-300 hover:bg-orange-100"
+                href="/dashboard/utilisateurs/roles"
+                className={dashboardActionLinkOutline}
               >
-                <Plus className="size-4" /> Nouvelle permission
+                <ListChecks className="size-4 shrink-0" /> Rôles et permissions
               </Link>
-            </>
-          ) : null}
-          {canCreateRole ? (
-            <Link
-              href="/dashboard/utilisateurs/roles/add"
-              className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50 p-4 font-medium text-orange-900 transition-all duration-300 hover:bg-orange-100"
-            >
-              <ShieldPlus className="size-4" /> Nouveau rôle
-            </Link>
-          ) : null}
-        </div>
-        <h1 className="shrink-0 text-4xl font-extrabold text-orange-500">
-          Utilisateurs
-        </h1>
-        <div className="flex-1" />
-      </div>
+            ) : null}
+            {catalogPermissionsAdmin ? (
+              <>
+                <Link
+                  href="/dashboard/utilisateurs/permissions"
+                  className={dashboardActionLinkOutline}
+                >
+                  <KeyRound className="size-4 shrink-0" /> Catalogue permissions
+                </Link>
+                <Link
+                  href="/dashboard/utilisateurs/permissions/add"
+                  className={dashboardActionLinkPrimary}
+                >
+                  <Plus className="size-4 shrink-0" /> Nouvelle permission
+                </Link>
+              </>
+            ) : null}
+            {canCreateRole ? (
+              <Link
+                href="/dashboard/utilisateurs/roles/add"
+                className={dashboardActionLinkPrimary}
+              >
+                <ShieldPlus className="size-4 shrink-0" /> Nouveau rôle
+              </Link>
+            ) : null}
+          </>
+        }
+      />
 
       {showPolesSection ? (
         <PolesWithUsersSection
@@ -193,8 +201,47 @@ export default function UtilisateursPage() {
               Tous les utilisateurs
             </h2>
           ) : null}
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full min-w-[960px] text-left text-sm">
+          <MobileOnly>
+            <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
+              {sortedUsers.map((u) => (
+                <li key={u.id}>
+                  <button
+                    type="button"
+                    className="flex w-full cursor-pointer gap-3 px-4 py-4 text-left transition-colors hover:bg-gray-50/80 active:bg-gray-100"
+                    onClick={() => router.push(`/dashboard/utilisateurs/${u.id}`)}
+                    aria-label={`Voir les détails de ${u.email}`}
+                  >
+                    <UserProfileAvatar
+                      email={u.email}
+                      firstName={u.firstName}
+                      lastName={u.lastName}
+                      profilePhotoUrl={u.profilePhotoUrl}
+                      size="md"
+                      className="size-10 shrink-0 ring-1"
+                    />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="truncate font-medium text-gray-900">
+                        {userDisplayName(u)}
+                      </p>
+                      <p className="truncate text-sm text-gray-600">{u.email}</p>
+                      <p className="text-xs text-gray-500">
+                        {u.role.name}
+                        {u.role.pole
+                          ? ` · ${rolePoleLabel(u.role.pole)}`
+                          : ` · ${rolePoleLabel(null)}`}
+                      </p>
+                      <p className="truncate text-xs text-gray-500">
+                        {u.organization.name}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </MobileOnly>
+          <DesktopOnly>
+          <TableScroll className="border-gray-200">
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="px-4 py-3 font-semibold text-gray-900">
@@ -299,7 +346,8 @@ export default function UtilisateursPage() {
               ))}
             </tbody>
           </table>
-          </div>
+          </TableScroll>
+          </DesktopOnly>
         </div>
       )}
     </main>

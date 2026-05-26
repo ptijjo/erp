@@ -79,8 +79,8 @@ export default function FirstLoginPage() {
   });
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 bg-[#F3F4F6] p-6">
-      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+    <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 bg-[#F3F4F6] p-4 sm:p-6">
+      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
           <div
             className="flex size-14 items-center justify-center rounded-full bg-orange-500/15 text-orange-600"

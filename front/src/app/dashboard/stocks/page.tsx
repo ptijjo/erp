@@ -18,6 +18,7 @@ import {
 } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type {
+  OrganizationDto,
   ProductDto,
   StockDto,
   StockOrderDto,
@@ -28,6 +29,11 @@ import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
 
 import { apiErrorMessage } from "~/lib/api-error-message";
+import { TableScroll } from "~/components/layout/table-scroll";
+import {
+  StockOrderBudgetBadge,
+  StockOrderBudgetConfirmHint,
+} from "~/app/dashboard/stocks/_components/StockOrderBudgetBadge";
 
 const ORANGE = "#FF8C00";
 
@@ -90,6 +96,8 @@ type EditingStockState =
   | { kind: "patch"; stock: StockDto }
   | { kind: "upsert"; product: ProductDto };
 
+const ALL_SUBSIDIARIES = "all";
+
 const STATUS_LABEL: Record<StockOrderDto["status"], string> = {
   PENDING: "En attente",
   CONFIRMED: "Réception confirmée",
@@ -127,6 +135,8 @@ export default function StocksPage() {
   const [orderSupplierId, setOrderSupplierId] = useState("");
   const [orderQty, setOrderQty] = useState("1");
   const [orderNote, setOrderNote] = useState("");
+  const [orderSubsidiaryFilter, setOrderSubsidiaryFilter] =
+    useState(ALL_SUBSIDIARIES);
 
   const { data: stocks = [], isLoading, isError } = useQuery({
     queryKey: ["stock"] as const,
@@ -149,10 +159,34 @@ export default function StocksPage() {
     enabled: Boolean(me && !isMain && canReadCatalog),
   });
 
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ["stock-order"] as const,
+  const { data: organizations = [] } = useQuery({
+    queryKey: ["organisation"] as const,
     queryFn: async () => {
-      const { data } = await api.get<StockOrderDto[]>("/stock-order");
+      const { data } = await api.get<OrganizationDto[]>("/organisation");
+      return data;
+    },
+    enabled: Boolean(me && isMain && canReadOrders),
+  });
+
+  const orderSubsidiaries = useMemo(
+    () =>
+      organizations.filter((o) => o.organizationType === "SUBSIDIARY"),
+    [organizations],
+  );
+
+  const orderSubsidiaryFilterId =
+    orderSubsidiaryFilter !== ALL_SUBSIDIARIES
+      ? orderSubsidiaryFilter
+      : undefined;
+
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ["stock-order", orderSubsidiaryFilterId] as const,
+    queryFn: async () => {
+      const { data } = await api.get<StockOrderDto[]>("/stock-order", {
+        params: orderSubsidiaryFilterId
+          ? { subsidiaryOrganizationId: orderSubsidiaryFilterId }
+          : undefined,
+      });
       return data;
     },
     enabled: canReadOrders,
@@ -288,11 +322,24 @@ export default function StocksPage() {
       id: string;
       status: StockOrderDto["status"];
     }) => {
-      await api.patch(`/stock-order/${id}/status`, { status });
+      const { data } = await api.patch<StockOrderDto>(
+        `/stock-order/${id}/status`,
+        { status },
+      );
+      return data;
     },
-    onSuccess: async () => {
+    onSuccess: async (data, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["stock-order"] });
       await queryClient.invalidateQueries({ queryKey: ["stock"] });
+      if (
+        variables.status === "CONFIRMED" &&
+        data.budgetLink &&
+        !data.budgetLink.linked
+      ) {
+        alert(
+          `Réception enregistrée, mais non imputée au budget : ${data.budgetLink.reason ?? "vérifiez le budget du mois (ligne STOCK)."}`,
+        );
+      }
     },
     onError: (e) => {
       alert(apiErrorMessage(e, "Impossible de mettre à jour la commande"));
@@ -400,7 +447,7 @@ export default function StocksPage() {
     : subsidiaryFiltered.length > 0;
 
   return (
-    <main className="flex min-h-0 min-w-0 w-full flex-1 flex-col gap-8 overflow-auto bg-[#F3F4F6] p-6">
+    <main className="flex min-h-0 min-w-0 w-full flex-1 flex-col gap-8 overflow-auto bg-[#F3F4F6] p-4 sm:p-6">
       <header className="flex flex-wrap items-center gap-3">
         <div
           className="flex size-11 items-center justify-center rounded-xl bg-white shadow-sm"
@@ -478,8 +525,8 @@ export default function StocksPage() {
         </p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-left text-sm">
+          <TableScroll bleed className="rounded-none border-0">
+            <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50/80">
                   <th className="px-4 py-3 font-semibold text-[#2D323E]">
@@ -679,7 +726,7 @@ export default function StocksPage() {
                     })}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </div>
       )}
 
@@ -701,14 +748,42 @@ export default function StocksPage() {
             commande en attente.
           </p>
 
+          {!isMain && canUpdateOrder ? (
+            <StockOrderBudgetConfirmHint />
+          ) : null}
+
+          {isMain && orderSubsidiaries.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <label
+                htmlFor="order-subsidiary-filter"
+                className="text-sm font-medium text-[#2D323E]"
+              >
+                Filiale
+              </label>
+              <select
+                id="order-subsidiary-filter"
+                value={orderSubsidiaryFilter}
+                onChange={(e) => setOrderSubsidiaryFilter(e.target.value)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm"
+              >
+                <option value={ALL_SUBSIDIARIES}>Toutes les filiales</option>
+                {orderSubsidiaries.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
           {ordersLoading ? (
             <p className="text-sm text-gray-600">Chargement des commandes…</p>
           ) : orders.length === 0 ? (
             <p className="text-sm text-gray-600">Aucune commande.</p>
           ) : (
             <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1080px] text-left text-sm">
+              <TableScroll bleed className="rounded-none border-0">
+                <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50/80">
                       <th className="px-4 py-3 font-semibold text-[#2D323E]">
@@ -734,6 +809,9 @@ export default function StocksPage() {
                       </th>
                       <th className="px-4 py-3 font-semibold text-[#2D323E]">
                         Statut
+                      </th>
+                      <th className="px-4 py-3 font-semibold text-[#2D323E]">
+                        Budget
                       </th>
                       <th className="px-4 py-3 font-semibold text-[#2D323E]">
                         Demandeur
@@ -785,6 +863,9 @@ export default function StocksPage() {
                           >
                             {STATUS_LABEL[o.status]}
                           </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <StockOrderBudgetBadge budgetLink={o.budgetLink} />
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {o.requestedBy?.email ?? "—"}
@@ -846,7 +927,7 @@ export default function StocksPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             </div>
           )}
         </section>

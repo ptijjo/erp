@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -29,8 +30,10 @@ import {
   formatLeaveYearLabel,
   getLeaveYear,
   LEAVE_ANNUAL_ENTITLEMENT_DAYS,
+  LEAVE_RENEWAL_MONTH,
   type LeaveBalanceRow,
 } from './leave-balance.rules';
+import { EmployeeStatus } from '../generated/prisma/client';
 
 const balanceInclude = {
   employee: {
@@ -305,6 +308,87 @@ export class LeaveBalanceService {
       select: { year: true, totalDays: true, usedDays: true },
       orderBy: { year: 'asc' },
     });
+  }
+
+  /**
+   * Renouvelle les soldes pour l’exercice en cours (mai) : 30 j + report.
+   * À appeler via tâche planifiée (cron) en début d’exercice.
+   */
+  async renewExerciseForAll(
+    viewer: AuthenticatedUser,
+    referenceDate: Date = new Date(),
+  ): Promise<{ renewed: number; leaveYear: number }> {
+    const orgFilter = organizationListWhere(viewer);
+    const leaveYear = getLeaveYear(referenceDate);
+    const refDate = new Date(leaveYear, LEAVE_RENEWAL_MONTH - 1, 1);
+
+    const employeeWhere: Prisma.EmployeeWhereInput = {
+      status: EmployeeStatus.ACTIVE,
+      ...('organizationId' in orgFilter && orgFilter.organizationId
+        ? { organizationId: orgFilter.organizationId }
+        : {}),
+    };
+
+    const employees = await this.prisma.employee.findMany({
+      where: employeeWhere,
+      select: { id: true },
+    });
+
+    for (const emp of employees) {
+      await this.ensureForEmployee(emp.id, viewer, refDate);
+    }
+
+    return { renewed: employees.length, leaveYear };
+  }
+
+  /** Tâche planifiée : tous les employés actifs, sans session utilisateur. */
+  async renewExerciseScheduled(
+    referenceDate: Date = new Date(),
+  ): Promise<{ renewed: number; leaveYear: number }> {
+    const leaveYear = getLeaveYear(referenceDate);
+    const refDate = new Date(leaveYear, LEAVE_RENEWAL_MONTH - 1, 1);
+
+    const employees = await this.prisma.employee.findMany({
+      where: { status: EmployeeStatus.ACTIVE },
+      select: { id: true, organizationId: true },
+    });
+
+    for (const emp of employees) {
+      await this.ensureBalanceForEmployee(emp.id, emp.organizationId, refDate);
+    }
+
+    return { renewed: employees.length, leaveYear };
+  }
+
+  private async ensureBalanceForEmployee(
+    employeeId: string,
+    organizationId: string,
+    referenceDate: Date,
+  ): Promise<void> {
+    const leaveYear = getLeaveYear(referenceDate);
+    const balances = await this.listBalancesForEmployee(employeeId);
+    const existing = balances.find((b) => b.year === leaveYear);
+    if (existing) {
+      return;
+    }
+
+    const totalDays = computeTotalDaysForLeaveYear(balances, leaveYear);
+    try {
+      await this.prisma.leaveBalance.create({
+        data: {
+          employeeId,
+          organizationId,
+          year: leaveYear,
+          totalDays,
+          usedDays: 0,
+        },
+      });
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'code' in e && e.code === 'P2002') {
+        return;
+      }
+      throw e;
+    }
   }
 
   private toView(row: LeaveBalance): LeaveBalanceView {

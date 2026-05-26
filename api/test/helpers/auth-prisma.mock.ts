@@ -18,17 +18,70 @@ export type AuthPrismaMock = {
   permissionRole: { findMany: jest.Mock };
   pole?: { findMany: jest.Mock };
   budget?: {
-    findMany: jest.Mock;
+    findMany?: jest.Mock;
+    findFirst?: jest.Mock;
     findUnique?: jest.Mock;
+    count?: jest.Mock;
+    update?: jest.Mock;
   };
-  budgetLine?: { findUnique?: jest.Mock };
+  budgetLine?: { findUnique?: jest.Mock; findFirst?: jest.Mock };
   budgetExpense?: {
     create?: jest.Mock;
     findMany?: jest.Mock;
     findUnique?: jest.Mock;
     delete?: jest.Mock;
+    aggregate?: jest.Mock;
   };
-  stockOrder?: { findMany?: jest.Mock };
+  budgetSupplementRequest?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    count?: jest.Mock;
+  };
+  stockOrder?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    update?: jest.Mock;
+    count?: jest.Mock;
+    groupBy?: jest.Mock;
+  };
+  organization?: { count?: jest.Mock; findMany?: jest.Mock };
+  product?: { count?: jest.Mock };
+  stock?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    update?: jest.Mock;
+  };
+  sessionCaisse?: {
+    findFirst?: jest.Mock;
+    findUnique?: jest.Mock;
+    findMany?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+  };
+  vente?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    findUniqueOrThrow?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    count?: jest.Mock;
+    aggregate?: jest.Mock;
+  };
+  venteLine?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    findFirst?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
+  ventePaiement?: {
+    deleteMany?: jest.Mock;
+    createMany?: jest.Mock;
+  };
+  $transaction?: jest.Mock;
   department?: {
     findMany?: jest.Mock;
     count?: jest.Mock;
@@ -40,6 +93,7 @@ export type AuthPrismaMock = {
   employee?: {
     findMany?: jest.Mock;
     count?: jest.Mock;
+    groupBy?: jest.Mock;
     findUnique?: jest.Mock;
     create?: jest.Mock;
     update?: jest.Mock;
@@ -48,6 +102,8 @@ export type AuthPrismaMock = {
   leaveRequest?: {
     findMany?: jest.Mock;
     findUnique?: jest.Mock;
+    count?: jest.Mock;
+    groupBy?: jest.Mock;
     create?: jest.Mock;
     update?: jest.Mock;
     delete?: jest.Mock;

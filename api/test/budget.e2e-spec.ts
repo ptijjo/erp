@@ -21,6 +21,17 @@ describe('Budget (e2e)', () => {
       year: 2026,
       month: 5,
       status: BudgetStatus.DRAFT,
+      financeNote: null,
+      submittedAt: null,
+      submittedByUserId: null,
+      submittedBy: null,
+      approvedAt: null,
+      approvedByUserId: null,
+      approvedBy: null,
+      rejectedAt: null,
+      rejectedByUserId: null,
+      rejectedBy: null,
+      rejectionReason: null,
       createdAt: new Date('2026-05-01T00:00:00.000Z'),
       updatedAt: new Date('2026-05-01T00:00:00.000Z'),
       subsidiaryOrganization: {
@@ -39,6 +50,7 @@ describe('Budget (e2e)', () => {
     const prismaMock = createAuthPrismaMock(userRow);
     prismaMock.budget = {
       findMany: jest.fn().mockResolvedValue(budgetsFixture),
+      count: jest.fn().mockResolvedValue(budgetsFixture.length),
     };
     ctx = await createAuthE2eApp(prismaMock);
     app = ctx.app;
@@ -60,12 +72,12 @@ describe('Budget (e2e)', () => {
       .expect(200);
 
     const res = await agent.get('/budget').expect(200);
-    expect(res.body).toEqual([
-      {
-        ...budgetsFixture[0],
-        createdAt: budgetsFixture[0].createdAt.toISOString(),
-        updatedAt: budgetsFixture[0].updatedAt.toISOString(),
-      },
-    ]);
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.meta.total).toBe(1);
+    expect(res.body.items[0]).toMatchObject({
+      id: budgetsFixture[0].id,
+      year: 2026,
+      month: 5,
+    });
   });
 });

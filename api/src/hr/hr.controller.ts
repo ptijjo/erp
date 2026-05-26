@@ -201,6 +201,12 @@ export class HrController {
     return this.leaveBalanceService.findAll(viewer, query);
   }
 
+  @Post('leave-balances/renew-exercise')
+  @CheckPolicies({ action: 'manage', subject: 'LeaveBalance' })
+  renewLeaveExercise(@CurrentUser() viewer: AuthenticatedUser) {
+    return this.leaveBalanceService.renewExerciseForAll(viewer);
+  }
+
   @Post('leave-balances/ensure')
   @CheckPolicies({ action: 'create', subject: 'LeaveBalance' })
   ensureLeaveBalance(

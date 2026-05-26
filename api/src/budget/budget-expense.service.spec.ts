@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BudgetExpenseService } from './budget-expense.service';
+import { AccountingPeriodService } from '../treasury/accounting-period.service';
+import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { BudgetStatus } from '../generated/prisma/client';
@@ -52,6 +54,7 @@ describe('BudgetExpenseService', () => {
   let budgetExpenseFindMany: jest.Mock;
   let budgetExpenseFindUnique: jest.Mock;
   let budgetExpenseDelete: jest.Mock;
+  let budgetExpenseAggregate: jest.Mock;
 
   beforeEach(async () => {
     budgetLineFindUnique = jest.fn().mockResolvedValue(approvedLine);
@@ -68,6 +71,7 @@ describe('BudgetExpenseService', () => {
       id: 'exp-1',
       budgetLineId: 'line-1',
       amount: 500,
+      stockOrderId: null,
       budgetLine: {
         budget: {
           subsidiaryOrganizationId: 'org-sub',
@@ -76,6 +80,9 @@ describe('BudgetExpenseService', () => {
       },
     });
     budgetExpenseDelete = jest.fn().mockResolvedValue({ id: 'exp-1' });
+    budgetExpenseAggregate = jest
+      .fn()
+      .mockResolvedValue({ _sum: { amount: 0 } });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -89,8 +96,19 @@ describe('BudgetExpenseService', () => {
               findMany: budgetExpenseFindMany,
               findUnique: budgetExpenseFindUnique,
               delete: budgetExpenseDelete,
+              aggregate: budgetExpenseAggregate,
             },
           },
+        },
+        {
+          provide: AccountingPeriodService,
+          useValue: {
+            assertPeriodOpenForDate: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: NotificationService,
+          useValue: { notifyUsersWithPermission: jest.fn() },
         },
       ],
     }).compile();
@@ -183,6 +201,16 @@ describe('BudgetExpenseService', () => {
               budgetExpense: { findMany: budgetExpenseFindMany },
             },
           },
+          {
+            provide: AccountingPeriodService,
+            useValue: {
+              assertPeriodOpenForDate: jest.fn().mockResolvedValue(undefined),
+            },
+          },
+          {
+            provide: NotificationService,
+            useValue: { notifyUsersWithPermission: jest.fn() },
+          },
         ],
       }).compile();
       const svc = module.get<BudgetExpenseService>(BudgetExpenseService);
@@ -202,6 +230,26 @@ describe('BudgetExpenseService', () => {
     it('supprime une sortie de sa filiale', async () => {
       await service.remove('exp-1', subsidiaryViewer);
       expect(budgetExpenseDelete).toHaveBeenCalledWith({ where: { id: 'exp-1' } });
+    });
+
+    it('refuse de supprimer une sortie liée à une commande stock', async () => {
+      budgetExpenseFindUnique.mockResolvedValueOnce({
+        id: 'exp-stock',
+        budgetLineId: 'line-1',
+        amount: 500,
+        stockOrderId: 'order-1',
+        budgetLine: {
+          budget: {
+            subsidiaryOrganizationId: 'org-sub',
+            status: BudgetStatus.APPROVED,
+          },
+        },
+      });
+
+      await expect(
+        service.remove('exp-stock', subsidiaryViewer),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(budgetExpenseDelete).not.toHaveBeenCalled();
     });
   });
 });

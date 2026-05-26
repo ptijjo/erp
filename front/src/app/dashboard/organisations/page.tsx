@@ -6,6 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, ArrowUpDown, Layers, SquarePlus } from "lucide-react";
 
+import { DashboardTitleBar } from "~/components/layout/dashboard-title-bar";
+import { DesktopOnly, MobileOnly } from "~/components/layout/viewport";
+import { TableScroll } from "~/components/layout/table-scroll";
 import { api } from "~/lib/api";
 import type { OrganizationDto } from "~/lib/api-types";
 import {
@@ -14,6 +17,11 @@ import {
   isMainOrganization,
   useMe,
 } from "~/hooks/use-me";
+import {
+  dashboardActionLinkMuted,
+  dashboardActionLinkPrimary,
+  dashboardMainClass,
+} from "~/lib/dashboard-styles";
 
 function OrganisationSortIcon({
   column,
@@ -77,40 +85,43 @@ export default function OrganisationsPage() {
     setSortOrder("asc");
   }
 
+  function openOrganisation(slug: string) {
+    router.push(`/dashboard/organisations/${slug}`);
+  }
+
   if (me && !isMainOrganization(me)) {
     return (
-      <main className="flex flex-1 items-center justify-center bg-white p-6 text-gray-600">
+      <main className="flex flex-1 items-center justify-center bg-white p-4 sm:p-6 text-gray-600">
         Redirection…
       </main>
     );
   }
 
   return (
-    <main className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-4 overflow-auto bg-white p-6">
-      <div className="flex w-full items-center">
-        <div className="flex flex-1 flex-wrap justify-start gap-3">
-          {canCreateOrganization && (
-            <Link
-              href="/dashboard/organisations/add"
-              className="flex w-fit cursor-pointer items-center gap-2 rounded-md bg-gray-100 p-4 transition-all duration-300 hover:bg-gray-200"
-            >
-              <SquarePlus className="size-4" /> Nouvelle filiale
-            </Link>
-          )}
-          {canCreatePole && (
-            <Link
-              href="/dashboard/organisations/poles/add"
-              className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50/80 p-4 font-medium text-orange-900 transition-all duration-300 hover:bg-orange-100"
-            >
-              <Layers className="size-4" /> Nouveau pôle
-            </Link>
-          )}
-        </div>
-        <h1 className="shrink-0 text-4xl font-extrabold text-orange-500">
-          Organisations
-        </h1>
-        <div className="flex-1" />
-      </div>
+    <main className={`${dashboardMainClass} gap-4`}>
+      <DashboardTitleBar
+        title="Organisations"
+        actions={
+          <>
+            {canCreateOrganization ? (
+              <Link
+                href="/dashboard/organisations/add"
+                className={dashboardActionLinkMuted}
+              >
+                <SquarePlus className="size-4 shrink-0" /> Nouvelle filiale
+              </Link>
+            ) : null}
+            {canCreatePole ? (
+              <Link
+                href="/dashboard/organisations/poles/add"
+                className={dashboardActionLinkPrimary}
+              >
+                <Layers className="size-4 shrink-0" /> Nouveau pôle
+              </Link>
+            ) : null}
+          </>
+        }
+      />
 
       {!canReadOrganization ? (
         <div
@@ -139,68 +150,121 @@ export default function OrganisationsPage() {
           Aucune organisation. Créez-en une ou vérifiez vos droits d’accès.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full min-w-[480px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-4 py-3 font-semibold text-gray-900">
-                  <button
-                    type="button"
-                    className="inline-flex cursor-pointer items-center gap-1.5 text-left hover:text-orange-600"
-                    onClick={() => toggleSort("name")}
-                    aria-label="Trier par nom"
-                  >
-                    Nom
-                    <OrganisationSortIcon
-                      column="name"
-                      sortBy={sortBy}
-                      sortOrder={sortOrder}
-                    />
-                  </button>
-                </th>
-                <th className="px-4 py-3 font-semibold text-gray-900">
-                  <button
-                    type="button"
-                    className="inline-flex cursor-pointer items-center gap-1.5 text-left hover:text-orange-600"
-                    onClick={() => toggleSort("slug")}
-                    aria-label="Trier par slug"
-                  >
-                    Slug
-                    <OrganisationSortIcon
-                      column="slug"
-                      sortBy={sortBy}
-                      sortOrder={sortOrder}
-                    />
-                  </button>
-                </th>
-                <th className="px-4 py-3 font-semibold text-gray-900">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedOrganizations.map((org) => (
-                <tr
-                  key={org.id}
-                  className="border-b border-gray-100 hover:bg-gray-50/80"
+        <>
+          <MobileOnly>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900 hover:border-orange-200 hover:text-orange-600"
+              onClick={() => toggleSort("name")}
+              aria-label="Trier par nom"
+            >
+              Nom
+              <OrganisationSortIcon
+                column="name"
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+              />
+            </button>
+            <button
+              type="button"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900 hover:border-orange-200 hover:text-orange-600"
+              onClick={() => toggleSort("slug")}
+              aria-label="Trier par slug"
+            >
+              Slug
+              <OrganisationSortIcon
+                column="slug"
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+              />
+            </button>
+          </div>
+
+          <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
+            {sortedOrganizations.map((org) => (
+              <li key={org.id}>
+                <button
+                  type="button"
+                  className="flex w-full cursor-pointer flex-col gap-1 px-4 py-4 text-left transition-colors hover:bg-gray-50/80 active:bg-gray-100"
+                  onClick={() => openOrganisation(org.slug)}
+                  aria-label={`Voir ${org.name}`}
                 >
-                  <td className="px-4 py-3 font-medium text-gray-900">
-                    {org.name}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-gray-600">
+                  <span className="font-medium text-gray-900">{org.name}</span>
+                  <span className="font-mono text-sm text-gray-600">
                     {org.slug}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/dashboard/organisations/${org.slug}`}
-                      className="text-orange-600 underline-offset-2 hover:underline"
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          </MobileOnly>
+
+          <DesktopOnly>
+          <TableScroll className="border-gray-200">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="px-4 py-3 font-semibold text-gray-900">
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center gap-1.5 text-left hover:text-orange-600"
+                      onClick={() => toggleSort("name")}
+                      aria-label="Trier par nom"
                     >
-                      Détails
-                    </Link>
-                  </td>
+                      Nom
+                      <OrganisationSortIcon
+                        column="name"
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                      />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 font-semibold text-gray-900">
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer items-center gap-1.5 text-left hover:text-orange-600"
+                      onClick={() => toggleSort("slug")}
+                      aria-label="Trier par slug"
+                    >
+                      Slug
+                      <OrganisationSortIcon
+                        column="slug"
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                      />
+                    </button>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {sortedOrganizations.map((org) => (
+                  <tr
+                    key={org.id}
+                    className="cursor-pointer border-b border-gray-100 last:border-0 hover:bg-gray-50/80"
+                    onClick={() => openOrganisation(org.slug)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === "Enter") {
+                        openOrganisation(org.slug);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Voir ${org.name}`}
+                  >
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {org.name}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-gray-600">
+                      {org.slug}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
+          </DesktopOnly>
+        </>
       )}
     </main>
   );

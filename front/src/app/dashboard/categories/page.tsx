@@ -15,11 +15,15 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { DashboardTitleBar } from "~/components/layout/dashboard-title-bar";
+import { DesktopOnly, MobileOnly } from "~/components/layout/viewport";
+import { TableScroll } from "~/components/layout/table-scroll";
 import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { CategoryDto } from "~/lib/api-types";
 
 import { apiErrorMessage } from "~/lib/api-error-message";
+import { dashboardActionLinkMuted, dashboardMainClass } from "~/lib/dashboard-styles";
 import {
   categoryOptionsForSelect,
   getParentId,
@@ -179,25 +183,19 @@ export default function CategoriesPage() {
   }
 
   return (
-    <main className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-auto bg-white p-6">
-      <div className="flex w-full flex-wrap items-center gap-4">
-        <div className="flex flex-1 flex-wrap justify-start gap-3">
-          {canCreateCategory && (
-            <Link
-              href="/dashboard/categories/add"
-              className="flex w-fit cursor-pointer items-center gap-2 rounded-md bg-gray-100 p-4 transition-all duration-300 hover:bg-gray-200"
-            >
-              <SquarePlus className="size-4" />
+    <main className={dashboardMainClass}>
+      <DashboardTitleBar
+        title="Catégories"
+        icon={FolderTree}
+        actions={
+          canCreateCategory ? (
+            <Link href="/dashboard/categories/add" className={dashboardActionLinkMuted}>
+              <SquarePlus className="size-4 shrink-0" />
               Nouvelle catégorie
             </Link>
-          )}
-        </div>
-        <h1 className="flex shrink-0 items-center gap-2 text-4xl font-extrabold text-orange-500">
-          <FolderTree className="size-9 shrink-0" strokeWidth={1.75} />
-          Catégories
-        </h1>
-        <div className="hidden flex-1 sm:block" />
-      </div>
+          ) : undefined
+        }
+      />
 
       <div className="mt-2 flex flex-col gap-1">
         <p className="text-sm text-gray-600">
@@ -299,8 +297,62 @@ export default function CategoriesPage() {
           Aucune catégorie ne correspond aux filtres.
         </p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full min-w-[560px] text-left text-sm">
+        <>
+        <MobileOnly>
+          <ul className="mt-6 divide-y divide-gray-200 rounded-lg border border-gray-200">
+            {filteredSortedCategories.map((c) => (
+              <li key={c.id}>
+                <div className="flex w-full items-center justify-between gap-3 px-4 py-4">
+                  {canUpdateCategory ? (
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 text-left transition-colors hover:bg-gray-50/80 active:bg-gray-100 -mx-2 rounded-lg px-2 py-1"
+                      onClick={() => goToCategory(c.id)}
+                      aria-label={`Modifier la catégorie ${c.name}`}
+                    >
+                      <p className="truncate font-medium text-gray-900">
+                        {categoryLabels.get(c.id) ?? c.name}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {categorySubOfParentId ? "Sous-catégorie" : "Racine"}
+                      </p>
+                    </button>
+                  ) : (
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-gray-900">
+                        {categoryLabels.get(c.id) ?? c.name}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {categorySubOfParentId ? "Sous-catégorie" : "Racine"}
+                      </p>
+                    </div>
+                  )}
+                  {canDeleteCategory ? (
+                    <button
+                      type="button"
+                      title="Supprimer"
+                      disabled={deleteCategoryMutation.isPending}
+                      onClick={(e) =>
+                        handleDeleteCategory(
+                          e,
+                          c.id,
+                          categoryLabels.get(c.id) ?? c.name,
+                        )
+                      }
+                      className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={`Supprimer ${c.name}`}
+                    >
+                      <Trash2 className="size-4" strokeWidth={2} />
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </MobileOnly>
+        <DesktopOnly>
+        <TableScroll className="mt-6 border-gray-200">
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="px-4 py-3 font-semibold text-gray-900">
@@ -394,7 +446,9 @@ export default function CategoriesPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
+        </DesktopOnly>
+        </>
       )}
     </main>
   );

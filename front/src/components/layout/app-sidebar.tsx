@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -10,6 +11,7 @@ import {
   navItemIsActive,
   type NavItem,
 } from "~/lib/dashboard-navigation";
+import { useSidebar } from "~/components/layout/sidebar-context";
 import { isMainOrganization, useMe } from "~/hooks/use-me";
 import { cn } from "~/lib/utils";
 
@@ -42,11 +44,30 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 export function AppSidebar() {
   const pathname = usePathname();
   const { data: me } = useMe();
+  const { mobileOpen, setMobileOpen } = useSidebar();
   const sections = buildNavSections(me);
   const isHq = me != null && isMainOrganization(me);
 
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname, setMobileOpen]);
+
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <>
+      {mobileOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 top-14 z-40 bg-black/40 lg:hidden"
+          aria-label="Fermer le menu"
+          onClick={() => setMobileOpen(false)}
+        />
+      ) : null}
+      <aside
+        className={cn(
+          "fixed bottom-0 left-0 top-14 z-50 flex w-[min(100%,16rem)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-xl transition-transform duration-200 ease-out lg:static lg:top-auto lg:z-auto lg:w-60 lg:shrink-0 lg:translate-x-0 lg:shadow-none",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
       <div className="flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border px-4">
         <div className="flex size-9 items-center justify-center rounded-md bg-sidebar-accent text-sm font-bold text-white shadow-sm">
           V
@@ -101,5 +122,6 @@ export function AppSidebar() {
         </p>
       </div>
     </aside>
+    </>
   );
 }

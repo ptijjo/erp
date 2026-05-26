@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   KeyRound,
   ListChecks,
   Pencil,
@@ -13,9 +12,17 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { DashboardTitleBar } from "~/components/layout/dashboard-title-bar";
+import { TableScroll } from "~/components/layout/table-scroll";
 import { hasMePermission, isAdminUser, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { RoleDto } from "~/lib/api-types";
+import {
+  dashboardActionLinkOutline,
+  dashboardActionLinkPrimary,
+  dashboardBackLinkClass,
+  dashboardMainClass,
+} from "~/lib/dashboard-styles";
 
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { isFullAccessRole } from "../_lib/full-access-roles";
@@ -61,57 +68,47 @@ export default function RolesListPage() {
   );
 
   return (
-    <main className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-6 overflow-auto bg-white p-6">
-      <div className="flex w-full flex-wrap items-center gap-4">
-        <div className="flex flex-1 justify-start">
-          <Link
-            href="/dashboard/utilisateurs"
-            className="flex w-fit cursor-pointer items-center gap-2 rounded-md p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-orange-500"
-          >
-            <ArrowLeft className="size-4" />
-            Retour
-          </Link>
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-orange-500/15 text-orange-600">
-            <ListChecks className="size-7" strokeWidth={1.75} />
-          </div>
-          <h1 className="text-3xl font-extrabold text-orange-500 sm:text-4xl">
-            Rôles
-          </h1>
-        </div>
-        <div className="flex flex-1 flex-wrap justify-end gap-3">
-          {catalogAdminOnly && (
-            <>
-              <Link
-                href="/dashboard/utilisateurs/permissions"
-                className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-50"
-              >
-                <KeyRound className="size-4" />
-                Catalogue permissions
-              </Link>
-              {canCreatePermission && (
-                <Link
-                  href="/dashboard/utilisateurs/permissions/add"
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
-                >
-                  <Plus className="size-4" />
-                  Nouvelle permission
-                </Link>
-              )}
-            </>
-          )}
-          {canCreateRole && (
-            <Link
-              href="/dashboard/utilisateurs/roles/add"
-              className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
-            >
-              <ShieldPlus className="size-4" />
-              Nouveau rôle
+    <main className={`${dashboardMainClass} gap-6`}>
+      <DashboardTitleBar
+        title="Rôles"
+        icon={ListChecks}
+        actions={
+          <>
+            <Link href="/dashboard/utilisateurs" className={dashboardBackLinkClass}>
+              Retour
             </Link>
-          )}
-        </div>
-      </div>
+            {catalogAdminOnly ? (
+              <>
+                <Link
+                  href="/dashboard/utilisateurs/permissions"
+                  className={dashboardActionLinkOutline}
+                >
+                  <KeyRound className="size-4 shrink-0" />
+                  Catalogue permissions
+                </Link>
+                {canCreatePermission ? (
+                  <Link
+                    href="/dashboard/utilisateurs/permissions/add"
+                    className={dashboardActionLinkPrimary}
+                  >
+                    <Plus className="size-4 shrink-0" />
+                    Nouvelle permission
+                  </Link>
+                ) : null}
+              </>
+            ) : null}
+            {canCreateRole ? (
+              <Link
+                href="/dashboard/utilisateurs/roles/add"
+                className={dashboardActionLinkPrimary}
+              >
+                <ShieldPlus className="size-4 shrink-0" />
+                Nouveau rôle
+              </Link>
+            ) : null}
+          </>
+        }
+      />
 
       {deleteError && (
         <p className="text-sm text-red-600" role="alert">
@@ -134,8 +131,8 @@ export default function RolesListPage() {
           Aucun rôle.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full min-w-[720px] text-left text-sm">
+        <TableScroll className="border-gray-200">
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="px-4 py-3 font-semibold text-gray-900">Nom</th>
@@ -224,7 +221,7 @@ export default function RolesListPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
     </main>
   );

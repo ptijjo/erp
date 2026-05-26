@@ -97,6 +97,9 @@ export function BudgetExpensesPanel({
       await queryClient.invalidateQueries({
         queryKey: ["budget", effectiveBudgetId, "expenses"],
       });
+      await queryClient.invalidateQueries({
+        queryKey: ["budget", "expenses", "ledger"],
+      });
     },
     onError: (e) => {
       alert(apiErrorMessage(e, "Impossible d’enregistrer la sortie"));
@@ -259,6 +262,7 @@ export function BudgetExpensesPanel({
                     <th className="px-3 py-2">Date</th>
                     <th className="px-3 py-2">Ligne</th>
                     <th className="px-3 py-2">Libellé</th>
+                    <th className="px-3 py-2">Source</th>
                     <th className="px-3 py-2 text-right">Montant</th>
                     {canRecordExpense ? (
                       <th className="px-3 py-2 text-right"> </th>
@@ -276,11 +280,26 @@ export function BudgetExpensesPanel({
                         {e.budgetLine.label}
                       </td>
                       <td className="px-3 py-2">{e.label ?? "—"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {e.stockOrderId ? (
+                          <span
+                            className="inline-flex rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-900"
+                            title="Sortie créée à la réception d’une commande stock"
+                          >
+                            Commande stock
+                          </span>
+                        ) : (
+                          "Saisie manuelle"
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums">
                         {formatFcfa(parseDecimal(e.amount))}
                       </td>
                       {canRecordExpense ? (
                         <td className="px-3 py-2 text-right">
+                          {e.stockOrderId ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : (
                           <Button
                             type="button"
                             variant="ghost"
@@ -300,6 +319,9 @@ export function BudgetExpensesPanel({
                                     "expenses",
                                   ],
                                 });
+                                await queryClient.invalidateQueries({
+                                  queryKey: ["budget", "expenses", "ledger"],
+                                });
                               } catch (err) {
                                 alert(
                                   apiErrorMessage(err, "Suppression impossible"),
@@ -309,6 +331,7 @@ export function BudgetExpensesPanel({
                           >
                             Supprimer
                           </Button>
+                          )}
                         </td>
                       ) : null}
                     </tr>

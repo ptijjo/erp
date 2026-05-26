@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { StockOrderService } from './stock-order.service';
+import { BudgetStockLinkService } from '../budget/budget-stock-link.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { StockOrderStatus } from '../generated/prisma/client';
@@ -81,15 +82,27 @@ describe('StockOrderService', () => {
         stockOrder: { update: jest.Mock; findUniqueOrThrow: jest.Mock };
         stock: { upsert: jest.Mock };
       }) => unknown) => {
+        const confirmedForBudget = {
+          id: pendingOrder.id,
+          subsidiaryOrganizationId: pendingOrder.subsidiaryOrganizationId,
+          quantity: pendingOrder.quantity,
+          unitPrice: pendingOrder.unitPrice,
+          createdAt: new Date(),
+          requestedByUserId: 'u-sub',
+          product: { name: 'Produit test' },
+        };
+        const confirmedWithInclude = {
+          ...pendingOrder,
+          status: StockOrderStatus.CONFIRMED,
+          budgetExpense: { id: 'exp-1', amount: 3000 },
+        };
         const tx = {
           stockOrder: {
             update: jest.fn().mockResolvedValue({}),
             findUniqueOrThrow: jest
               .fn()
-              .mockResolvedValue({
-                ...pendingOrder,
-                status: StockOrderStatus.CONFIRMED,
-              }),
+              .mockResolvedValueOnce(confirmedForBudget)
+              .mockResolvedValueOnce(confirmedWithInclude),
           },
           stock: { upsert: stockUpsert },
         };
@@ -100,6 +113,14 @@ describe('StockOrderService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StockOrderService,
+        {
+          provide: BudgetStockLinkService,
+          useValue: {
+            recordExpenseForConfirmedStockOrder: jest
+              .fn()
+              .mockResolvedValue({ linked: true } as const),
+          },
+        },
         {
           provide: PrismaService,
           useValue: {
@@ -202,6 +223,44 @@ describe('StockOrderService', () => {
       expect(transaction).toHaveBeenCalled();
       expect(stockUpsert).toHaveBeenCalled();
       expect(row.status).toBe(StockOrderStatus.CONFIRMED);
+      expect(row.budgetLink).toEqual({ linked: true });
+    });
+
+    it('expose budgetLink non lié si le budget refuse la sortie', async () => {
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          StockOrderService,
+          {
+            provide: BudgetStockLinkService,
+            useValue: {
+              recordExpenseForConfirmedStockOrder: jest
+                .fn()
+                .mockResolvedValue({
+                  linked: false,
+                  reason: 'Solde insuffisant',
+                }),
+            },
+          },
+          {
+            provide: PrismaService,
+            useValue: {
+              stockOrder: { findUnique, update },
+              organization: { findUnique: organizationFindUnique },
+              $transaction: transaction,
+            },
+          },
+        ],
+      }).compile();
+      const svc = moduleRef.get(StockOrderService);
+      const row = await svc.updateStatus(
+        'order-1',
+        StockOrderStatus.CONFIRMED,
+        subsidiaryViewer,
+      );
+      expect(row.budgetLink).toEqual({
+        linked: false,
+        reason: 'Solde insuffisant',
+      });
     });
 
     it('peut annuler une commande en attente', async () => {

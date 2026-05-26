@@ -12,6 +12,9 @@ import { PoleModule } from '../../src/pole/pole.module';
 import { BudgetModule } from '../../src/budget/budget.module';
 import { StockOrderModule } from '../../src/stock-order/stock-order.module';
 import { HrModule } from '../../src/hr/hr.module';
+import { AnalyticsModule } from '../../src/analytics/analytics.module';
+import { VenteModule } from '../../src/vente/vente.module';
+import { SessionCaisseModule } from '../../src/session-caisse/session-caisse.module';
 import { InMemoryRedisService } from './in-memory-redis.service';
 import type { AuthPrismaMock } from './auth-prisma.mock';
 
@@ -47,6 +50,9 @@ export async function createAuthE2eApp(
       BudgetModule,
       StockOrderModule,
       HrModule,
+      AnalyticsModule,
+      VenteModule,
+      SessionCaisseModule,
     ],
   })
     .overrideModule(UserModule)

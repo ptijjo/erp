@@ -12,6 +12,7 @@ import { fetchHrPage } from "../_lib/hr-list";
 import { EMPLOYEE_STATUS_LABEL } from "../_lib/hr-labels";
 import { PageHeader } from "~/components/layout/page-header";
 import { PageShell } from "~/components/layout/page-shell";
+import { TableScroll } from "~/components/layout/table-scroll";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { hasMePermission, useMe } from "~/hooks/use-me";
@@ -68,7 +69,7 @@ export default function EmployesPage() {
             setSearch(searchDraft.trim());
           }}
         >
-          <div className="min-w-[200px] flex-1">
+          <div className="w-full sm:flex-1">
             <label className="mb-1 block text-sm font-medium">Recherche</label>
             <input
               value={searchDraft}
@@ -107,8 +108,8 @@ export default function EmployesPage() {
         <p className="text-sm text-muted-foreground">Aucun résultat sur cette page.</p>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full min-w-[720px] text-left text-sm">
+          <TableScroll>
+            <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="px-4 py-3 font-semibold">Nom</th>
@@ -153,7 +154,7 @@ export default function EmployesPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </>
       )}
       {meta ? (

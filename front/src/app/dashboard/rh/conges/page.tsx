@@ -8,14 +8,15 @@ import { ListPagination } from "../_components/ListPagination";
 import { employeeDisplayName } from "../_lib/employee-display";
 import { fetchHrAllItems, fetchHrPage } from "../_lib/hr-list";
 import { dateInputToIso, isoToDateInput } from "../_lib/date-input";
-import { LEAVE_STATUS_LABEL } from "../_lib/hr-labels";
+import { LEAVE_STATUS_LABEL, LEAVE_TYPE_LABEL, LEAVE_TYPE_OPTIONS } from "../_lib/hr-labels";
 import { PageHeader } from "~/components/layout/page-header";
 import { PageShell } from "~/components/layout/page-shell";
+import { TableScroll } from "~/components/layout/table-scroll";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
-import type { EmployeeDto, LeaveRequestDto } from "~/lib/api-types";
+import type { EmployeeDto, LeaveRequestDto, LeaveTypeDto } from "~/lib/api-types";
 import { apiErrorMessage } from "~/lib/api-error-message";
 
 export default function CongesPage() {
@@ -27,6 +28,7 @@ export default function CongesPage() {
   const canDelete = me != null && hasMePermission(me, "delete", "LeaveRequest");
 
   const [employeeId, setEmployeeId] = useState("");
+  const [leaveType, setLeaveType] = useState<LeaveTypeDto>("PAID_LEAVE");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
@@ -58,6 +60,7 @@ export default function CongesPage() {
         startDate: dateInputToIso(startDate),
         endDate: dateInputToIso(endDate),
         reason: reason.trim() || undefined,
+        type: leaveType,
       });
     },
     onSuccess: async () => {
@@ -129,6 +132,20 @@ export default function CongesPage() {
               ))}
             </select>
           </div>
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium">Type *</label>
+            <select
+              value={leaveType}
+              onChange={(e) => setLeaveType(e.target.value as LeaveTypeDto)}
+              className="h-10 w-full rounded-lg border border-input px-3 text-sm"
+            >
+              {LEAVE_TYPE_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Début *</label>
             <input
@@ -173,11 +190,12 @@ export default function CongesPage() {
       ) : requests.length === 0 ? (
         <p className="text-sm text-muted-foreground">Aucune demande.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[720px] text-left text-sm">
+        <TableScroll>
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 font-semibold">Employé</th>
+                <th className="px-4 py-3 font-semibold">Type</th>
                 <th className="px-4 py-3 font-semibold">Période</th>
                 <th className="px-4 py-3 font-semibold">Statut</th>
                 <th className="px-4 py-3 font-semibold">Actions</th>
@@ -188,6 +206,9 @@ export default function CongesPage() {
                 <tr key={r.id} className="border-b border-border/60">
                   <td className="px-4 py-3 font-medium">
                     {employeeDisplayName(r.employee)}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {LEAVE_TYPE_LABEL[r.type]}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {isoToDateInput(r.startDate)} → {isoToDateInput(r.endDate)}
@@ -266,7 +287,7 @@ export default function CongesPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
       {meta ? (
         <ListPagination meta={meta} onPageChange={setPage} className="mt-4" />

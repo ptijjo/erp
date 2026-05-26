@@ -5,13 +5,19 @@ import {
   organizationListWhere,
 } from '../auth/organization-scope';
 import { PrismaService } from '../prisma/prisma.service';
-import { LeaveStatus, type Prisma } from '../generated/prisma/client';
+import {
+  LeaveStatus,
+  LeaveType,
+  type Prisma,
+} from '../generated/prisma/client';
 import type {
   CreateLeaveRequestDto,
   UpdateLeaveRequestStatusDto,
 } from './dto/leave-request.dto';
 import { assertEmployeeInViewerScope } from './hr-org-scope.util';
 import { LeaveBalanceService } from './leave-balance.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../generated/prisma/client';
 import {
   countInclusiveLeaveDays,
   getLeaveYear,
@@ -38,6 +44,7 @@ export class LeaveRequestService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly leaveBalanceService: LeaveBalanceService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async findAll(
@@ -86,38 +93,62 @@ export class LeaveRequestService {
       dto.employeeId,
       viewer,
     );
+    const leaveType = dto.type ?? LeaveType.PAID_LEAVE;
     const days = countInclusiveLeaveDays(dto.startDate, dto.endDate);
-    await this.leaveBalanceService.ensureForEmployee(
-      employee.id,
-      viewer,
-      dto.startDate,
-    );
-    const leaveYear = getLeaveYear(dto.startDate);
-    const balance = await this.prisma.leaveBalance.findUnique({
-      where: {
-        employeeId_year: { employeeId: employee.id, year: leaveYear },
-      },
-    });
-    if (balance) {
-      const remaining = balance.totalDays - balance.usedDays;
-      if (days > remaining) {
-        throw new BadRequestException(
-          `Solde insuffisant sur l’exercice ${formatLeaveYearLabel(leaveYear)} : ${Math.max(0, remaining)} jour(s) disponible(s), ${days} demandé(s).`,
-        );
+
+    if (leaveType === LeaveType.PAID_LEAVE) {
+      await this.leaveBalanceService.ensureForEmployee(
+        employee.id,
+        viewer,
+        dto.startDate,
+      );
+      const leaveYear = getLeaveYear(dto.startDate);
+      const balance = await this.prisma.leaveBalance.findUnique({
+        where: {
+          employeeId_year: { employeeId: employee.id, year: leaveYear },
+        },
+      });
+      if (balance) {
+        const remaining = balance.totalDays - balance.usedDays;
+        if (days > remaining) {
+          throw new BadRequestException(
+            `Solde insuffisant sur l’exercice ${formatLeaveYearLabel(leaveYear)} : ${Math.max(0, remaining)} jour(s) disponible(s), ${days} demandé(s).`,
+          );
+        }
       }
     }
 
-    return this.prisma.leaveRequest.create({
+    const request = await this.prisma.leaveRequest.create({
       data: {
         employeeId: employee.id,
         organizationId: employee.organizationId,
         startDate: dto.startDate,
         endDate: dto.endDate,
         reason: dto.reason?.trim() || null,
+        type: leaveType,
         status: LeaveStatus.PENDING,
       },
       include: leaveInclude,
     });
+
+    if (employee.managerId) {
+      const manager = await this.prisma.employee.findUnique({
+        where: { id: employee.managerId },
+        select: { userId: true, firstName: true, lastName: true },
+      });
+      if (manager?.userId) {
+        void this.notificationService.create({
+          userId: manager.userId,
+          type: NotificationType.LEAVE_REQUEST_PENDING,
+          title: 'Demande de congé',
+          body: `${employee.firstName} ${employee.lastName} a soumis une demande de congé (${days} jour(s)).`,
+          organizationId: employee.organizationId,
+          metadata: { leaveRequestId: request.id, employeeId: employee.id },
+        });
+      }
+    }
+
+    return request;
   }
 
   async updateStatus(
@@ -133,7 +164,7 @@ export class LeaveRequestService {
     }
     const approverEmployeeId = await this.resolveApproverEmployeeId(viewer);
 
-    if (dto.status === 'APPROVED') {
+    if (dto.status === 'APPROVED' && row.type === LeaveType.PAID_LEAVE) {
       await this.leaveBalanceService.reserveLeaveDays(
         row.employeeId,
         row.organizationId,

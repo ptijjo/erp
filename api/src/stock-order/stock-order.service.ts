@@ -11,8 +11,14 @@ import {
 } from '../auth/organization-scope';
 import { assertProductUsableForOrganization } from '../product/product-subsidiary-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { BudgetStockLinkService } from '../budget/budget-stock-link.service';
 import { OrganizationType, StockOrderStatus } from '../generated/prisma/client';
 import type { Prisma, StockOrder } from '../generated/prisma/client';
+import {
+  type BudgetLinkResult,
+  type StockOrderResponseDto,
+  toStockOrderResponse,
+} from './stock-order.mapper';
 
 type OrderRow = StockOrder & {
   product: { id: string };
@@ -24,7 +30,10 @@ type OrderRow = StockOrder & {
 
 @Injectable()
 export class StockOrderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly budgetStockLink: BudgetStockLinkService,
+  ) {}
 
   private readonly orderInclude = {
     product: {
@@ -36,6 +45,7 @@ export class StockOrderService {
     subsidiaryOrganization: true,
     supplier: true,
     requestedBy: { select: { id: true, email: true } },
+    budgetExpense: { select: { id: true, amount: true } },
   } as const;
 
   /**
@@ -45,13 +55,14 @@ export class StockOrderService {
   async findAll(
     viewer: AuthenticatedUser,
     subsidiaryOrganizationId?: string | undefined,
-  ): Promise<StockOrder[]> {
+  ): Promise<StockOrderResponseDto[]> {
     if (!isMainOrganizationUser(viewer)) {
-      return this.prisma.stockOrder.findMany({
+      const rows = await this.prisma.stockOrder.findMany({
         where: { subsidiaryOrganizationId: viewer.organisationId },
         orderBy: { createdAt: 'desc' },
         include: this.orderInclude,
       });
+      return rows.map((row) => toStockOrderResponse(row));
     }
 
     const trimmedFilter = subsidiaryOrganizationId?.trim() ?? '';
@@ -73,11 +84,12 @@ export class StockOrderService {
       where = { subsidiaryOrganizationId: trimmedFilter };
     }
 
-    return this.prisma.stockOrder.findMany({
+    const rows = await this.prisma.stockOrder.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: this.orderInclude,
     });
+    return rows.map((row) => toStockOrderResponse(row));
   }
 
   async create(
@@ -88,7 +100,7 @@ export class StockOrderService {
       note?: string;
     },
     viewer: AuthenticatedUser,
-  ): Promise<StockOrder> {
+  ): Promise<StockOrderResponseDto> {
     if (isMainOrganizationUser(viewer)) {
       throw new ForbiddenException(
         'Les commandes de réapprovisionnement sont créées par les filiales.',
@@ -133,7 +145,7 @@ export class StockOrderService {
       throw new BadRequestException('Fournisseur introuvable.');
     }
 
-    return this.prisma.stockOrder.create({
+    const row = await this.prisma.stockOrder.create({
       data: {
         subsidiaryOrganizationId: viewer.organisationId,
         productId: dto.productId,
@@ -145,13 +157,14 @@ export class StockOrderService {
       },
       include: this.orderInclude,
     });
+    return toStockOrderResponse(row);
   }
 
   async updateStatus(
     id: string,
     nextStatus: StockOrderStatus,
     viewer: AuthenticatedUser,
-  ): Promise<StockOrder> {
+  ): Promise<StockOrderResponseDto> {
     const row = (await this.prisma.stockOrder.findUnique({
       where: { id },
       include: {
@@ -177,7 +190,7 @@ export class StockOrderService {
   private async applyMainStatusTransition(
     row: OrderRow,
     nextStatus: StockOrderStatus,
-  ): Promise<StockOrder> {
+  ): Promise<StockOrderResponseDto> {
     if (
       row.subsidiaryOrganization.organizationType !== OrganizationType.SUBSIDIARY
     ) {
@@ -196,11 +209,12 @@ export class StockOrderService {
       );
     }
 
-    return this.prisma.stockOrder.update({
+    const updated = await this.prisma.stockOrder.update({
       where: { id: row.id },
       data: { status: StockOrderStatus.CANCELLED },
       include: this.orderInclude,
     });
+    return toStockOrderResponse(updated);
   }
 
   /** Filiale : confirmer la réception (incrémente le stock) ou annuler tant que la commande est en attente. */
@@ -208,7 +222,7 @@ export class StockOrderService {
     row: OrderRow,
     nextStatus: StockOrderStatus,
     viewer: AuthenticatedUser,
-  ): Promise<StockOrder> {
+  ): Promise<StockOrderResponseDto> {
     if (row.subsidiaryOrganizationId !== viewer.organisationId) {
       throw new ForbiddenException();
     }
@@ -220,11 +234,12 @@ export class StockOrderService {
     }
 
     if (nextStatus === StockOrderStatus.CANCELLED) {
-      return this.prisma.stockOrder.update({
+      const updated = await this.prisma.stockOrder.update({
         where: { id: row.id },
         data: { status: StockOrderStatus.CANCELLED },
         include: this.orderInclude,
       });
+      return toStockOrderResponse(updated);
     }
 
     if (nextStatus === StockOrderStatus.CONFIRMED) {
@@ -252,10 +267,30 @@ export class StockOrderService {
           },
         });
 
-        return tx.stockOrder.findUniqueOrThrow({
+        const fullOrder = await tx.stockOrder.findUniqueOrThrow({
+          where: { id: row.id },
+          select: {
+            id: true,
+            subsidiaryOrganizationId: true,
+            quantity: true,
+            unitPrice: true,
+            createdAt: true,
+            requestedByUserId: true,
+            product: { select: { name: true } },
+          },
+        });
+
+        const linkResult: BudgetLinkResult =
+          await this.budgetStockLink.recordExpenseForConfirmedStockOrder(
+            fullOrder,
+            tx,
+          );
+
+        const confirmed = await tx.stockOrder.findUniqueOrThrow({
           where: { id: row.id },
           include: this.orderInclude,
         });
+        return toStockOrderResponse(confirmed, linkResult);
       });
     }
 

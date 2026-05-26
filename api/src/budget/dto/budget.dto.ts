@@ -5,6 +5,7 @@ import {
   IsIn,
   IsInt,
   IsNumber,
+  IsOptional,
   IsString,
   IsUUID,
   Max,
@@ -13,13 +14,20 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-
-/** Catégories de lignes budgétaires (prévisions). */
-const BUDGET_LINE_CATEGORIES = ['LOYER', 'SALAIRE'] as const;
+import {
+  BUDGET_LINE_CATEGORIES,
+  BUDGET_LINE_NATURES,
+  type BudgetLineCategoryValue,
+  type BudgetLineNatureValue,
+} from '../budget-line.defaults';
 
 export class CreateBudgetLineDto {
   @IsIn(BUDGET_LINE_CATEGORIES)
-  category!: (typeof BUDGET_LINE_CATEGORIES)[number];
+  category!: BudgetLineCategoryValue;
+
+  @IsOptional()
+  @IsIn(BUDGET_LINE_NATURES)
+  nature?: BudgetLineNatureValue;
 
   @IsString()
   @MinLength(1)
@@ -61,4 +69,18 @@ export class UpdateBudgetDto {
   @ValidateNested({ each: true })
   @Type(() => CreateBudgetLineDto)
   lines!: CreateBudgetLineDto[];
+}
+
+export class SubmitBudgetDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  financeNote?: string;
+}
+
+export class RejectBudgetDto {
+  @IsString()
+  @MinLength(3)
+  @MaxLength(2000)
+  rejectionReason!: string;
 }

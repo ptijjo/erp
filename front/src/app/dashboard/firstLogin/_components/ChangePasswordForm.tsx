@@ -44,7 +44,7 @@ const ChangePasswordForm = () => {
       onSubmit={handleSubmit(onSubmit)}
       className="flex w-1/3 flex-col items-center justify-center gap-4"
     >
-      <h1 className="text-4xl font-extrabold text-orange-500">
+      <h1 className="text-2xl font-extrabold text-orange-500 sm:text-4xl">
         Changer le mot de passe
       </h1>
       <div className="flex w-full flex-col gap-1">

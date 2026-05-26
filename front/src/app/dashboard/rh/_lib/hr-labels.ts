@@ -3,6 +3,7 @@ import type {
   EmploymentContractStatusDto,
   EmploymentContractTypeDto,
   LeaveStatusDto,
+  LeaveTypeDto,
 } from "~/lib/api-types";
 
 export const EMPLOYEE_STATUS_LABEL: Record<EmployeeStatusDto, string> = {
@@ -18,6 +19,18 @@ export const LEAVE_STATUS_LABEL: Record<LeaveStatusDto, string> = {
   REJECTED: "Refusé",
   CANCELLED: "Annulé",
 };
+
+export const LEAVE_TYPE_LABEL: Record<LeaveTypeDto, string> = {
+  PAID_LEAVE: "Congés payés",
+  RTT: "RTT",
+  SICK_LEAVE: "Maladie",
+  UNPAID_LEAVE: "Sans solde",
+};
+
+export const LEAVE_TYPE_OPTIONS = Object.entries(LEAVE_TYPE_LABEL) as [
+  LeaveTypeDto,
+  string,
+][];
 
 export const CONTRACT_TYPE_LABEL: Record<EmploymentContractTypeDto, string> = {
   CDI: "CDI",

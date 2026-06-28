@@ -14,9 +14,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   OrganizationType,
   VenteStatut,
+  StockMovementType,
+  SessionCaisseStatut,
+  NotificationType,
   type Prisma,
 } from '../generated/prisma/client';
-import type { AddVenteLineDto, ConfirmVenteDto } from './dto/vente.dto';
+import type { AddVenteLineDto, ConfirmVenteDto, ReturnVenteDto } from './dto/vente.dto';
 import type {
   ConfirmVenteResultDto,
   LowStockAlertDto,
@@ -27,10 +30,7 @@ import { venteInclude } from './vente.types';
 import { SessionCaisseService } from '../session-caisse/session-caisse.service';
 import { AccountingPeriodService } from '../treasury/accounting-period.service';
 import { NotificationService } from '../notification/notification.service';
-import {
-  NotificationType,
-  SessionCaisseStatut,
-} from '../generated/prisma/client';
+import { recordStockMovement } from '../stock-movement/stock-movement.util';
 
 @Injectable()
 export class VenteService {
@@ -334,6 +334,16 @@ export class VenteService {
             minQuantity: updated.minQuantity,
           });
         }
+
+        await recordStockMovement(tx, {
+          organizationId: orgId,
+          productId: line.productId,
+          quantityDelta: -line.quantity,
+          type: StockMovementType.SALE,
+          referenceType: 'Vente',
+          referenceId: venteId,
+          recordedByUserId: viewer.sub,
+        });
       }
 
       await tx.ventePaiement.deleteMany({ where: { venteId } });
@@ -383,6 +393,100 @@ export class VenteService {
       data: { status: VenteStatut.CANCELLED },
       include: venteInclude,
     });
+  }
+
+  /** Retour partiel ou total sur une vente confirmée — réintègre le stock. */
+  async returnSale(
+    venteId: string,
+    dto: ReturnVenteDto,
+    viewer: AuthenticatedUser,
+  ): Promise<{ returnId: string; totalAmount: number }> {
+    const vente = await this.findOne(venteId, viewer);
+    if (vente.status !== VenteStatut.CONFIRMED) {
+      throw new BadRequestException(
+        'Seules les ventes confirmées peuvent faire l’objet d’un retour.',
+      );
+    }
+    const orgId = vente.organizationId;
+    this.requireSubsidiaryViewer(viewer);
+    assertOrganizationResourceAccess(viewer, orgId);
+
+    await this.accountingPeriodService.assertPeriodOpenForDate(
+      orgId,
+      new Date(),
+    );
+
+    let totalAmount = 0;
+    for (const line of dto.lines) {
+      const original = vente.lines.find((l) => l.productId === line.productId);
+      if (!original) {
+        throw new BadRequestException(
+          `Produit absent de la vente d’origine : ${line.productId}`,
+        );
+      }
+      if (line.quantity > original.quantity) {
+        throw new BadRequestException(
+          `Quantité retournée trop élevée pour « ${original.product.name} ».`,
+        );
+      }
+      totalAmount += Number(original.unitPrice) * line.quantity;
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.venteReturn.create({
+        data: {
+          organizationId: orgId,
+          venteId,
+          reason: dto.reason?.trim() || null,
+          totalAmount,
+          recordedByUserId: viewer.sub,
+          lines: {
+            create: dto.lines.map((line) => {
+              const original = vente.lines.find(
+                (l) => l.productId === line.productId,
+              )!;
+              return {
+                productId: line.productId,
+                quantity: line.quantity,
+                unitPrice: original.unitPrice,
+              };
+            }),
+          },
+        },
+      });
+
+      for (const line of dto.lines) {
+        await tx.stock.upsert({
+          where: {
+            organizationId_productId: {
+              organizationId: orgId,
+              productId: line.productId,
+            },
+          },
+          create: {
+            organizationId: orgId,
+            productId: line.productId,
+            quantity: line.quantity,
+            minQuantity: 0,
+          },
+          update: { quantity: { increment: line.quantity } },
+        });
+        await recordStockMovement(tx, {
+          organizationId: orgId,
+          productId: line.productId,
+          quantityDelta: line.quantity,
+          type: StockMovementType.SALE_RETURN,
+          referenceType: 'VenteReturn',
+          referenceId: created.id,
+          label: dto.reason?.trim() || null,
+          recordedByUserId: viewer.sub,
+        });
+      }
+
+      return created;
+    });
+
+    return { returnId: result.id, totalAmount: Number(result.totalAmount) };
   }
 
   private requireSubsidiaryViewer(viewer: AuthenticatedUser): string {

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Building2, History, ScanLine } from "lucide-react";
 
+import { DashboardAlertBanner } from "~/app/dashboard/_components/DashboardAlertBanner";
+import { HqOverviewDashboard } from "~/app/dashboard/_components/HqOverviewDashboard";
 import { GroupAnalyticsDashboard } from "~/app/dashboard/_components/GroupAnalyticsDashboard";
 import {
   canOperateCaisse,
@@ -46,6 +48,13 @@ export default function DashboardPage() {
   const canUseCaisse = canOperateCaisse(me);
   const canViewCaisse = canSeeCaisseNav(me);
   const canViewSessions = canReadSessionCaisseHistory(me);
+  const profileLabel = main
+    ? me.role.name.startsWith("DIRECTOR_") || me.permissionMode === "FULL_ACCESS"
+      ? "Direction"
+      : me.role.poleCode
+        ? `Pôle ${me.role.poleCode.replace(/^Pole_/, "").replace(/_/g, " ")}`
+        : "Maison mère"
+    : "Filiale";
 
   return (
     <PageShell>
@@ -54,9 +63,9 @@ export default function DashboardPage() {
         description={
           main ? (
             <>
-              Vue d’ensemble du groupe{" "}
-              <span className="font-medium text-foreground">VIFAA</span> — accédez
-              aux modules selon vos droits.
+              Vue d’ensemble de votre holding et de ses filiales
+              {" · "}
+              <span className="text-muted-foreground">{profileLabel}</span>
             </>
           ) : (
             <>
@@ -80,18 +89,29 @@ export default function DashboardPage() {
         }
       />
 
+      <div className="mt-6">
+        <DashboardAlertBanner />
+      </div>
+
       <section className="mt-8 space-y-8">
         {main ? (
           <>
-            {showAnalytics ? (
-              <GroupAnalyticsDashboard variant="compact" />
-            ) : null}
-            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {modules.map((tile) => (
-                <ModuleTile key={tile.href} {...tile} />
-              ))}
-            </section>
-            {modules.length === 0 ? (
+            <HqOverviewDashboard />
+            {modules.length > 0 ? (
+              <section>
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold">Accès rapide</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Modules métier selon vos permissions.
+                  </p>
+                </div>
+                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {modules.map((tile) => (
+                    <ModuleTile key={tile.href} {...tile} />
+                  ))}
+                </section>
+              </section>
+            ) : (
               <Card className="border-dashed">
                 <CardHeader>
                   <CardTitle className="text-base">
@@ -103,7 +123,7 @@ export default function DashboardPage() {
                   </CardDescription>
                 </CardHeader>
               </Card>
-            ) : null}
+            )}
           </>
         ) : (
           <section className="space-y-6">

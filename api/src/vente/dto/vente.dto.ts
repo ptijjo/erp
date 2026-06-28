@@ -52,3 +52,25 @@ export class ConfirmVenteDto {
   @Type(() => VentePaiementDto)
   paiements!: VentePaiementDto[];
 }
+
+export class ReturnVenteLineDto {
+  @IsUUID('4')
+  productId!: string;
+
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  quantity!: number;
+}
+
+export class ReturnVenteDto {
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ReturnVenteLineDto)
+  lines!: ReturnVenteLineDto[];
+}

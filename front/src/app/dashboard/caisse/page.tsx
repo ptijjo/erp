@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ScanLine, ShoppingCart, Trash2 } from "lucide-react";
+import { AlertTriangle, Minus, Plus, ScanLine, ShoppingCart, Trash2 } from "lucide-react";
 
 import { CaisseCloseSessionDialog } from "./_components/CaisseCloseSessionDialog";
+import { CaisseDraftTicketsPanel } from "./_components/CaisseDraftTicketsPanel";
 import { CaisseOpenSession } from "./_components/CaisseOpenSession";
 import { CaisseSessionBar } from "./_components/CaisseSessionBar";
 import { PageHeader } from "~/components/layout/page-header";
@@ -34,6 +35,7 @@ import type {
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
+import { cn } from "~/lib/utils";
 
 const MODE_LABEL: Record<ModePaiementDto, string> = {
   ESPECES: "Espèces",
@@ -51,12 +53,16 @@ export default function CaissePage() {
   const canOperate = me != null && canOperateCaisse(me);
   const canReadSession =
     me != null && hasMePermission(me, "read", "SessionCaisse");
+  const canCloseSession =
+    me != null && hasMePermission(me, "update", "SessionCaisse");
   const qrRef = useRef<HTMLInputElement>(null);
+  const creatingVenteRef = useRef(false);
 
   const [venteId, setVenteId] = useState<string | null>(null);
   const [qrInput, setQrInput] = useState("");
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [paymentMode, setPaymentMode] = useState<ModePaiementDto>("ESPECES");
+  const [cashReceived, setCashReceived] = useState("");
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
 
   const {
@@ -71,7 +77,7 @@ export default function CaissePage() {
       );
       return data;
     },
-    enabled: canSession || (canReadSession && !canOperate),
+    enabled: canSession || canCloseSession || (canReadSession && !canOperate),
   });
 
   const sessionOpen = currentSession?.statut === "OUVERTE";
@@ -82,26 +88,77 @@ export default function CaissePage() {
       return data;
     },
     onSuccess: (data) => {
+      creatingVenteRef.current = false;
       setVenteId(data.id);
       void queryClient.invalidateQueries({ queryKey: ["vente", data.id] });
       void queryClient.invalidateQueries({
         queryKey: ["session-caisse", "current"],
       });
+      if (currentSession?.id) {
+        void queryClient.invalidateQueries({
+          queryKey: ["vente", "drafts", currentSession.id],
+        });
+      }
+    },
+    onError: () => {
+      creatingVenteRef.current = false;
     },
   });
 
   useEffect(() => {
     if (
-      canSell &&
-      sessionOpen &&
-      !venteId &&
-      !createVenteMutation.isPending &&
-      !createVenteMutation.isError
+      !canSell ||
+      !sessionOpen ||
+      venteId ||
+      createVenteMutation.isPending ||
+      createVenteMutation.isError ||
+      creatingVenteRef.current
     ) {
-      createVenteMutation.mutate();
+      return;
     }
+    creatingVenteRef.current = true;
+    createVenteMutation.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nouveau ticket quand session ouverte
-  }, [canSell, sessionOpen, venteId]);
+  }, [canSell, sessionOpen, venteId, createVenteMutation.isPending, createVenteMutation.isError]);
+
+  const { data: sessionDrafts = [] } = useQuery({
+    queryKey: ["vente", "drafts", currentSession?.id] as const,
+    queryFn: async () => {
+      const { data } = await api.get<VenteDto[]>("/vente");
+      return data.filter(
+        (item) =>
+          item.status === "DRAFT" &&
+          item.sessionCaisseId === currentSession!.id,
+      );
+    },
+    enabled: Boolean(sessionOpen && currentSession?.id && canOperate),
+  });
+
+  useEffect(() => {
+    if (!currentSession?.id || !sessionOpen || sessionDrafts.length === 0) {
+      return;
+    }
+
+    const orphanEmptyDrafts = sessionDrafts.filter(
+      (draft) => draft.lines.length === 0 && draft.id !== venteId,
+    );
+    if (orphanEmptyDrafts.length === 0) {
+      return;
+    }
+
+    void (async () => {
+      for (const draft of orphanEmptyDrafts) {
+        try {
+          await api.post(`/vente/${draft.id}/cancel`);
+        } catch {
+          /* nettoyage best-effort des tickets vides orphelins */
+        }
+      }
+      void queryClient.invalidateQueries({
+        queryKey: ["vente", "drafts", currentSession.id],
+      });
+    })();
+  }, [sessionDrafts, venteId, currentSession?.id, sessionOpen, queryClient]);
 
   const { data: vente, isLoading } = useQuery({
     queryKey: ["vente", venteId] as const,
@@ -127,6 +184,11 @@ export default function CaissePage() {
       void queryClient.invalidateQueries({
         queryKey: ["session-caisse", "current"],
       });
+      if (currentSession?.id) {
+        void queryClient.invalidateQueries({
+          queryKey: ["vente", "drafts", currentSession.id],
+        });
+      }
       qrRef.current?.focus();
     },
     onError: (e) => {
@@ -144,6 +206,11 @@ export default function CaissePage() {
       void queryClient.invalidateQueries({
         queryKey: ["session-caisse", "current"],
       });
+      if (currentSession?.id) {
+        void queryClient.invalidateQueries({
+          queryKey: ["vente", "drafts", currentSession.id],
+        });
+      }
     },
     onError: (e) => {
       alert(apiErrorMessage(e, "Impossible d’annuler le ticket"));
@@ -159,8 +226,49 @@ export default function CaissePage() {
     },
     onSuccess: (data) => {
       void queryClient.setQueryData(["vente", venteId], data);
+      if (currentSession?.id) {
+        void queryClient.invalidateQueries({
+          queryKey: ["vente", "drafts", currentSession.id],
+        });
+      }
     },
   });
+
+  const updateLineMutation = useMutation({
+    mutationFn: async ({
+      lineId,
+      quantity,
+    }: {
+      lineId: string;
+      quantity: number;
+    }) => {
+      const { data } = await api.patch<VenteDto>(
+        `/vente/${venteId}/lines/${lineId}`,
+        { quantity },
+      );
+      return data;
+    },
+    onSuccess: (data) => {
+      void queryClient.setQueryData(["vente", venteId], data);
+      if (currentSession?.id) {
+        void queryClient.invalidateQueries({
+          queryKey: ["vente", "drafts", currentSession.id],
+        });
+      }
+    },
+    onError: (error) => {
+      alert(apiErrorMessage(error, "Impossible de modifier la quantité"));
+    },
+  });
+
+  function changeLineQuantity(lineId: string, currentQuantity: number, delta: number) {
+    const nextQuantity = currentQuantity + delta;
+    if (nextQuantity < 1) {
+      removeLineMutation.mutate(lineId);
+      return;
+    }
+    updateLineMutation.mutate({ lineId, quantity: nextQuantity });
+  }
 
   const confirmMutation = useMutation({
     mutationFn: async () => {
@@ -183,16 +291,34 @@ export default function CaissePage() {
           `Vente enregistrée. Stock bas : ${names}. Pensez à commander au fournisseur.`,
         );
       }
+      if (venteId) {
+        void queryClient.removeQueries({ queryKey: ["vente", venteId] });
+      }
       setVenteId(null);
+      setCashReceived("");
       void queryClient.invalidateQueries({
         queryKey: ["session-caisse", "current"],
       });
-      createVenteMutation.mutate();
+      if (currentSession?.id) {
+        void queryClient.invalidateQueries({
+          queryKey: ["vente", "drafts", currentSession.id],
+        });
+      }
     },
     onError: (e) => {
       alert(apiErrorMessage(e, "Impossible de valider la vente"));
     },
   });
+
+  function handleSelectDraft(nextVenteId: string) {
+    if (!nextVenteId) {
+      setVenteId(null);
+      setCashReceived("");
+      return;
+    }
+    setVenteId(nextVenteId);
+    setCashReceived("");
+  }
 
   async function handleScanSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -210,7 +336,31 @@ export default function CaissePage() {
   function setFondClotureReset() {
     setQrInput("");
     setScanMessage(null);
+    setCashReceived("");
   }
+
+  const total = vente ? parseDecimal(vente.totalAmount) : 0;
+  const isDraft = vente?.status === "DRAFT";
+
+  const cashReceivedAmount = useMemo(() => {
+    const trimmed = cashReceived.trim();
+    if (!trimmed) return null;
+    const amount = parseDecimal(trimmed.replace(",", "."));
+    return Number.isFinite(amount) ? amount : null;
+  }, [cashReceived]);
+
+  const cashChange =
+    paymentMode === "ESPECES" && cashReceivedAmount != null
+      ? cashReceivedAmount - total
+      : null;
+
+  const canConfirmCashPayment =
+    paymentMode !== "ESPECES" ||
+    (cashReceivedAmount != null && cashReceivedAmount >= total);
+
+  const anySessionDraftWithLines = sessionDrafts.some(
+    (draft) => draft.lines.length > 0,
+  );
 
   if (!canViewCaisse) {
     return (
@@ -301,9 +451,6 @@ export default function CaissePage() {
     );
   }
 
-  const total = vente ? parseDecimal(vente.totalAmount) : 0;
-  const isDraft = vente?.status === "DRAFT";
-
   return (
     <PageShell>
       <PageHeader
@@ -315,6 +462,7 @@ export default function CaissePage() {
         <CaisseSessionBar
           session={currentSession!}
           onCloseClick={() => setCloseDialogOpen(true)}
+          canClose={canCloseSession}
         />
       </div>
 
@@ -322,10 +470,22 @@ export default function CaissePage() {
         open={closeDialogOpen}
         onOpenChange={setCloseDialogOpen}
         session={currentSession!}
-        draftVenteId={isDraft ? venteId : null}
-        draftVenteHasLines={Boolean(isDraft && vente && vente.lines.length > 0)}
+        sessionDrafts={sessionDrafts}
+        draftVenteHasLines={anySessionDraftWithLines}
         onClosed={handleSessionClosed}
+        onSelectDraft={handleSelectDraft}
       />
+
+      {sessionDrafts.length > 1 ? (
+        <div className="mt-4">
+          <CaisseDraftTicketsPanel
+            drafts={sessionDrafts}
+            activeVenteId={venteId}
+            sessionId={currentSession!.id}
+            onSelectDraft={handleSelectDraft}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <section className="lg:col-span-2 space-y-4">
@@ -372,19 +532,91 @@ export default function CaissePage() {
               </p>
             ) : (
               <ul className="divide-y">
-                {vente.lines.map((line) => (
+                {vente.lines.map((line) => {
+                  const lineBusy =
+                    (updateLineMutation.isPending &&
+                      updateLineMutation.variables?.lineId === line.id) ||
+                    (removeLineMutation.isPending &&
+                      removeLineMutation.variables === line.id);
+
+                  return (
                   <li
                     key={line.id}
                     className="flex items-center justify-between gap-4 px-4 py-3"
                   >
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="font-medium">{line.product.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {line.quantity} × {formatFcfa(parseDecimal(line.unitPrice))}
+                        {formatFcfa(parseDecimal(line.unitPrice))} / unité
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="font-mono font-semibold tabular-nums">
+                      {isDraft ? (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="size-8 shrink-0"
+                            disabled={lineBusy}
+                            onClick={() =>
+                              changeLineQuantity(line.id, line.quantity, -1)
+                            }
+                            aria-label="Diminuer la quantité"
+                          >
+                            <Minus className="size-4" />
+                          </Button>
+                          <Input
+                            key={`${line.id}-${line.quantity}`}
+                            type="number"
+                            min={1}
+                            inputMode="numeric"
+                            defaultValue={line.quantity}
+                            disabled={lineBusy}
+                            onBlur={(event) => {
+                              const parsed = Number.parseInt(
+                                event.target.value,
+                                10,
+                              );
+                              if (Number.isNaN(parsed) || parsed < 1) {
+                                event.target.value = String(line.quantity);
+                                return;
+                              }
+                              if (parsed !== line.quantity) {
+                                updateLineMutation.mutate({
+                                  lineId: line.id,
+                                  quantity: parsed,
+                                });
+                              }
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.currentTarget.blur();
+                              }
+                            }}
+                            className="h-8 w-14 px-1 text-center tabular-nums"
+                            aria-label={`Quantité pour ${line.product.name}`}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="size-8 shrink-0"
+                            disabled={lineBusy}
+                            onClick={() =>
+                              changeLineQuantity(line.id, line.quantity, 1)
+                            }
+                            aria-label="Augmenter la quantité"
+                          >
+                            <Plus className="size-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="min-w-8 text-center font-mono tabular-nums">
+                          {line.quantity}
+                        </span>
+                      )}
+                      <span className="min-w-20 text-right font-mono font-semibold tabular-nums">
                         {formatFcfa(
                           parseDecimal(line.unitPrice) * line.quantity,
                         )}
@@ -394,6 +626,7 @@ export default function CaissePage() {
                           type="button"
                           variant="ghost"
                           size="icon"
+                          disabled={lineBusy}
                           onClick={() => removeLineMutation.mutate(line.id)}
                           aria-label="Retirer la ligne"
                         >
@@ -402,7 +635,8 @@ export default function CaissePage() {
                       ) : null}
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -434,7 +668,12 @@ export default function CaissePage() {
               <Label>Mode de paiement</Label>
               <Select
                 value={paymentMode}
-                onValueChange={(v) => setPaymentMode(v as ModePaiementDto)}
+                onValueChange={(value) => {
+                  setPaymentMode(value as ModePaiementDto);
+                  if (value !== "ESPECES") {
+                    setCashReceived("");
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -447,11 +686,59 @@ export default function CaissePage() {
                   ))}
                 </SelectContent>
               </Select>
+              {paymentMode === "ESPECES" ? (
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="cash-received">
+                      Montant reçu du client
+                    </Label>
+                    <Input
+                      id="cash-received"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={cashReceived}
+                      onChange={(event) => setCashReceived(event.target.value)}
+                      placeholder="Ex. 15000"
+                      className="mt-2"
+                    />
+                  </div>
+                  {cashReceivedAmount != null ? (
+                    <div
+                      className={cn(
+                        "rounded-lg border px-3 py-2",
+                        cashChange != null && cashChange < 0
+                          ? "border-destructive/40 bg-destructive/5"
+                          : "border-primary/20 bg-primary/5",
+                      )}
+                    >
+                      <p className="text-xs text-muted-foreground">
+                        {cashChange != null && cashChange < 0
+                          ? "Montant insuffisant"
+                          : "Monnaie à rendre"}
+                      </p>
+                      <p
+                        className={cn(
+                          "text-xl font-bold tabular-nums",
+                          cashChange != null && cashChange < 0
+                            ? "text-destructive"
+                            : "text-foreground",
+                        )}
+                      >
+                        {cashChange != null && cashChange < 0
+                          ? `Manque ${formatFcfa(Math.abs(cashChange))}`
+                          : formatFcfa(cashChange ?? 0)}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <Button
                 className="w-full"
                 size="lg"
                 onClick={() => confirmMutation.mutate()}
-                disabled={confirmMutation.isPending}
+                disabled={
+                  confirmMutation.isPending || !canConfirmCashPayment
+                }
               >
                 Valider la vente
               </Button>

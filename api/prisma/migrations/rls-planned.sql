@@ -1,0 +1,8 @@
+-- RLS PostgreSQL (cible sécurité) — NON APPLIQUÉ automatiquement.
+-- Nécessite un rôle DB par session (`SET app.current_organization_id`) côté Prisma.
+-- À activer après validation explicite et tests d'intégration dédiés.
+--
+-- Exemple filiale sur Stock :
+-- ALTER TABLE "Stock" ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY stock_subsidiary_isolation ON "Stock"
+--   USING ("organizationId" = current_setting('app.organization_id', true));

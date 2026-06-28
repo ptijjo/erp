@@ -10,6 +10,7 @@ import { api } from "~/lib/api";
 import type {
   SessionCaisseCurrentDto,
   SessionCaisseDto,
+  VenteDto,
 } from "~/lib/api-types";
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { formatFcfa } from "~/lib/format-fcfa";
@@ -19,23 +20,40 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   session: SessionCaisseCurrentDto;
-  draftVenteId?: string | null;
+  sessionDrafts?: VenteDto[];
   draftVenteHasLines?: boolean;
   onClosed: () => void;
+  onSelectDraft?: (venteId: string) => void;
 };
 
 export function CaisseCloseSessionDialog({
   open,
   onOpenChange,
   session,
-  draftVenteId = null,
+  sessionDrafts = [],
   draftVenteHasLines = false,
   onClosed,
+  onSelectDraft,
 }: Props) {
   const queryClient = useQueryClient();
   const [fondCloture, setFondCloture] = useState("");
   const [commentaire, setCommentaire] = useState("");
   const theorique = session.live.theoriqueCaisseEspecesFcfa;
+
+  const cancelDraftMutation = useMutation({
+    mutationFn: async (venteId: string) => {
+      const { data } = await api.post<VenteDto>(`/vente/${venteId}/cancel`);
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["vente", "drafts", session.id],
+      });
+    },
+    onError: (error) => {
+      alert(apiErrorMessage(error, "Impossible d’annuler ce ticket"));
+    },
+  });
 
   const closeMutation = useMutation({
     mutationFn: async () => {
@@ -43,9 +61,6 @@ export function CaisseCloseSessionDialog({
         throw new Error(
           "Validez la vente en cours ou videz le panier avant la fin de service.",
         );
-      }
-      if (draftVenteId) {
-        await api.post(`/vente/${draftVenteId}/cancel`);
       }
       const fond = parseDecimal(fondCloture);
       if (Number.isNaN(fond) || fond < 0) {
@@ -122,9 +137,61 @@ export function CaisseCloseSessionDialog({
 
         {draftVenteHasLines ? (
           <p className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Un panier en cours contient des articles : validez la vente ou videz
-            le panier avant de clôturer.
+            Un ou plusieurs tickets contiennent encore des articles : ouvrez-les,
+            validez la vente ou videz le panier avant de clôturer.
           </p>
+        ) : sessionDrafts.length > 1 ? (
+          <p className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Plusieurs tickets en brouillon sont ouverts dans cette session.
+            Annulez les tickets inutiles ci-dessous.
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Les tickets vides en brouillon seront annulés automatiquement à la
+            clôture.
+          </p>
+        )}
+
+        {sessionDrafts.length > 0 ? (
+          <ul className="mt-3 space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
+            {sessionDrafts.map((draft) => (
+              <li
+                key={draft.id}
+                className="flex flex-wrap items-center justify-between gap-2"
+              >
+                <span>
+                  {draft.lines.length > 0
+                    ? `${draft.lines.length} article(s) · ${formatFcfa(parseDecimal(draft.totalAmount))}`
+                    : "Ticket vide"}
+                </span>
+                <div className="flex gap-2">
+                  {onSelectDraft && draft.lines.length > 0 ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        onSelectDraft(draft.id);
+                        onOpenChange(false);
+                      }}
+                    >
+                      Ouvrir
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    disabled={cancelDraftMutation.isPending}
+                    onClick={() => cancelDraftMutation.mutate(draft.id)}
+                  >
+                    Annuler
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
         ) : null}
 
         <div className="mt-4 space-y-3">

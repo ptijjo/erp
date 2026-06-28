@@ -10,6 +10,10 @@ import {
   assertOrganizationResourceAccess,
   isMainOrganizationUser,
 } from '../auth/organization-scope';
+import {
+  assertMainOrgPoleDomain,
+  POLE_DOMAIN,
+} from '../auth/pole-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   BudgetStatus,
@@ -84,6 +88,9 @@ export class BudgetService {
       Prisma.BudgetGetPayload<{ include: typeof budgetInclude }>
     >
   > {
+    if (isMainOrganizationUser(viewer)) {
+      assertMainOrgPoleDomain(viewer, POLE_DOMAIN.FINANCE);
+    }
     const { page, limit } = resolvePagination(query);
 
     const where: Prisma.BudgetWhereInput = isMainOrganizationUser(viewer)
@@ -129,6 +136,10 @@ export class BudgetService {
     });
     if (!row) {
       throw new NotFoundException('Budget introuvable');
+    }
+
+    if (isMainOrganizationUser(viewer)) {
+      assertMainOrgPoleDomain(viewer, POLE_DOMAIN.FINANCE);
     }
 
     assertOrganizationResourceAccess(

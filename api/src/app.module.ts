@@ -20,6 +20,12 @@ import { CategoryModule } from './category/category.module';
 import { ProductModule } from './product/product.module';
 import { StockModule } from './stock/stock.module';
 import { StockOrderModule } from './stock-order/stock-order.module';
+import { StockMovementModule } from './stock-movement/stock-movement.module';
+import { StockTransferModule } from './stock-transfer/stock-transfer.module';
+import { AlertsModule } from './alerts/alerts.module';
+import { HeritageModule } from './heritage/heritage.module';
+import { LegalModule } from './legal/legal.module';
+import { ProductionModule } from './production/production.module';
 import { SupplierModule } from './supplier/supplier.module';
 import { BudgetModule } from './budget/budget.module';
 import { PoleModule } from './pole/pole.module';
@@ -56,6 +62,12 @@ import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
     SeederModule,
     StockModule,
     StockOrderModule,
+    StockMovementModule,
+    StockTransferModule,
+    AlertsModule,
+    HeritageModule,
+    LegalModule,
+    ProductionModule,
     SupplierModule,
     BudgetModule,
     HrModule,

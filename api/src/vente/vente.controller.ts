@@ -16,6 +16,7 @@ import { PoliciesGuard } from '../casl/policies.guard';
 import {
   AddVenteLineDto,
   ConfirmVenteDto,
+  ReturnVenteDto,
   UpdateVenteLineDto,
 } from './dto/vente.dto';
 import { VenteService } from './vente.service';
@@ -94,6 +95,16 @@ export class VenteController {
     @CurrentUser() viewer: AuthenticatedUser,
   ) {
     return this.venteService.confirm(id, dto, viewer);
+  }
+
+  @Post(':id/return')
+  @CheckPolicies({ action: 'update', subject: 'Vente' })
+  returnSale(
+    @Param('id') id: string,
+    @Body() dto: ReturnVenteDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.venteService.returnSale(id, dto, viewer);
   }
 
   @Post(':id/cancel')

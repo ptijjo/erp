@@ -6,8 +6,13 @@ import {
 import type { AuthenticatedUser } from '../auth/auth.types';
 import {
   assertOrganizationResourceAccess,
+  isMainOrganizationUser,
   organizationListWhere,
 } from '../auth/organization-scope';
+import {
+  assertMainOrgPoleDomain,
+  POLE_DOMAIN,
+} from '../auth/pole-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   EmployeeStatus,
@@ -50,6 +55,9 @@ export class EmployeeService {
       Prisma.EmployeeGetPayload<{ include: typeof employeeInclude }>
     >
   > {
+    if (isMainOrganizationUser(viewer)) {
+      assertMainOrgPoleDomain(viewer, POLE_DOMAIN.HR);
+    }
     const { page, limit } = resolvePagination(paginationInput);
     const orgFilter = organizationListWhere(viewer);
     const where: Prisma.EmployeeWhereInput =

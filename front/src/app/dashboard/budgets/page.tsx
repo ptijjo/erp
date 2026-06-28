@@ -317,10 +317,10 @@ export default function BudgetsPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Budgets filiales"
+        title={isMain ? "Finances" : "Budgets filiales"}
         description={
           isMain
-            ? "Le pôle finance propose les budgets filiales ; le DG ou le directeur des opérations valide. Suivi des dépenses et demandes de rallonge."
+            ? "Suivi des revenus et dépenses de vos filiales."
             : "Gérez vos charges fixes et variables sur le budget validé, ou demandez une rallonge à la maison mère."
         }
         actions={

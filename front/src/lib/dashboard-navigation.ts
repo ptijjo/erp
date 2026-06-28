@@ -1,14 +1,19 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowLeftRight,
   BarChart3,
   Building2,
+  ClipboardList,
+  Factory,
   FolderTree,
   History,
+  Landmark,
   Lock,
   Layers,
   LayoutDashboard,
   Package,
   Receipt,
+  Scale,
   ScanLine,
   MessageSquare,
   ScrollText,
@@ -138,6 +143,24 @@ const baseNavItems: NavItem[] = [
     requiredPermission: { action: "read", subject: "Stock" },
   },
   {
+    label: "Transferts stock",
+    href: "/dashboard/stocks/transferts",
+    icon: ArrowLeftRight,
+    requiredPermission: { action: "read", subject: "StockTransfer" },
+  },
+  {
+    label: "Journal mouvements",
+    href: "/dashboard/stocks/mouvements",
+    icon: ClipboardList,
+    requiredPermission: { action: "read", subject: "StockMovement" },
+  },
+  {
+    label: "Production",
+    href: "/dashboard/production",
+    icon: Factory,
+    requiredPermission: { action: "read", subject: "ProductionOrder" },
+  },
+  {
     label: "Caisse",
     href: "/dashboard/caisse",
     icon: ScanLine,
@@ -154,7 +177,7 @@ const baseNavItems: NavItem[] = [
     requiredPermission: { action: "read", subject: "Budget" },
   },
   {
-    label: "Trésorerie",
+    label: "Clôtures comptables",
     href: "/dashboard/tresorerie",
     icon: Lock,
     requiredPermission: { action: "read", subject: "AccountingPeriod" },
@@ -164,6 +187,115 @@ const baseNavItems: NavItem[] = [
     href: "/dashboard/comptabilite",
     icon: Receipt,
     requiredPermission: { action: "read", subject: "StockOrder" },
+  },
+  {
+    label: "Journal d'audit",
+    href: "/dashboard/audit",
+    icon: ScrollText,
+    requiredPermission: { action: "read", subject: "AuditLog" },
+  },
+  {
+    label: "Messagerie",
+    href: "/dashboard/messages",
+    icon: MessageSquare,
+    requiredPermission: { action: "read", subject: "Message" },
+  },
+];
+
+/** Navigation simplifiée pour la maison mère (vue holding). */
+const HQ_PRIMARY_NAV: NavItem[] = [
+  {
+    label: "Tableau de bord",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    exact: true,
+  },
+  {
+    label: "Filiales",
+    href: "/dashboard/organisations",
+    icon: Building2,
+    requiredPermission: { action: "read", subject: "Organization" },
+  },
+  {
+    label: "Finances",
+    href: "/dashboard/budgets",
+    icon: Wallet,
+    requiredPermission: { action: "read", subject: "Budget" },
+  },
+  {
+    label: "Stocks",
+    href: "/dashboard/stocks",
+    icon: Layers,
+    requiredPermission: { action: "read", subject: "Stock" },
+  },
+  {
+    label: "Commandes",
+    href: "/dashboard/comptabilite",
+    icon: Receipt,
+    requiredPermission: { action: "read", subject: "StockOrder" },
+  },
+  {
+    label: "Rapports",
+    href: "/dashboard/rapports",
+    icon: BarChart3,
+  },
+];
+
+const HQ_ADMIN_NAV: NavItem[] = [
+  {
+    label: "Utilisateurs",
+    href: "/dashboard/utilisateurs",
+    icon: Users,
+    requiredPermission: { action: "read", subject: "User" },
+  },
+  {
+    label: "Ressources humaines",
+    href: "/dashboard/rh",
+    icon: UserCircle,
+    requiredPermission: { action: "read", subject: "Employee" },
+  },
+  {
+    label: "Catalogue",
+    href: "/dashboard/produits",
+    icon: Package,
+    requiredPermission: { action: "read", subject: "Product" },
+  },
+  {
+    label: "Catégories",
+    href: "/dashboard/categories",
+    icon: FolderTree,
+    requiredPermission: { action: "read", subject: "Category" },
+  },
+  {
+    label: "Fournisseurs",
+    href: "/dashboard/fournisseurs",
+    icon: Truck,
+    requiredPermission: { action: "read", subject: "Supplier" },
+    mainOnly: true,
+  },
+  {
+    label: "Clôtures comptables",
+    href: "/dashboard/tresorerie",
+    icon: Lock,
+    requiredPermission: { action: "read", subject: "AccountingPeriod" },
+  },
+  {
+    label: "Patrimoine",
+    href: "/dashboard/patrimoine",
+    icon: Landmark,
+    requiredPermission: { action: "read", subject: "HeritageAsset" },
+  },
+  {
+    label: "Juridique",
+    href: "/dashboard/juridique",
+    icon: Scale,
+    requiredPermission: { action: "read", subject: "LegalContract" },
+  },
+  {
+    label: "Production",
+    href: "/dashboard/production",
+    icon: Factory,
+    requiredPermission: { action: "read", subject: "ProductionOrder" },
   },
   {
     label: "Journal d'audit",
@@ -189,6 +321,11 @@ const SECTION_BY_HREF: Record<string, string> = {
   "/dashboard/fournisseurs": "catalogue",
   "/dashboard/categories": "catalogue",
   "/dashboard/stocks": "operations",
+  "/dashboard/stocks/transferts": "operations",
+  "/dashboard/stocks/mouvements": "operations",
+  "/dashboard/production": "operations",
+  "/dashboard/patrimoine": "gouvernance",
+  "/dashboard/juridique": "gouvernance",
   "/dashboard/caisse": "operations",
   "/dashboard/compte": "operations",
   "/dashboard/comptabilite": "operations",
@@ -235,6 +372,24 @@ function itemIsAllowed(me: Me, item: NavItem): boolean {
 
 export function buildNavSections(me: Me | null | undefined): NavSection[] {
   if (!me) return [];
+
+  if (isMainOrganization(me)) {
+    const pilotage = HQ_PRIMARY_NAV.filter((item) => itemIsAllowed(me, item));
+    const administration = HQ_ADMIN_NAV.filter((item) => itemIsAllowed(me, item));
+    const sections: NavSection[] = [];
+
+    if (pilotage.length > 0) {
+      sections.push({ id: "pilotage", label: "Pilotage", items: pilotage });
+    }
+    if (administration.length > 0) {
+      sections.push({
+        id: "administration",
+        label: "Administration",
+        items: administration,
+      });
+    }
+    return sections;
+  }
 
   const orgPath = subsidiaryOrganizationPath(me);
   const items: NavItem[] = [];
@@ -374,6 +529,27 @@ export const HQ_MODULE_TILES: ModuleTile[] = [
     subject: "AuditLog",
   },
   {
+    title: "Patrimoine",
+    description: "Actifs et biens patrimoniaux",
+    href: "/dashboard/patrimoine",
+    icon: Landmark,
+    subject: "HeritageAsset",
+  },
+  {
+    title: "Juridique",
+    description: "Contrats et engagements",
+    href: "/dashboard/juridique",
+    icon: Scale,
+    subject: "LegalContract",
+  },
+  {
+    title: "Production",
+    description: "Ordres de fabrication",
+    href: "/dashboard/production",
+    icon: Factory,
+    subject: "ProductionOrder",
+  },
+  {
     title: "Messagerie",
     description: "Échanges internes maison mère et filiales",
     href: "/dashboard/messages",
@@ -427,6 +603,13 @@ export const SUBSIDIARY_MODULE_TILES: ModuleTile[] = [
     href: "/dashboard/rh",
     icon: UserCircle,
     subject: "Employee",
+  },
+  {
+    title: "Transferts stock",
+    description: "Échanges entre filiales",
+    href: "/dashboard/stocks/transferts",
+    icon: ArrowLeftRight,
+    subject: "StockTransfer",
   },
   {
     title: "Messagerie",

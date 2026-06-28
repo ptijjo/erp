@@ -762,3 +762,122 @@ export type BudgetExpenseDto = {
   };
   recordedBy: { id: string; email: string } | null;
 };
+
+export type HeritageAssetStatusDto =
+  | "ACTIVE"
+  | "MAINTENANCE"
+  | "RETIRED";
+
+export type HeritageAssetDto = {
+  id: string;
+  name: string;
+  description: string | null;
+  location: string | null;
+  value: string | null;
+  status: HeritageAssetStatusDto;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LegalContractStatusDto =
+  | "DRAFT"
+  | "ACTIVE"
+  | "EXPIRED"
+  | "TERMINATED";
+
+export type LegalContractDto = {
+  id: string;
+  title: string;
+  partyName: string;
+  startDate: string | null;
+  endDate: string | null;
+  status: LegalContractStatusDto;
+  notes: string | null;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProductionOrderStatusDto =
+  | "PLANNED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type ProductionOrderDto = {
+  id: string;
+  title: string;
+  quantity: number;
+  status: ProductionOrderStatusDto;
+  scheduledAt: string | null;
+  completedAt: string | null;
+  notes: string | null;
+  organizationId: string;
+  productId: string | null;
+  product: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StockTransferStatusDto =
+  | "PENDING"
+  | "SHIPPED"
+  | "RECEIVED"
+  | "CANCELLED";
+
+export type StockTransferDto = {
+  id: string;
+  quantity: number;
+  status: StockTransferStatusDto;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+  shippedAt: string | null;
+  receivedAt: string | null;
+  fromOrganizationId: string;
+  toOrganizationId: string;
+  productId: string;
+  product: { id: string; name: string; qrCode: string | null };
+  fromOrganization: {
+    id: string;
+    name: string;
+    slug: string;
+    organizationType: string;
+  };
+  toOrganization: {
+    id: string;
+    name: string;
+    slug: string;
+    organizationType: string;
+  };
+  requestedBy: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+};
+
+export type StockMovementTypeDto =
+  | "RECEIPT_STOCK_ORDER"
+  | "SALE"
+  | "SALE_RETURN"
+  | "ADJUSTMENT"
+  | "TRANSFER_OUT"
+  | "TRANSFER_IN"
+  | "INVENTORY";
+
+export type StockMovementDto = {
+  id: string;
+  createdAt: string;
+  quantityDelta: number;
+  type: StockMovementTypeDto;
+  referenceType: string | null;
+  referenceId: string | null;
+  label: string | null;
+  organizationId: string;
+  productId: string;
+  product: { id: string; name: string; qrCode: string | null };
+  organization: { id: string; name: string; slug: string };
+};

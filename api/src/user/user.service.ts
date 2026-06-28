@@ -13,6 +13,10 @@ import {
   assertOrganizationResourceAccess,
   isMainOrganizationUser,
 } from '../auth/organization-scope';
+import {
+  assertUserTargetInPoleScope,
+  mainOrgUserListPoleFilter,
+} from '../auth/pole-scope';
 import { isFullAccessRoleName } from '../casl/define-ability';
 import type { Prisma } from '../generated/prisma/client';
 import type {
@@ -57,36 +61,9 @@ export class UserService {
    */
   private buildUserListWhere(viewer: AuthenticatedUser): Prisma.UserWhereInput {
     if (!isMainOrganizationUser(viewer)) {
-      if (isFullAccessRoleName(viewer.role.name)) {
-        return { organizationId: viewer.organisationId };
-      }
-      const subPole = viewer.role.poleCode;
-      if (subPole != null && subPole !== '') {
-        return {
-          organizationId: viewer.organisationId,
-          role: { pole: { code: subPole } },
-        };
-      }
       return { organizationId: viewer.organisationId };
     }
-
-    if (isFullAccessRoleName(viewer.role.name)) {
-      return {};
-    }
-
-    const sameOrganization: Prisma.UserWhereInput = {
-      organizationId: viewer.organisationId,
-    };
-
-    const poleCode = viewer.role.poleCode;
-    if (poleCode != null && poleCode !== '') {
-      return {
-        ...sameOrganization,
-        role: { pole: { code: poleCode } },
-      };
-    }
-
-    return sameOrganization;
+    return mainOrgUserListPoleFilter(viewer);
   }
 
   /** Lecture / écriture sur une fiche utilisateur : même périmètre que `buildUserListWhere`. */
@@ -97,23 +74,12 @@ export class UserService {
       role: { pole: { code: string } | null };
     },
   ): boolean {
-    if (isFullAccessRoleName(viewer.role.name)) {
-      if (!isMainOrganizationUser(viewer)) {
-        return target.organizationId === viewer.organisationId;
-      }
+    try {
+      assertUserTargetInPoleScope(viewer, target);
       return true;
-    }
-
-    if (target.organizationId !== viewer.organisationId) {
+    } catch {
       return false;
     }
-
-    const poleCode = viewer.role.poleCode;
-    if (poleCode == null || poleCode === '') {
-      return true;
-    }
-
-    return (target.role.pole?.code ?? null) === poleCode;
   }
 
   /** Rôle avec périmètre org : filiales = rôle strictement scoppé à leur id ; maison mère = scope null ou égal à l’org cible. */

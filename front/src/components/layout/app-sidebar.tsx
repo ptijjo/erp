@@ -2,9 +2,12 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { ChevronRight, LogOut } from "lucide-react";
 
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import {
   buildNavSections,
@@ -12,7 +15,8 @@ import {
   type NavItem,
 } from "~/lib/dashboard-navigation";
 import { useSidebar } from "~/components/layout/sidebar-context";
-import { isMainOrganization, useMe } from "~/hooks/use-me";
+import { isMainOrganization, meQueryKey, useMe } from "~/hooks/use-me";
+import { api } from "~/lib/api";
 import { cn } from "~/lib/utils";
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
@@ -21,7 +25,7 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       href={item.href}
       className={cn(
-        "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        "group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
         active
           ? "bg-sidebar-accent text-white shadow-sm"
           : "text-sidebar-foreground/80 hover:bg-white/8 hover:text-sidebar-foreground",
@@ -37,16 +41,32 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
         strokeWidth={1.75}
       />
       <span className="truncate">{item.label}</span>
+      {active ? (
+        <ChevronRight className="ml-auto size-4 shrink-0 text-white/90" />
+      ) : null}
     </Link>
   );
 }
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: me } = useMe();
   const { mobileOpen, setMobileOpen } = useSidebar();
   const sections = buildNavSections(me);
   const isHq = me != null && isMainOrganization(me);
+
+  async function handleLogout() {
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      /* sortie locale */
+    }
+    await queryClient.invalidateQueries({ queryKey: meQueryKey });
+    queryClient.removeQueries({ queryKey: meQueryKey });
+    router.replace("/");
+  }
 
   useEffect(() => {
     setMobileOpen(false);
@@ -74,10 +94,10 @@ export function AppSidebar() {
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold tracking-wide text-white">
-            VIFAA
+            {isHq ? "VIFAA HOLDING" : "VIFAA"}
           </p>
           <p className="truncate text-[11px] text-sidebar-foreground/60">
-            ERP groupe
+            {isHq ? "Console maison mère" : "ERP filiale"}
           </p>
         </div>
       </div>
@@ -116,10 +136,16 @@ export function AppSidebar() {
         ))}
       </nav>
 
-      <div className="shrink-0 border-t border-sidebar-border px-4 py-3">
-        <p className="text-[10px] text-sidebar-foreground/40">
-          © VIFAA · Console métier
-        </p>
+      <div className="shrink-0 border-t border-sidebar-border px-2 py-3">
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full justify-start gap-3 px-3 text-sidebar-foreground/80 hover:bg-white/8 hover:text-sidebar-foreground"
+          onClick={() => void handleLogout()}
+        >
+          <LogOut className="size-[18px]" strokeWidth={1.75} />
+          Déconnexion
+        </Button>
       </div>
     </aside>
     </>

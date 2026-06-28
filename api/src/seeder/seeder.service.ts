@@ -322,6 +322,38 @@ export class SeederService implements OnModuleInit {
         Logger.log(
           'Permissions SessionCaisse alignées sur les rôles ayant read:Stock',
         );
+
+        const stockExtendedNames = [
+          'read:StockMovement',
+          'read:StockTransfer',
+          'create:StockTransfer',
+          'update:StockTransfer',
+          'delete:StockTransfer',
+        ] as const;
+        for (const permName of stockExtendedNames) {
+          const perm = await this.prisma.permission.findUnique({
+            where: { name: permName },
+          });
+          if (!perm) continue;
+          for (const { roleId } of roleLinks) {
+            await this.prisma.permissionRole.upsert({
+              where: {
+                permissionId_roleId: {
+                  permissionId: perm.id,
+                  roleId,
+                },
+              },
+              create: {
+                permissionId: perm.id,
+                roleId,
+              },
+              update: {},
+            });
+          }
+        }
+        Logger.log(
+          'Permissions StockMovement / StockTransfer alignées sur read:Stock',
+        );
       }
 
       const supplierNames = [
@@ -733,6 +765,62 @@ export class SeederService implements OnModuleInit {
           'Permissions clôture comptable (manage) liées aux rôles direction',
         );
       }
+
+      const poleModuleLinks: Array<{
+        roleName: string;
+        permissions: readonly string[];
+      }> = [
+        {
+          roleName: 'DIRECTOR_ARCHITECTURE_HERITAGE',
+          permissions: [
+            'read:HeritageAsset',
+            'create:HeritageAsset',
+            'update:HeritageAsset',
+            'delete:HeritageAsset',
+          ],
+        },
+        {
+          roleName: 'DIRECTOR_LEGAL',
+          permissions: [
+            'read:LegalContract',
+            'create:LegalContract',
+            'update:LegalContract',
+            'delete:LegalContract',
+          ],
+        },
+        {
+          roleName: 'DIRECTOR_PRODUCTION',
+          permissions: [
+            'read:ProductionOrder',
+            'create:ProductionOrder',
+            'update:ProductionOrder',
+            'delete:ProductionOrder',
+          ],
+        },
+      ];
+      for (const link of poleModuleLinks) {
+        const role = await this.prisma.role.findUnique({
+          where: { name: link.roleName },
+        });
+        if (!role) continue;
+        for (const permName of link.permissions) {
+          const perm = await this.prisma.permission.findUnique({
+            where: { name: permName },
+          });
+          if (!perm) continue;
+          await this.prisma.permissionRole.upsert({
+            where: {
+              permissionId_roleId: {
+                permissionId: perm.id,
+                roleId: role.id,
+              },
+            },
+            create: { permissionId: perm.id, roleId: role.id },
+            update: {},
+          });
+        }
+      }
+      Logger.log('Permissions modules pôle (Patrimoine, Juridique, Production) liées');
     } catch (error) {
       Logger.error(error);
       throw error;

@@ -118,7 +118,7 @@ Schémas Zod : règles métier front (ex. mot de passe, pôle obligatoire si mai
 
 ## Source de vérité API
 
-- Dossier `api/` : routes, DTO, CASL, `casl-permission-names.ts`.
+- Dossier `C:\dev\erp\api` : routes, DTO, CASL, `casl-permission-names.ts`.
 - Avant un écran ou un appel : lire le contrôleur Nest et la permission associée.
 - Découpage domaines / phases : `03-conception-decoupage.mdc` + `api/.cursor/rules/03-conception-decoupage.mdc`.
 

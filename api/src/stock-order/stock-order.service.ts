@@ -12,8 +12,9 @@ import {
 import { assertProductUsableForOrganization } from '../product/product-subsidiary-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { BudgetStockLinkService } from '../budget/budget-stock-link.service';
-import { OrganizationType, StockOrderStatus } from '../generated/prisma/client';
+import { OrganizationType, StockMovementType, StockOrderStatus } from '../generated/prisma/client';
 import type { Prisma, StockOrder } from '../generated/prisma/client';
+import { recordStockMovement } from '../stock-movement/stock-movement.util';
 import {
   type BudgetLinkResult,
   type StockOrderResponseDto,
@@ -265,6 +266,16 @@ export class StockOrderService {
           update: {
             quantity: { increment: row.quantity },
           },
+        });
+
+        await recordStockMovement(tx, {
+          organizationId: row.subsidiaryOrganizationId,
+          productId: row.productId,
+          quantityDelta: row.quantity,
+          type: StockMovementType.RECEIPT_STOCK_ORDER,
+          referenceType: 'StockOrder',
+          referenceId: row.id,
+          recordedByUserId: viewer.sub,
         });
 
         const fullOrder = await tx.stockOrder.findUniqueOrThrow({

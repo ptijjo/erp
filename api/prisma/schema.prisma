@@ -117,6 +117,43 @@ enum SessionCaisseStatut {
   CLOTUREE
 }
 
+enum StockMovementType {
+  RECEIPT_STOCK_ORDER
+  SALE
+  SALE_RETURN
+  ADJUSTMENT
+  TRANSFER_OUT
+  TRANSFER_IN
+  INVENTORY
+}
+
+enum StockTransferStatus {
+  PENDING
+  SHIPPED
+  RECEIVED
+  CANCELLED
+}
+
+enum HeritageAssetStatus {
+  ACTIVE
+  MAINTENANCE
+  RETIRED
+}
+
+enum LegalContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+enum ProductionOrderStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 model User {
   id              String    @id @default(uuid())
   email           String    @unique
@@ -141,8 +178,11 @@ model User {
   auditLogs      AuditLog[]
   stockOrders    StockOrder[]
   ventes         Vente[]
+  venteReturns   VenteReturn[]
   sessionsCaisseOpened SessionCaisse[] @relation("SessionCaisseOpenedBy")
   sessionsCaisseClosed SessionCaisse[] @relation("SessionCaisseClosedBy")
+  stockTransfersRequested StockTransfer[]
+  stockMovementsRecorded  StockMovement[]
   budgetExpenses              BudgetExpense[]
   budgetsSubmitted            Budget[]                  @relation("BudgetSubmittedBy")
   budgetsApproved             Budget[]                  @relation("BudgetApprovedBy")
@@ -217,7 +257,14 @@ model Organization {
   catalogProducts   OrganizationCatalogProduct[]
   stockOrders       StockOrder[]
   ventes            Vente[]
+  venteReturns      VenteReturn[]
   sessionsCaisse    SessionCaisse[]
+  stockMovements    StockMovement[]
+  stockTransfersOut StockTransfer[] @relation("StockTransferFrom")
+  stockTransfersIn  StockTransfer[] @relation("StockTransferTo")
+  heritageAssets    HeritageAsset[]
+  legalContracts    LegalContract[]
+  productionOrders  ProductionOrder[]
   /// Budgets où cette organisation est la filiale concernée.
   budgets           Budget[]
 
@@ -387,6 +434,10 @@ model Product {
   organizationCatalogEntries OrganizationCatalogProduct[]
   stockOrders                StockOrder[]
   venteLines                 VenteLine[]
+  stockMovements             StockMovement[]
+  stockTransfers             StockTransfer[]
+  productionOrders           ProductionOrder[]
+  venteReturnLines           VenteReturnLine[]
 
   @@index([offeredToSubsidiaries])
 }
@@ -450,6 +501,7 @@ model Vente {
 
   lines     VenteLine[]
   paiements VentePaiement[]
+  returns   VenteReturn[]
 
   @@unique([sessionCaisseId, numeroTicket])
   @@index([organizationId])
@@ -898,4 +950,161 @@ model Message {
 
   @@index([threadId, createdAt])
   @@index([senderId])
+}
+
+/// Journal des mouvements de stock (traçabilité filiale).
+model StockMovement {
+  id             String            @id @default(uuid())
+  createdAt      DateTime          @default(now())
+  quantityDelta  Int
+  type           StockMovementType
+  referenceType  String?
+  referenceId    String?
+  label          String?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  recordedByUserId String?
+  recordedBy       User?   @relation(fields: [recordedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([productId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+/// Transfert de stock entre organisations (filiale ↔ filiale ou maison mère ↔ filiale).
+model StockTransfer {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fromOrganizationId String
+  fromOrganization   Organization @relation("StockTransferFrom", fields: [fromOrganizationId], references: [id], onDelete: Restrict)
+
+  toOrganizationId String
+  toOrganization   Organization @relation("StockTransferTo", fields: [toOrganizationId], references: [id], onDelete: Restrict)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  quantity Int
+  status   StockTransferStatus @default(PENDING)
+  note     String?
+
+  requestedByUserId String?
+  requestedBy       User?   @relation(fields: [requestedByUserId], references: [id], onDelete: SetNull)
+
+  shippedAt  DateTime?
+  receivedAt DateTime?
+
+  @@index([fromOrganizationId])
+  @@index([toOrganizationId])
+  @@index([status])
+  @@index([productId])
+}
+
+/// Retour / avoir sur une vente confirmée (réintègre le stock).
+model VenteReturn {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  reason    String?
+  totalAmount Decimal @default(0)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  venteId String
+  vente   Vente  @relation(fields: [venteId], references: [id], onDelete: Restrict)
+
+  recordedByUserId String?
+  recordedBy       User?   @relation(fields: [recordedByUserId], references: [id], onDelete: SetNull)
+
+  lines VenteReturnLine[]
+
+  @@index([organizationId])
+  @@index([venteId])
+  @@index([createdAt])
+}
+
+model VenteReturnLine {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  quantity  Int
+  unitPrice Decimal
+
+  venteReturnId String
+  venteReturn   VenteReturn @relation(fields: [venteReturnId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([venteReturnId])
+  @@index([productId])
+}
+
+/// Patrimoine / actifs (pôle architecture & héritage).
+model HeritageAsset {
+  id          String              @id @default(uuid())
+  name        String
+  description String?
+  location    String?
+  acquiredAt  DateTime?
+  value       Decimal?
+  status      HeritageAssetStatus @default(ACTIVE)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+/// Contrats juridiques (pôle legal).
+model LegalContract {
+  id        String              @id @default(uuid())
+  title     String
+  partyName String
+  startDate DateTime?
+  endDate   DateTime?
+  status    LegalContractStatus @default(DRAFT)
+  notes     String?
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([endDate])
+}
+
+/// Ordre de production (pôle production).
+model ProductionOrder {
+  id          String                @id @default(uuid())
+  title       String
+  quantity    Int
+  status      ProductionOrderStatus @default(PLANNED)
+  scheduledAt DateTime?
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([productId])
 }

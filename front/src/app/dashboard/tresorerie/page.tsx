@@ -121,7 +121,7 @@ export default function TresoreriePage() {
     return (
       <PageShell>
         <PageHeader
-          title="Trésorerie"
+          title="Clôtures comptables"
           description="Vous n’avez pas accès aux clôtures comptables."
         />
       </PageShell>
@@ -131,7 +131,7 @@ export default function TresoreriePage() {
   return (
     <PageShell>
       <PageHeader
-        title="Trésorerie — clôtures mensuelles"
+        title="Clôtures comptables"
         description="Verrouillez un mois pour empêcher toute vente ou dépense rétroactive sur cette période."
       />
 

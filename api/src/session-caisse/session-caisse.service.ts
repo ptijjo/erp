@@ -146,15 +146,37 @@ export class SessionCaisseService {
     }
     assertOrganizationResourceAccess(viewer, session.organizationId);
 
-    const drafts = await this.prisma.vente.count({
+    const draftsWithLines = await this.prisma.vente.count({
+      where: {
+        sessionCaisseId: id,
+        status: VenteStatut.DRAFT,
+        lines: { some: {} },
+      },
+    });
+    if (draftsWithLines > 0) {
+      throw new BadRequestException(
+        `${draftsWithLines} vente(s) en brouillon : validez ou annulez-les avant la fin de service.`,
+      );
+    }
+
+    await this.prisma.vente.updateMany({
+      where: {
+        sessionCaisseId: id,
+        status: VenteStatut.DRAFT,
+        lines: { none: {} },
+      },
+      data: { status: VenteStatut.CANCELLED },
+    });
+
+    const remainingDrafts = await this.prisma.vente.count({
       where: {
         sessionCaisseId: id,
         status: VenteStatut.DRAFT,
       },
     });
-    if (drafts > 0) {
+    if (remainingDrafts > 0) {
       throw new BadRequestException(
-        `${drafts} vente(s) en brouillon : validez ou annulez-les avant la fin de service.`,
+        `${remainingDrafts} vente(s) en brouillon : validez ou annulez-les avant la fin de service.`,
       );
     }
 

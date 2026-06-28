@@ -55,8 +55,23 @@ describe('StockOrderService', () => {
   let service: StockOrderService;
   let findMany: jest.Mock;
   let findUnique: jest.Mock;
-  let create: jest.Mock;
-  let update: jest.Mock;
+  let create: jest.Mock<
+    Promise<unknown>,
+    [
+      {
+        data: {
+          subsidiaryOrganizationId: string;
+          requestedByUserId: string;
+          quantity: number;
+          unitPrice: number;
+        };
+      },
+    ]
+  >;
+  let update: jest.Mock<
+    Promise<unknown>,
+    [{ where: { id: string }; data: { status: StockOrderStatus } }]
+  >;
   let organizationFindUnique: jest.Mock;
   let productSupplierFindUnique: jest.Mock;
   let supplierFindUnique: jest.Mock;
@@ -66,22 +81,45 @@ describe('StockOrderService', () => {
   beforeEach(async () => {
     findMany = jest.fn().mockResolvedValue([pendingOrder]);
     findUnique = jest.fn().mockResolvedValue(pendingOrder);
-    create = jest.fn().mockResolvedValue({ ...pendingOrder, id: 'order-new' });
-    update = jest.fn().mockResolvedValue({
-      ...pendingOrder,
-      status: StockOrderStatus.CANCELLED,
-    });
+    create = jest
+      .fn<
+        Promise<unknown>,
+        [
+          {
+            data: {
+              subsidiaryOrganizationId: string;
+              requestedByUserId: string;
+              quantity: number;
+              unitPrice: number;
+            };
+          },
+        ]
+      >()
+      .mockResolvedValue({ ...pendingOrder, id: 'order-new' });
+    update = jest
+      .fn<
+        Promise<unknown>,
+        [{ where: { id: string }; data: { status: StockOrderStatus } }]
+      >()
+      .mockResolvedValue({
+        ...pendingOrder,
+        status: StockOrderStatus.CANCELLED,
+      });
     organizationFindUnique = jest
       .fn()
       .mockResolvedValue({ organizationType: 'SUBSIDIARY' });
-    productSupplierFindUnique = jest.fn().mockResolvedValue({ productId: 'prod-1' });
+    productSupplierFindUnique = jest
+      .fn()
+      .mockResolvedValue({ productId: 'prod-1' });
     supplierFindUnique = jest.fn().mockResolvedValue({ price: 100 });
     stockUpsert = jest.fn().mockResolvedValue({});
     transaction = jest.fn(
-      async (cb: (tx: {
-        stockOrder: { update: jest.Mock; findUniqueOrThrow: jest.Mock };
-        stock: { upsert: jest.Mock };
-      }) => unknown) => {
+      (
+        cb: (tx: {
+          stockOrder: { update: jest.Mock; findUniqueOrThrow: jest.Mock };
+          stock: { upsert: jest.Mock };
+        }) => unknown,
+      ) => {
         const confirmedForBudget = {
           id: pendingOrder.id,
           subsidiaryOrganizationId: pendingOrder.subsidiaryOrganizationId,
@@ -105,6 +143,7 @@ describe('StockOrderService', () => {
               .mockResolvedValueOnce(confirmedWithInclude),
           },
           stock: { upsert: stockUpsert },
+          stockMovement: { create: jest.fn().mockResolvedValue({}) },
         };
         return cb(tx);
       },
@@ -172,23 +211,19 @@ describe('StockOrderService', () => {
 
     it('crée une commande PENDING pour la filiale', async () => {
       await service.create(dto, subsidiaryViewer);
-      expect(create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            subsidiaryOrganizationId: 'org-sub',
-            requestedByUserId: 'u-sub',
-            quantity: 5,
-            unitPrice: 100,
-          }),
-        }),
-      );
+      expect(create).toHaveBeenCalledTimes(1);
+      const callArg = create.mock.calls[0][0];
+      expect(callArg.data.subsidiaryOrganizationId).toBe('org-sub');
+      expect(callArg.data.requestedByUserId).toBe('u-sub');
+      expect(callArg.data.quantity).toBe(5);
+      expect(callArg.data.unitPrice).toBe(100);
     });
 
     it('refuse si le fournisseur n’est pas lié au produit', async () => {
       productSupplierFindUnique.mockResolvedValueOnce(null);
-      await expect(service.create(dto, subsidiaryViewer)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.create(dto, subsidiaryViewer),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
@@ -199,11 +234,10 @@ describe('StockOrderService', () => {
         StockOrderStatus.CANCELLED,
         mainViewer,
       );
-      expect(update).toHaveBeenCalledWith({
-        where: { id: 'order-1' },
-        data: { status: StockOrderStatus.CANCELLED },
-        include: expect.any(Object),
-      });
+      expect(update).toHaveBeenCalledTimes(1);
+      const updateCall = update.mock.calls[0][0];
+      expect(updateCall.where.id).toBe('order-1');
+      expect(updateCall.data.status).toBe(StockOrderStatus.CANCELLED);
     });
 
     it('ne peut pas confirmer une commande', async () => {
@@ -233,12 +267,10 @@ describe('StockOrderService', () => {
           {
             provide: BudgetStockLinkService,
             useValue: {
-              recordExpenseForConfirmedStockOrder: jest
-                .fn()
-                .mockResolvedValue({
-                  linked: false,
-                  reason: 'Solde insuffisant',
-                }),
+              recordExpenseForConfirmedStockOrder: jest.fn().mockResolvedValue({
+                linked: false,
+                reason: 'Solde insuffisant',
+              }),
             },
           },
           {

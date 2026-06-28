@@ -11,9 +11,10 @@ import { parseDecimal } from "~/lib/parse-decimal";
 type Props = {
   session: SessionCaisseCurrentDto;
   onCloseClick: () => void;
+  canClose?: boolean;
 };
 
-export function CaisseSessionBar({ session, onCloseClick }: Props) {
+export function CaisseSessionBar({ session, onCloseClick, canClose = true }: Props) {
   const { live } = session;
   const fond = parseDecimal(session.fondOuverture);
 
@@ -37,7 +38,7 @@ export function CaisseSessionBar({ session, onCloseClick }: Props) {
               Mes sessions
             </Link>
           </Button>
-          <Button variant="destructive" size="sm" onClick={onCloseClick}>
+          <Button variant="destructive" size="sm" onClick={onCloseClick} disabled={!canClose}>
             <LogOut className="mr-1 size-4" />
             Fin de service
           </Button>

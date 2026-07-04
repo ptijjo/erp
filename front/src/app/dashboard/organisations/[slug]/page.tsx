@@ -15,6 +15,7 @@ import {
 import { dashboardMainCenteredClass } from "~/lib/dashboard-styles";
 
 import OrganisationCatalogPanel from "../_components/OrganisationCatalogPanel";
+import { OrganisationDetailOverview } from "../_components/OrganisationDetailOverview";
 
 export default function OrganisationDetailPage() {
   const router = useRouter();
@@ -51,7 +52,10 @@ export default function OrganisationDetailPage() {
   return (
     <main className={dashboardMainCenteredClass}>
       <DashboardSubpageHeader
-        title={me && !isMainOrganization(me) ? "Mon organisation" : "Organisation"}
+        title={
+          org?.name ??
+          (me && !isMainOrganization(me) ? "Mon organisation" : "Organisation")
+        }
         backHref={showBackToOrgList ? "/dashboard/organisations" : "/dashboard"}
         backLabel={showBackToOrgList ? "Retour" : "Tableau de bord"}
       />
@@ -67,28 +71,13 @@ export default function OrganisationDetailPage() {
           Aucune organisation avec le slug <code className="font-mono">{slug}</code>.
         </p>
       ) : (
-        <div className="mt-8 max-w-xl space-y-3 text-gray-800">
-          <p>
-            <span className="font-semibold text-gray-900">Nom :</span> {org.name}
-          </p>
-          <p>
-            <span className="font-semibold text-gray-900">Slug :</span>{" "}
-            <code className="font-mono text-sm">{org.slug}</code>
-          </p>
-          <p>
-            <span className="font-semibold text-gray-900">Type :</span>{" "}
-            {org.organizationType}
-          </p>
-          {org.description ? (
-            <p>
-              <span className="font-semibold text-gray-900">Description :</span>{" "}
-              {org.description}
-            </p>
-          ) : null}
-          <p className="text-sm text-gray-500">
-            <span className="font-medium text-gray-700">Id :</span>{" "}
-            <code className="font-mono">{org.id}</code>
-          </p>
+        <div className="mt-8 flex w-full max-w-3xl flex-col gap-6">
+          <OrganisationDetailOverview
+            org={org}
+            canEdit={Boolean(
+              canUpdateOrganization && me && isMainOrganization(me),
+            )}
+          />
 
           {me && isMainOrganization(me) && org.organizationType === "SUBSIDIARY" ? (
             <OrganisationCatalogPanel

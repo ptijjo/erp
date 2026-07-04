@@ -250,7 +250,7 @@ export default function OrganisationCatalogPanel({
   );
 
   return (
-    <div className="mt-8 max-w-3xl rounded-xl border border-orange-200 bg-orange-50/40 p-5">
+    <div className="w-full rounded-xl border border-orange-200 bg-orange-50/40 p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">

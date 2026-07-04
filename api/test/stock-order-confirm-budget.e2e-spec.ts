@@ -53,7 +53,13 @@ describe('StockOrder confirm + budget (e2e)', () => {
       organizationType: OrganizationType.SUBSIDIARY,
     },
     supplier: { id: 'sup-1', name: 'Fournisseur E2E' },
-    requestedBy: { id: 'e2e-subsidiary-user-id', email: E2E_SUBSIDIARY_EMAIL },
+    requestedBy: {
+      id: 'e2e-subsidiary-user-id',
+      email: E2E_SUBSIDIARY_EMAIL,
+      firstName: null,
+      lastName: null,
+      profilePhotoUrl: null,
+    },
     budgetExpense: { id: 'exp-stock-1', amount: 3000 },
   };
 

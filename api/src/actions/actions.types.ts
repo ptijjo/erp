@@ -6,6 +6,14 @@ import type {
 
 export type ActionItemKind = 'MANUAL' | 'SYSTEM';
 
+export type ActionUserSummaryDto = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePhotoUrl: string | null;
+};
+
 export type ActionItemDto = {
   id: string;
   kind: ActionItemKind;
@@ -19,6 +27,8 @@ export type ActionItemDto = {
   organizationId?: string;
   organizationName?: string;
   assigneeUserId?: string | null;
+  /** Responsable affiché : assigné ou créateur si non assigné. */
+  assignee?: ActionUserSummaryDto | null;
   createdByUserId?: string;
   createdAt: string;
   completedAt: string | null;

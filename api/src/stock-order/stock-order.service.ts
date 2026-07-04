@@ -45,7 +45,15 @@ export class StockOrderService {
     },
     subsidiaryOrganization: true,
     supplier: true,
-    requestedBy: { select: { id: true, email: true } },
+    requestedBy: {
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        profilePhotoUrl: true,
+      },
+    },
     budgetExpense: { select: { id: true, amount: true } },
   } as const;
 

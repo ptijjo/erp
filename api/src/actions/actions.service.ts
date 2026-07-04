@@ -34,10 +34,22 @@ import type { DashboardAlertSeverity } from '../alerts/alerts.service';
 const taskInclude = {
   organization: { select: { name: true } },
   assignee: {
-    select: { id: true, firstName: true, lastName: true, email: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      profilePhotoUrl: true,
+    },
   },
   createdBy: {
-    select: { id: true, firstName: true, lastName: true, email: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      profilePhotoUrl: true,
+    },
   },
 } satisfies Prisma.TaskInclude;
 
@@ -393,6 +405,7 @@ export class ActionsService {
   }
 
   private toManualActionItem(row: TaskRow): ActionItemDto {
+    const responsible = row.assignee ?? row.createdBy;
     return {
       id: row.id,
       kind: 'MANUAL',
@@ -405,6 +418,13 @@ export class ActionsService {
       organizationId: row.organizationId,
       organizationName: row.organization.name,
       assigneeUserId: row.assigneeUserId,
+      assignee: {
+        id: responsible.id,
+        email: responsible.email,
+        firstName: responsible.firstName,
+        lastName: responsible.lastName,
+        profilePhotoUrl: responsible.profilePhotoUrl,
+      },
       createdByUserId: row.createdByUserId,
       createdAt: row.createdAt.toISOString(),
       completedAt: row.completedAt?.toISOString() ?? null,

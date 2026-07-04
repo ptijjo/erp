@@ -14,6 +14,8 @@ import {
   TASK_PRIORITY_LABEL,
   TASK_STATUS_LABEL,
 } from "~/app/dashboard/mes-actions/_lib/action-labels";
+import { UserProfileAvatar } from "~/app/dashboard/utilisateurs/_components/UserProfileAvatar";
+import { userDisplayName } from "~/app/dashboard/utilisateurs/_lib/user-display";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import {
@@ -23,7 +25,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { useMe } from "~/hooks/use-me";
 import type { ActionItemDto, TaskStatusDto } from "~/lib/api-types";
 import { cn } from "~/lib/utils";
 
@@ -84,18 +85,11 @@ export function ActionPriorityPill({ priority }: ActionPriorityPillProps) {
   );
 }
 
-function emailInitials(email: string) {
-  const local = email.split("@")[0] ?? email;
-  return local.slice(0, 2).toUpperCase();
-}
-
 type ActionOwnerCellProps = {
   action: ActionItemDto;
 };
 
 export function ActionOwnerCell({ action }: ActionOwnerCellProps) {
-  const { data: me } = useMe();
-
   if (action.kind === "SYSTEM") {
     return (
       <div className="flex items-center gap-1.5">
@@ -111,13 +105,25 @@ export function ActionOwnerCell({ action }: ActionOwnerCellProps) {
     );
   }
 
-  const initials = me?.email ? emailInitials(me.email) : "?";
+  const responsible = action.assignee;
+  if (!responsible) {
+    return <span className="text-muted-foreground text-sm">—</span>;
+  }
+
   return (
-    <Avatar size="sm" title={me?.email ?? "Moi"}>
-      <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-semibold">
-        {initials}
-      </AvatarFallback>
-    </Avatar>
+    <div className="flex min-w-[120px] items-center gap-2">
+      <UserProfileAvatar
+        email={responsible.email}
+        firstName={responsible.firstName}
+        lastName={responsible.lastName}
+        profilePhotoUrl={responsible.profilePhotoUrl}
+        size="md"
+        className="size-8 shrink-0 ring-1"
+      />
+      <span className="truncate text-sm font-medium text-foreground">
+        {userDisplayName(responsible)}
+      </span>
+    </div>
   );
 }
 

@@ -330,7 +330,13 @@ export type StockOrderDto = {
     slug: string;
     organizationType: "MAIN" | "SUBSIDIARY";
   };
-  requestedBy: { id: string; email: string } | null;
+  requestedBy: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    profilePhotoUrl: string | null;
+  } | null;
 };
 
 export type BudgetStatusDto =
@@ -890,6 +896,14 @@ export type TaskPriorityDto = "LOW" | "NORMAL" | "HIGH";
 export type TaskScopeDto = "USER" | "POLE" | "ORGANIZATION";
 export type ActionItemKindDto = "MANUAL" | "SYSTEM";
 
+export type ActionUserSummaryDto = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePhotoUrl: string | null;
+};
+
 export type ActionItemDto = {
   id: string;
   kind: ActionItemKindDto;
@@ -903,6 +917,8 @@ export type ActionItemDto = {
   organizationId?: string;
   organizationName?: string;
   assigneeUserId?: string | null;
+  /** Responsable affiché : assigné ou créateur si non assigné. */
+  assignee?: ActionUserSummaryDto | null;
   createdByUserId?: string;
   createdAt: string;
   completedAt: string | null;
@@ -930,11 +946,13 @@ export type TaskDto = {
     firstName: string | null;
     lastName: string | null;
     email: string;
+    profilePhotoUrl: string | null;
   } | null;
   createdBy: {
     id: string;
     firstName: string | null;
     lastName: string | null;
     email: string;
+    profilePhotoUrl: string | null;
   };
 };

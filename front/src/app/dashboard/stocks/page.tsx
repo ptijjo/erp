@@ -34,6 +34,7 @@ import {
   StockOrderBudgetBadge,
   StockOrderBudgetConfirmHint,
 } from "~/app/dashboard/stocks/_components/StockOrderBudgetBadge";
+import { StockOrderRequesterCell } from "~/app/dashboard/stocks/_components/StockOrderRequesterCell";
 
 const ORANGE = "#FF8C00";
 
@@ -867,8 +868,8 @@ export default function StocksPage() {
                         <td className="px-4 py-3">
                           <StockOrderBudgetBadge budgetLink={o.budgetLink} />
                         </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {o.requestedBy?.email ?? "—"}
+                        <td className="px-4 py-3">
+                          <StockOrderRequesterCell requester={o.requestedBy} />
                         </td>
                         <td className="px-4 py-3 text-right">
                           {canUpdateOrder && o.status === "PENDING" ? (

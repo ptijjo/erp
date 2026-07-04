@@ -100,6 +100,7 @@ export type UserDetailDto = {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  bio?: string | null;
   profilePhotoUrl?: string | null;
   organizationId: string;
   roleId: string;
@@ -494,6 +495,7 @@ export type MessagingContactDto = {
   email: string;
   firstName: string | null;
   lastName: string | null;
+  profilePhotoUrl: string | null;
   organizationId: string;
   organization: { name: string; organizationType: string };
   role: {
@@ -507,6 +509,7 @@ export type MessageSenderDto = {
   email: string;
   firstName: string | null;
   lastName: string | null;
+  profilePhotoUrl: string | null;
 };
 
 export type MessageDto = {
@@ -880,4 +883,58 @@ export type StockMovementDto = {
   productId: string;
   product: { id: string; name: string; qrCode: string | null };
   organization: { id: string; name: string; slug: string };
+};
+
+export type TaskStatusDto = "TODO" | "IN_PROGRESS" | "DONE";
+export type TaskPriorityDto = "LOW" | "NORMAL" | "HIGH";
+export type TaskScopeDto = "USER" | "POLE" | "ORGANIZATION";
+export type ActionItemKindDto = "MANUAL" | "SYSTEM";
+
+export type ActionItemDto = {
+  id: string;
+  kind: ActionItemKindDto;
+  title: string;
+  description?: string;
+  status: TaskStatusDto;
+  priority: TaskPriorityDto;
+  scope?: TaskScopeDto;
+  dueDate: string | null;
+  href?: string;
+  organizationId?: string;
+  organizationName?: string;
+  assigneeUserId?: string | null;
+  createdByUserId?: string;
+  createdAt: string;
+  completedAt: string | null;
+  editable: boolean;
+};
+
+export type TaskDto = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatusDto;
+  priority: TaskPriorityDto;
+  scope: TaskScopeDto;
+  dueDate: string | null;
+  completedAt: string | null;
+  organizationId: string;
+  assigneeUserId: string | null;
+  createdByUserId: string;
+  poleCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+  organization: { name: string };
+  assignee: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
+  createdBy: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  };
 };

@@ -10,15 +10,20 @@ import { RealtimeHubService } from '../realtime/realtime-hub.service';
 import { MessagingPolicyService } from './messaging-policy.service';
 import type { CreateThreadDto, SendMessageDto } from './dto/messaging.dto';
 
+const messagingUserPublicSelect = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  profilePhotoUrl: true,
+} as const;
+
 const threadInclude = {
   participants: {
     include: {
       user: {
         select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
+          ...messagingUserPublicSelect,
           organization: { select: { id: true, name: true, organizationType: true } },
         },
       },
@@ -29,7 +34,7 @@ const threadInclude = {
     take: 1,
     include: {
       sender: {
-        select: { id: true, email: true, firstName: true, lastName: true },
+        select: messagingUserPublicSelect,
       },
     },
   },
@@ -61,10 +66,7 @@ export class MessagingService {
       },
       take: Math.min(limit, 50),
       select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
+        ...messagingUserPublicSelect,
         organizationId: true,
         organization: { select: { name: true, organizationType: true } },
         role: {
@@ -124,7 +126,7 @@ export class MessagingService {
       take: Math.min(limit, 200),
       include: {
         sender: {
-          select: { id: true, email: true, firstName: true, lastName: true },
+          select: messagingUserPublicSelect,
         },
       },
     });
@@ -198,7 +200,7 @@ export class MessagingService {
         },
         include: {
           sender: {
-            select: { id: true, email: true, firstName: true, lastName: true },
+            select: messagingUserPublicSelect,
           },
         },
       });

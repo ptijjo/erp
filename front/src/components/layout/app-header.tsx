@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, LogOut, Menu, Volume2, VolumeX } from "lucide-react";
+import { ChevronDown, LogOut, Menu, UserRound, Volume2, VolumeX } from "lucide-react";
 
 import { UserProfileAvatar } from "~/app/dashboard/utilisateurs/_components/UserProfileAvatar";
 import { userDisplayName } from "~/app/dashboard/utilisateurs/_lib/user-display";
@@ -113,50 +114,62 @@ export function AppHeader({ showMenu = true }: AppHeaderProps) {
           {isMainOrganization(me) ? "Maison mère" : "Filiale"}
         </Badge>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="h-10 gap-2 px-2 hover:bg-accent"
-            >
-              <UserProfileAvatar
-                email={profile?.email ?? me.email}
-                firstName={profile?.firstName}
-                lastName={profile?.lastName}
-                profilePhotoUrl={profile?.profilePhotoUrl}
-                size="md"
-                className="size-8 ring-0 ring-offset-0"
-              />
-              <div className="hidden min-w-0 text-left md:block">
-                <p className="truncate text-sm font-medium leading-none">
-                  {displayName}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {me.email}
-                </p>
-              </div>
-              <ChevronDown className="size-4 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="font-normal">
-              <p className="text-sm font-medium">{me.organisationName}</p>
-              <p className="text-xs text-muted-foreground">{me.email}</p>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={toggleSounds}>
-              {soundEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
-              {soundEnabled ? "Désactiver les sons" : "Activer les sons"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={() => void handleLogout()}
-            >
-              <LogOut className="size-4" />
-              Déconnexion
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center">
+          <Link
+            href="/dashboard/profil"
+            className="hover:bg-accent flex h-10 items-center gap-2 rounded-md px-2 transition-colors"
+            aria-label="Mon profil"
+          >
+            <UserProfileAvatar
+              email={profile?.email ?? me.email}
+              firstName={profile?.firstName}
+              lastName={profile?.lastName}
+              profilePhotoUrl={profile?.profilePhotoUrl}
+              size="md"
+              className="size-8 ring-0 ring-offset-0"
+            />
+            <span className="hidden max-w-[12rem] truncate text-sm font-medium md:inline">
+              {displayName}
+            </span>
+          </Link>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 shrink-0"
+                aria-label="Menu compte"
+              >
+                <ChevronDown className="size-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                <p className="text-sm font-medium">{displayName}</p>
+                <p className="text-xs text-muted-foreground">{me.organisationName}</p>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/profil">
+                  <UserRound className="size-4" />
+                  Mon profil
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleSounds}>
+                {soundEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
+                {soundEnabled ? "Désactiver les sons" : "Activer les sons"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => void handleLogout()}
+              >
+                <LogOut className="size-4" />
+                Déconnexion
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   );

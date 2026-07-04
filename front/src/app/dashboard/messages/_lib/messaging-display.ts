@@ -1,12 +1,15 @@
 import type { MessageSenderDto } from "~/lib/api-types";
+import {
+  userDisplayName,
+  userInitials,
+} from "~/app/dashboard/utilisateurs/_lib/user-display";
 
 export function displayName(c: {
   firstName: string | null;
   lastName: string | null;
   email: string;
 }) {
-  const n = `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim();
-  return n || c.email;
+  return userDisplayName(c);
 }
 
 export function contactInitials(c: {
@@ -14,11 +17,7 @@ export function contactInitials(c: {
   lastName: string | null;
   email: string;
 }) {
-  if (c.firstName && c.lastName) {
-    return `${c.firstName[0] ?? ""}${c.lastName[0] ?? ""}`.toUpperCase();
-  }
-  if (c.firstName) return c.firstName.slice(0, 2).toUpperCase();
-  return c.email.slice(0, 2).toUpperCase();
+  return userInitials(c);
 }
 
 export function threadTitle(participants: MessageSenderDto[]) {

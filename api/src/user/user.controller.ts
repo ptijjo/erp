@@ -6,15 +6,20 @@ import {
   Param,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
 import { CheckPolicies } from '../casl/check-policies.decorator';
 import { PoliciesGuard } from '../casl/policies.guard';
+import { PROFILE_AVATAR_MAX_INPUT_BYTES } from '../storage/image-processor.service';
 import { UserService } from './user.service';
-import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { CreateUserDto, UpdateMyProfileDto, UpdateUserDto } from './dto/user.dto';
 
 @Controller('user')
 export class UserController {
@@ -25,6 +30,15 @@ export class UserController {
   @CheckPolicies({ action: 'read', subject: 'User' })
   getUsers(@CurrentUser() viewer: AuthenticatedUser) {
     return this.userService.findAll(viewer);
+  }
+
+  @Patch('me/profile')
+  @UseGuards(JwtAuthGuard)
+  updateMyProfile(
+    @Body() dto: UpdateMyProfileDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.userService.updateMyProfile(viewer.sub, dto);
   }
 
   @Get(':id')
@@ -56,6 +70,31 @@ export class UserController {
     @CurrentUser() viewer: AuthenticatedUser,
   ) {
     return this.userService.update(id, user, viewer);
+  }
+
+  @Post(':id/profile-photo')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      storage: memoryStorage(),
+      limits: { fileSize: PROFILE_AVATAR_MAX_INPUT_BYTES },
+    }),
+  )
+  uploadProfilePhoto(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.userService.uploadProfilePhoto(id, file, viewer);
+  }
+
+  @Delete(':id/profile-photo')
+  @UseGuards(JwtAuthGuard)
+  removeProfilePhoto(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.userService.removeProfilePhoto(id, viewer);
   }
 
   @Delete(':id')

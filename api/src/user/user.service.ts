@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { CreateUserDto, UpdateMyProfileDto, UpdateUserDto } from './dto/user.dto';
 import {
   assertOrganizationResourceAccess,
   isMainOrganizationUser,
@@ -28,6 +28,9 @@ import type {
   UserWithRoleAndOrg,
 } from './user.types';
 import { OrganizationType } from '../generated/prisma/client';
+import { ImageProcessorService } from '../storage/image-processor.service';
+import { R2ObjectStorageService } from '../storage/r2-object-storage.service';
+import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 
 export type {
   SafeUserDetail,
@@ -52,7 +55,12 @@ export class UserService {
     },
   } as const;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly imageProcessor: ImageProcessorService,
+    private readonly objectStorage: R2ObjectStorageService,
+    private readonly caslAbilityFactory: CaslAbilityFactory,
+  ) {}
 
   /**
    * Filtre liste utilisateurs : filiales = **toujours** l’organisation du JWT (jamais de liste globale).
@@ -320,6 +328,14 @@ export class UserService {
         'Accès limité aux utilisateurs visibles pour votre périmètre (organisation / pôle).',
       );
     }
+    if (
+      (user.firstName !== undefined || user.lastName !== undefined) &&
+      !isFullAccessRoleName(viewer.role.name)
+    ) {
+      throw new ForbiddenException(
+        'Seuls ADMIN, le directeur général et le directeur des opérations peuvent modifier le prénom et le nom.',
+      );
+    }
     const nextOrganizationId = isMainOrganizationUser(viewer)
       ? (user.organizationId ?? existingUser.organizationId)
       : existingUser.organizationId;
@@ -341,13 +357,6 @@ export class UserService {
         : user.lastName.trim() === ''
           ? null
           : user.lastName.trim();
-    const nextProfilePhotoUrl =
-      user.profilePhotoUrl === undefined
-        ? undefined
-        : user.profilePhotoUrl === null ||
-            user.profilePhotoUrl.trim() === ''
-          ? null
-          : user.profilePhotoUrl.trim();
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: {
@@ -361,7 +370,6 @@ export class UserService {
         roleId: user.roleId ?? undefined,
         firstName: nextFirstName,
         lastName: nextLastName,
-        profilePhotoUrl: nextProfilePhotoUrl,
       },
       include: { role: true },
     });
@@ -406,5 +414,130 @@ export class UserService {
       organizationId: existingUser.organizationId,
       roleId: existingUser.roleId,
     };
+  };
+
+  /**
+   * Photo de profil : soi-même, ou modération par un utilisateur avec update:User
+   * dans le périmètre org/pôle (ex. admin remplaçant une photo compromettante).
+   */
+  private async assertProfilePhotoAccess(
+    viewer: AuthenticatedUser,
+    target: {
+      id: string;
+      organizationId: string;
+      role: { pole: { code: string } | null };
+    },
+  ): Promise<void> {
+    if (viewer.sub === target.id) {
+      return;
+    }
+
+    const ability = await this.caslAbilityFactory.createForUser(viewer);
+    if (!ability.can('update', 'User')) {
+      throw new ForbiddenException(
+        'Vous ne pouvez modifier que votre propre photo de profil.',
+      );
+    }
+
+    if (
+      !this.userTargetInViewerScope(viewer, {
+        organizationId: target.organizationId,
+        role: target.role,
+      })
+    ) {
+      throw new ForbiddenException(
+        'Accès limité aux utilisateurs visibles pour votre périmètre.',
+      );
+    }
+  }
+
+  public uploadProfilePhoto = async (
+    id: string,
+    file: Express.Multer.File,
+    viewer: AuthenticatedUser,
+  ): Promise<SafeUserWithRole & { profilePhotoUrl: string | null }> => {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        role: { include: { pole: { select: { code: true } } } },
+      },
+    });
+    if (!existingUser) {
+      throw new NotFoundException('Utilisateur non trouvé');
+    }
+
+    await this.assertProfilePhotoAccess(viewer, existingUser);
+
+    const processed = await this.imageProcessor.processProfileAvatar(file);
+    const key = this.objectStorage.buildProfilePhotoKey(id);
+    const uploaded = await this.objectStorage.uploadProfilePhoto(
+      key,
+      processed,
+    );
+
+    if (existingUser.profilePhotoUrl) {
+      await this.objectStorage.deleteByPublicUrl(existingUser.profilePhotoUrl);
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id },
+      data: { profilePhotoUrl: uploaded.publicUrl },
+      include: { role: true },
+    });
+
+    const { password: _p, ...rest } = updatedUser;
+    return rest;
+  };
+
+  public removeProfilePhoto = async (
+    id: string,
+    viewer: AuthenticatedUser,
+  ): Promise<SafeUserWithRole & { profilePhotoUrl: string | null }> => {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        role: { include: { pole: { select: { code: true } } } },
+      },
+    });
+    if (!existingUser) {
+      throw new NotFoundException('Utilisateur non trouvé');
+    }
+
+    await this.assertProfilePhotoAccess(viewer, existingUser);
+
+    if (existingUser.profilePhotoUrl) {
+      await this.objectStorage.deleteByPublicUrl(existingUser.profilePhotoUrl);
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id },
+      data: { profilePhotoUrl: null },
+      include: { role: true },
+    });
+
+    const { password: _p, ...rest } = updatedUser;
+    return rest;
+  };
+
+  public updateMyProfile = async (
+    userId: string,
+    dto: UpdateMyProfileDto,
+  ): Promise<
+    SafeUserWithRole & { bio: string | null; profilePhotoUrl: string | null }
+  > => {
+    if (dto.bio === undefined) {
+      throw new BadRequestException('Aucune donnée à mettre à jour.');
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        bio: dto.bio.trim() === '' ? null : dto.bio.trim(),
+      },
+      include: { role: true },
+    });
+
+    const { password: _p, ...rest } = updatedUser;
+    return rest;
   };
 }

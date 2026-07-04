@@ -37,6 +37,7 @@ export const KNOWN_POLICY_SUBJECTS = [
   "AccountingPeriod",
   "Notification",
   "Message",
+  "Task",
   "Supplier",
   "Budget",
   "BudgetExpense",
@@ -122,6 +123,10 @@ export const CASL_PERMISSION_NAMES = [
   "read:Message",
   "create:Message",
   "update:Message",
+  "read:Task",
+  "create:Task",
+  "update:Task",
+  "delete:Task",
   "read:Supplier",
   "create:Supplier",
   "update:Supplier",
@@ -199,6 +204,7 @@ export const SUBJECT_LABELS: Record<PolicySubject, string> = {
   AccountingPeriod: "Clôtures comptables",
   Notification: "Notifications",
   Message: "Messagerie interne",
+  Task: "Mes actions (agenda)",
   Supplier: "Fournisseurs",
   Budget: "Budgets",
   BudgetExpense: "Sorties budgétaires",
@@ -238,12 +244,20 @@ export const POLICY_SUBJECT_GROUPS: {
     subjects: [
       "Stock",
       "StockOrder",
+      "StockMovement",
+      "StockTransfer",
       "Vente",
       "SessionCaisse",
       "AccountingPeriod",
       "Notification",
       "Message",
+      "Task",
     ],
+  },
+  {
+    id: "poles",
+    label: "Pôles métier",
+    subjects: ["HeritageAsset", "LegalContract", "ProductionOrder"],
   },
   {
     id: "finance",
@@ -310,6 +324,16 @@ export function subjectForPermissionName(name: string): PolicySubject | null {
   return KNOWN_POLICY_SUBJECTS.includes(parsed.subject as PolicySubject)
     ? (parsed.subject as PolicySubject)
     : null;
+}
+
+export function actionLabelForPermissionName(name: string): string {
+  const parsed = parsePermissionName(name);
+  if (!parsed) {
+    if (name === "read:all") return "Lecture";
+    if (name === "manage:all") return "Gestion";
+    return "";
+  }
+  return ACTION_LABEL[parsed.action] ?? parsed.action;
 }
 
 export function groupLabelForPermissionName(name: string): string {

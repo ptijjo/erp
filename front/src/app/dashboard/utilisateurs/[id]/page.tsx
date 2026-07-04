@@ -15,6 +15,7 @@ import { dashboardBackLinkClass, dashboardMainClass } from "~/lib/dashboard-styl
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { rolePoleLabel } from "../_lib/pole-label";
 import { userDisplayName } from "../_lib/user-display";
+import { ProfilePhotoUpload } from "../_components/ProfilePhotoUpload";
 import { UserProfileAvatar } from "../_components/UserProfileAvatar";
 
 export default function UserDetailPage() {
@@ -42,6 +43,7 @@ export default function UserDetailPage() {
   });
 
   const isSelf = me != null && user != null && me.sub === user.id;
+  const canManagePhoto = isSelf || canUpdateUser;
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -127,15 +129,41 @@ export default function UserDetailPage() {
         <p className="mt-8 text-gray-600">Chargement…</p>
       ) : user ? (
         <div className="mt-8 max-w-2xl">
-          <div className="flex flex-col gap-6 border-b border-gray-200 pb-8 sm:flex-row sm:items-center">
-            <UserProfileAvatar
+          {canManagePhoto ? (
+            <ProfilePhotoUpload
+              userId={user.id}
               email={user.email}
               firstName={user.firstName}
               lastName={user.lastName}
               profilePhotoUrl={user.profilePhotoUrl}
-              size="lg"
+              moderation={!isSelf && canUpdateUser}
             />
-            <div className="min-w-0 flex-1 space-y-1">
+          ) : (
+            <div className="flex items-center gap-4 border-b border-gray-200 pb-8">
+              <UserProfileAvatar
+                email={user.email}
+                firstName={user.firstName}
+                lastName={user.lastName}
+                profilePhotoUrl={user.profilePhotoUrl}
+                size="lg"
+              />
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900">
+                  {userDisplayName(user)}
+                </h2>
+                <p className="text-sm text-gray-600">{user.email}</p>
+                <p className="text-sm text-gray-500">
+                  {user.role.name}
+                  {user.role.pole
+                    ? ` · ${rolePoleLabel(user.role.pole)}`
+                    : ` · ${rolePoleLabel(null)}`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {canManagePhoto ? (
+            <div className="mt-8 space-y-1 border-b border-gray-200 pb-8">
               <h2 className="text-2xl font-semibold text-gray-900">
                 {userDisplayName(user)}
               </h2>
@@ -146,15 +174,8 @@ export default function UserDetailPage() {
                   ? ` · ${rolePoleLabel(user.role.pole)}`
                   : ` · ${rolePoleLabel(null)}`}
               </p>
-              {canUpdateUser ? (
-                <p className="pt-1 text-xs text-muted-foreground">
-                  {user.profilePhotoUrl?.trim()
-                    ? "Photo définie via une URL — modifiable depuis l’édition du profil."
-                    : "Aucune photo : initiales affichées — vous pouvez ajouter une URL depuis l’édition."}
-                </p>
-              ) : null}
             </div>
-          </div>
+          ) : null}
 
           <div className="mt-6 space-y-3 text-gray-800">
           <p>

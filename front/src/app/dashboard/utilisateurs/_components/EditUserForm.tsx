@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   useMe,
+  canEditUserIdentity,
   hasMePermission,
   isMainOrganization,
   meQueryKey,
@@ -23,8 +24,8 @@ import {
 } from "../_lib/user-form-roles";
 import {
   optionalUserNameField,
-  profilePhotoUrlField,
 } from "../_lib/user-form-schema";
+import { ProfilePhotoUpload } from "./ProfilePhotoUpload";
 
 const passwordSchema = z
   .string()
@@ -39,7 +40,6 @@ function buildSchema(organisations: OrganizationDto[]) {
     .object({
       firstName: optionalUserNameField,
       lastName: optionalUserNameField,
-      profilePhotoUrl: profilePhotoUrlField,
       organizationId: z.string().uuid({ message: "Choisissez une organisation" }),
       poleId: z.string().optional(),
       roleId: z.string().uuid({ message: "Choisissez un rôle" }),
@@ -77,6 +77,7 @@ export default function EditUserForm({ userId }: Props) {
   const queryClient = useQueryClient();
   const { data: me, isPending: mePending } = useMe();
   const canUpdateUser = me != null && hasMePermission(me, "update", "User");
+  const canEditIdentity = me != null && canEditUserIdentity(me);
   const canReadPole = me != null && hasMePermission(me, "read", "Pole");
 
   const { data: user, isLoading: userLoading, isError: userError } = useQuery({
@@ -121,6 +122,8 @@ export default function EditUserForm({ userId }: Props) {
 
   const canChangeOrg = me != null && isMainOrganization(me);
   const isAdminTarget = user?.role.name === "ADMIN";
+  const isSelf = me?.sub === userId;
+  const canManagePhoto = isSelf || canUpdateUser;
 
   const schema = useMemo(() => buildSchema(organisations), [organisations]);
 
@@ -137,7 +140,6 @@ export default function EditUserForm({ userId }: Props) {
     defaultValues: {
       firstName: "",
       lastName: "",
-      profilePhotoUrl: "",
       organizationId: "",
       poleId: "",
       roleId: "",
@@ -166,7 +168,6 @@ export default function EditUserForm({ userId }: Props) {
     reset({
       firstName: user.firstName ?? "",
       lastName: user.lastName ?? "",
-      profilePhotoUrl: user.profilePhotoUrl?.trim() ?? "",
       organizationId: user.organizationId,
       poleId: user.role.pole?.id ?? "",
       roleId: user.roleId,
@@ -180,7 +181,6 @@ export default function EditUserForm({ userId }: Props) {
       const payload: {
         firstName?: string;
         lastName?: string;
-        profilePhotoUrl?: string | null;
         organizationId?: string;
         roleId?: string;
         password?: string;
@@ -188,16 +188,13 @@ export default function EditUserForm({ userId }: Props) {
 
       const first = data.firstName?.trim() ?? "";
       const last = data.lastName?.trim() ?? "";
-      if (first !== (user.firstName?.trim() ?? "")) {
-        payload.firstName = first;
-      }
-      if (last !== (user.lastName?.trim() ?? "")) {
-        payload.lastName = last;
-      }
-      const photo = data.profilePhotoUrl.trim();
-      const prevPhoto = user.profilePhotoUrl?.trim() ?? "";
-      if (photo !== prevPhoto) {
-        payload.profilePhotoUrl = photo === "" ? null : photo;
+      if (canEditIdentity) {
+        if (first !== (user.firstName?.trim() ?? "")) {
+          payload.firstName = first;
+        }
+        if (last !== (user.lastName?.trim() ?? "")) {
+          payload.lastName = last;
+        }
       }
       if (canChangeOrg && data.organizationId !== user.organizationId) {
         payload.organizationId = data.organizationId;
@@ -276,6 +273,17 @@ export default function EditUserForm({ userId }: Props) {
         </p>
       )}
 
+      {user && canManagePhoto ? (
+        <ProfilePhotoUpload
+          userId={userId}
+          email={user.email}
+          firstName={user.firstName}
+          lastName={user.lastName}
+          profilePhotoUrl={user.profilePhotoUrl}
+          moderation={!isSelf && canUpdateUser}
+        />
+      ) : null}
+
       <div>
         <span className="mb-1 block text-sm font-medium text-gray-800">
           Email
@@ -296,18 +304,32 @@ export default function EditUserForm({ userId }: Props) {
           >
             Prénom
           </label>
-          <input
-            id="edit-user-first-name"
-            type="text"
-            autoComplete="given-name"
-            {...register("firstName")}
-            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
-            aria-invalid={!!errors.firstName}
-          />
-          {errors.firstName && (
-            <p className="mt-1 text-sm text-red-600" role="alert">
-              {errors.firstName.message}
-            </p>
+          {canEditIdentity ? (
+            <>
+              <input
+                id="edit-user-first-name"
+                type="text"
+                autoComplete="given-name"
+                {...register("firstName")}
+                className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
+                aria-invalid={!!errors.firstName}
+              />
+              {errors.firstName && (
+                <p className="mt-1 text-sm text-red-600" role="alert">
+                  {errors.firstName.message}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="h-10 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">
+                {user.firstName?.trim() || "—"}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Réservé à ADMIN, au directeur général et au directeur des
+                opérations.
+              </p>
+            </>
           )}
         </div>
         <div>
@@ -317,47 +339,34 @@ export default function EditUserForm({ userId }: Props) {
           >
             Nom
           </label>
-          <input
-            id="edit-user-last-name"
-            type="text"
-            autoComplete="family-name"
-            {...register("lastName")}
-            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
-            aria-invalid={!!errors.lastName}
-          />
-          {errors.lastName && (
-            <p className="mt-1 text-sm text-red-600" role="alert">
-              {errors.lastName.message}
-            </p>
+          {canEditIdentity ? (
+            <>
+              <input
+                id="edit-user-last-name"
+                type="text"
+                autoComplete="family-name"
+                {...register("lastName")}
+                className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
+                aria-invalid={!!errors.lastName}
+              />
+              {errors.lastName && (
+                <p className="mt-1 text-sm text-red-600" role="alert">
+                  {errors.lastName.message}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="h-10 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">
+                {user.lastName?.trim() || "—"}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Réservé à ADMIN, au directeur général et au directeur des
+                opérations.
+              </p>
+            </>
           )}
         </div>
-      </div>
-
-      <div>
-        <label
-          htmlFor="edit-user-photo-url"
-          className="mb-1 block text-sm font-medium text-gray-800"
-        >
-          Photo de profil (URL)
-        </label>
-        <input
-          id="edit-user-photo-url"
-          type="url"
-          inputMode="url"
-          placeholder="https://…"
-          {...register("profilePhotoUrl")}
-          className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25"
-          aria-invalid={!!errors.profilePhotoUrl}
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          Laissez vide pour afficher les initiales. L’URL doit être accessible
-          publiquement (https).
-        </p>
-        {errors.profilePhotoUrl && (
-          <p className="mt-1 text-sm text-red-600" role="alert">
-            {errors.profilePhotoUrl.message}
-          </p>
-        )}
       </div>
 
       <div>

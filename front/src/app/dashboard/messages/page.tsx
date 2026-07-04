@@ -111,7 +111,12 @@ export default function MessagesPage() {
     if (!q) return threads;
     return threads.filter((t) => {
       const names = t.participants
-        .map((p) => displayName(p).toLowerCase())
+        .map((p) => {
+          const label = displayName(p).toLowerCase();
+          const first = p.firstName?.trim().toLowerCase() ?? "";
+          const last = p.lastName?.trim().toLowerCase() ?? "";
+          return `${label} ${first} ${last}`.trim();
+        })
         .join(" ");
       const preview = t.lastMessage?.body.toLowerCase() ?? "";
       return names.includes(q) || preview.includes(q);
@@ -236,7 +241,7 @@ export default function MessagesPage() {
             <div className="relative">
               <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Rechercher une conversation…"
+                placeholder="Nom, prénom ou message…"
                 value={threadSearch}
                 onChange={(e) => setThreadSearch(e.target.value)}
                 className="h-9 bg-background pl-8"
@@ -531,7 +536,7 @@ function ComposePanel({
               <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="contact-search"
-                placeholder="Nom, prénom ou e-mail (2 caractères min.)"
+                placeholder="Nom ou prénom (2 caractères min.)"
                 value={contactSearch}
                 onChange={(e) => {
                   onContactSearchChange(e.target.value);

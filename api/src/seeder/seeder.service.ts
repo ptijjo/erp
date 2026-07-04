@@ -709,6 +709,28 @@ export class SeederService implements OnModuleInit {
       }
       Logger.log('Permissions Message (messagerie) liées à tous les rôles');
 
+      for (const permName of [
+        'read:Task',
+        'create:Task',
+        'update:Task',
+        'delete:Task',
+      ] as const) {
+        const perm = await this.prisma.permission.findUnique({
+          where: { name: permName },
+        });
+        if (!perm) continue;
+        for (const { id: roleId } of allRoles) {
+          await this.prisma.permissionRole.upsert({
+            where: {
+              permissionId_roleId: { permissionId: perm.id, roleId },
+            },
+            create: { permissionId: perm.id, roleId },
+            update: {},
+          });
+        }
+      }
+      Logger.log('Permissions Task (Mes actions) liées à tous les rôles');
+
       const budgetReadForAccounting = await this.prisma.permission.findUnique({
         where: { name: 'read:Budget' },
       });

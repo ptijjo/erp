@@ -94,6 +94,17 @@ export function isMainOrganization(me: Me): boolean {
   return me.organizationType === "MAIN";
 }
 
+/** ADMIN, DG et directeur opérations : modification du prénom / nom des utilisateurs. */
+const USER_IDENTITY_EDITOR_ROLE_NAMES = new Set([
+  "ADMIN",
+  "DIRECTOR_GENERAL",
+  "DIRECTOR_OPERATIONS",
+]);
+
+export function canEditUserIdentity(me: Me): boolean {
+  return USER_IDENTITY_EDITOR_ROLE_NAMES.has(me.role.name);
+}
+
 /** Catalogue des permissions et CRUD Permission : réservé au rôle ADMIN. */
 export function isAdminUser(me: Me | null | undefined): boolean {
   return me?.role.name === "ADMIN";

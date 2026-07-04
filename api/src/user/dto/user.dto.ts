@@ -5,6 +5,7 @@ import {
   IsString,
   IsStrongPassword,
   IsUUID,
+  MaxLength,
 } from 'class-validator';
 
 export class CreateUserDto {
@@ -84,8 +85,11 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString({ message: 'Le nom doit être une chaîne' })
   public lastName?: string;
+}
 
+export class UpdateMyProfileDto {
   @IsOptional()
-  @IsString({ message: 'L’URL de la photo doit être une chaîne' })
-  public profilePhotoUrl?: string | null;
+  @IsString({ message: 'La bio doit être une chaîne' })
+  @MaxLength(500, { message: 'La bio ne peut pas dépasser 500 caractères' })
+  public bio?: string;
 }

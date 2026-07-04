@@ -8,6 +8,7 @@ import {
   FolderTree,
   History,
   Landmark,
+  ListChecks,
   Lock,
   Layers,
   LayoutDashboard,
@@ -195,6 +196,12 @@ const baseNavItems: NavItem[] = [
     requiredPermission: { action: "read", subject: "AuditLog" },
   },
   {
+    label: "Mes actions",
+    href: "/dashboard/mes-actions",
+    icon: ListChecks,
+    requiredPermission: { action: "read", subject: "Task" },
+  },
+  {
     label: "Messagerie",
     href: "/dashboard/messages",
     icon: MessageSquare,
@@ -209,6 +216,12 @@ const HQ_PRIMARY_NAV: NavItem[] = [
     href: "/dashboard",
     icon: LayoutDashboard,
     exact: true,
+  },
+  {
+    label: "Mes actions",
+    href: "/dashboard/mes-actions",
+    icon: ListChecks,
+    requiredPermission: { action: "read", subject: "Task" },
   },
   {
     label: "Filiales",
@@ -332,6 +345,7 @@ const SECTION_BY_HREF: Record<string, string> = {
   "/dashboard/budgets": "finance",
   "/dashboard/tresorerie": "finance",
   "/dashboard/audit": "gouvernance",
+  "/dashboard/mes-actions": "operations",
   "/dashboard/messages": "gouvernance",
 };
 
@@ -550,6 +564,13 @@ export const HQ_MODULE_TILES: ModuleTile[] = [
     subject: "ProductionOrder",
   },
   {
+    title: "Mes actions",
+    description: "Tâches et actions à traiter",
+    href: "/dashboard/mes-actions",
+    icon: ListChecks,
+    subject: "Task",
+  },
+  {
     title: "Messagerie",
     description: "Échanges internes maison mère et filiales",
     href: "/dashboard/messages",
@@ -610,6 +631,13 @@ export const SUBSIDIARY_MODULE_TILES: ModuleTile[] = [
     href: "/dashboard/stocks/transferts",
     icon: ArrowLeftRight,
     subject: "StockTransfer",
+  },
+  {
+    title: "Mes actions",
+    description: "Vos tâches et actions en attente",
+    href: "/dashboard/mes-actions",
+    icon: ListChecks,
+    subject: "Task",
   },
   {
     title: "Messagerie",

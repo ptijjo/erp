@@ -39,8 +39,8 @@ async function bootstrap() {
       .setVersion('1.0')
       .addTag('Vifaa')
       .build();
-    const documentFactory = () => SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, documentFactory);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('docs', app, document);
     Logger.log('Swagger disponible sur /docs (environnement non production)');
   }
 

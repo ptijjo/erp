@@ -105,7 +105,7 @@ export function ActionOwnerCell({ action }: ActionOwnerCellProps) {
     );
   }
 
-  const responsible = action.assignee;
+  const responsible = action.assignee ?? action.createdBy;
   if (!responsible) {
     return <span className="text-muted-foreground text-sm">—</span>;
   }

@@ -172,6 +172,48 @@ describe('ActionsService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('expose le créateur dans la liste quand aucun responsable assigné', async () => {
+    taskFindMany.mockResolvedValue([
+      {
+        id: 't-list',
+        title: "Finir l'application",
+        description: "Finir l'Erp à temps",
+        status: TaskStatus.IN_PROGRESS,
+        priority: TaskPriority.HIGH,
+        scope: TaskScope.ORGANIZATION,
+        dueDate: new Date('2026-09-30'),
+        completedAt: null,
+        organizationId: 'org-main',
+        assigneeUserId: null,
+        createdByUserId: mainUser.sub,
+        poleCode: null,
+        createdAt: new Date('2026-07-01'),
+        updatedAt: new Date('2026-07-01'),
+        organization: { name: 'VIFAA' },
+        assignee: null,
+        createdBy: {
+          id: mainUser.sub,
+          email: mainUser.email,
+          firstName: 'Admin',
+          lastName: 'VIFAA',
+          profilePhotoUrl: 'https://cdn.example/photo.webp',
+        },
+      },
+    ]);
+
+    const items = await service.listActions(mainUser);
+    const manual = items.find((i) => i.id === 't-list');
+
+    expect(manual?.assignee).toBeNull();
+    expect(manual?.createdBy).toEqual({
+      id: mainUser.sub,
+      email: mainUser.email,
+      firstName: 'Admin',
+      lastName: 'VIFAA',
+      profilePhotoUrl: 'https://cdn.example/photo.webp',
+    });
+  });
+
   it('agrège les alertes système dans la liste', async () => {
     getDashboardAlerts.mockResolvedValue([
       {

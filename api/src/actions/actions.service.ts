@@ -404,8 +404,24 @@ export class ActionsService {
     }
   }
 
+  private toUserSummary(
+    user: TaskRow['createdBy'],
+  ): ActionItemDto['createdBy'] {
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      profilePhotoUrl: user.profilePhotoUrl,
+    };
+  }
+
   private toManualActionItem(row: TaskRow): ActionItemDto {
-    const responsible = row.assignee ?? row.createdBy;
+    const createdBy = this.toUserSummary(row.createdBy);
+    const assignee = row.assignee
+      ? this.toUserSummary(row.assignee)
+      : null;
+
     return {
       id: row.id,
       kind: 'MANUAL',
@@ -418,14 +434,9 @@ export class ActionsService {
       organizationId: row.organizationId,
       organizationName: row.organization.name,
       assigneeUserId: row.assigneeUserId,
-      assignee: {
-        id: responsible.id,
-        email: responsible.email,
-        firstName: responsible.firstName,
-        lastName: responsible.lastName,
-        profilePhotoUrl: responsible.profilePhotoUrl,
-      },
+      assignee,
       createdByUserId: row.createdByUserId,
+      createdBy,
       createdAt: row.createdAt.toISOString(),
       completedAt: row.completedAt?.toISOString() ?? null,
       editable: true,

@@ -27,9 +27,11 @@ export type ActionItemDto = {
   organizationId?: string;
   organizationName?: string;
   assigneeUserId?: string | null;
-  /** Responsable affiché : assigné ou créateur si non assigné. */
+  /** Responsable assigné (peut être absent). */
   assignee?: ActionUserSummaryDto | null;
   createdByUserId?: string;
+  /** Créateur de la tâche (toujours renseigné pour les tâches manuelles). */
+  createdBy?: ActionUserSummaryDto | null;
   createdAt: string;
   completedAt: string | null;
   editable: boolean;

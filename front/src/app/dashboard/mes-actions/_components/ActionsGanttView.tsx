@@ -17,8 +17,13 @@ import {
   sortGanttItems,
 } from "~/app/dashboard/mes-actions/_lib/gantt-layout";
 import { formatShortDueDate } from "~/app/dashboard/mes-actions/_lib/action-board";
-import type { ActionItemDto } from "~/lib/api-types";
+import type { ActionItemDto, TaskStatusDto } from "~/lib/api-types";
 import { cn } from "~/lib/utils";
+
+const STATUS_OPTIONS = Object.entries(TASK_STATUS_LABEL) as [
+  TaskStatusDto,
+  string,
+][];
 
 type ActionsGanttViewProps = {
   actions: ActionItemDto[];
@@ -62,7 +67,7 @@ export function ActionsGanttView({ actions }: ActionsGanttViewProps) {
           <p className="text-muted-foreground text-xs">{rangeLabel}</p>
         </div>
         <div className="flex flex-wrap gap-3 text-xs">
-          {(Object.entries(TASK_STATUS_LABEL) as const).map(([status, label]) => (
+          {STATUS_OPTIONS.map(([status, label]) => (
             <span key={status} className="inline-flex items-center gap-1.5">
               <span
                 className={cn(

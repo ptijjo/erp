@@ -263,7 +263,7 @@ export default function MesActionsPage() {
 
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Chargement…</p>
-      ) : actions.length === 0 ? (
+      ) : actions.length === 0 && !showForm ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center">
           <ListChecks className="text-muted-foreground size-12" />
           <p className="font-medium">Aucune action pour le moment</p>

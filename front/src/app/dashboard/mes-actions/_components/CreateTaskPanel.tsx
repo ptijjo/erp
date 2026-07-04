@@ -89,16 +89,38 @@ export function CreateTaskPanel({
   const formOrganizationId = organizationId || defaultOrganizationId;
 
   return (
-    <div className="mb-4 overflow-hidden rounded-xl border bg-card shadow-sm">
-      <div className="border-b bg-muted/30 px-4 py-3">
-        <h2 className="text-sm font-semibold">Nouvelle tâche</h2>
-        {presetGroup && GROUP_HINT[presetGroup] && (
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            {GROUP_HINT[presetGroup]}
-          </p>
-        )}
+    <div className="mb-4 rounded-xl border bg-card shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/30 px-4 py-3">
+        <div>
+          <h2 className="text-sm font-semibold">Nouvelle tâche</h2>
+          {presetGroup && GROUP_HINT[presetGroup] && (
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              {GROUP_HINT[presetGroup]}
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button
+            type="submit"
+            form="create-task-form"
+            disabled={!title.trim() || pending}
+          >
+            {pending ? "Création…" : "Créer la tâche"}
+          </Button>
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Annuler
+          </Button>
+        </div>
       </div>
-      <div className="space-y-4 p-4">
+      <form
+        id="create-task-form"
+        className="space-y-4 p-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!title.trim() || pending) return;
+          onSubmit();
+        }}
+      >
         <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
           <div className="space-y-2">
             <Label htmlFor="task-title">Titre</Label>
@@ -199,19 +221,7 @@ export function CreateTaskPanel({
             label="Organisation"
           />
         )}
-        <div className="flex gap-2 border-t pt-3">
-          <Button
-            type="button"
-            disabled={!title.trim() || pending}
-            onClick={onSubmit}
-          >
-            Créer la tâche
-          </Button>
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Annuler
-          </Button>
-        </div>
-      </div>
+      </form>
     </div>
   );
 }

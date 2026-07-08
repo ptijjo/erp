@@ -35,6 +35,8 @@ import type {
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { cn } from "~/lib/utils";
 
+type MainView = "empty" | "thread" | "compose";
+
 function contactSubtitle(c: MessagingContactDto): string {
   const parts = [
     c.organization.name,

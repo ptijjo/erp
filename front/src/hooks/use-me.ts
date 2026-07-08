@@ -30,6 +30,8 @@ export type Me = {
   firstLogin: boolean;
   permissionMode: "FULL_ACCESS" | "ROLE_PERMISSIONS" | "FALLBACK_READ_ALL";
   permissions: string[];
+  /** Fille : catalogue vente (catégories ou produits) assigné par la maison mère. */
+  hasSalesCatalog: boolean;
 };
 
 /** Aligné sur le backend `FULL_ACCESS_ROLE_NAMES` — accès total incl. journal d’audit. */

@@ -54,4 +54,18 @@ export const SUBSIDIARY_MANAGER_PERMISSION_NAMES = [
   'create:EmployeeSalary',
   'update:EmployeeSalary',
   'delete:EmployeeSalary',
+  // Planning (emploi du temps) — réservé aux filiales, piloté par le directeur de la filiale.
+  'read:WorkShift',
+  'create:WorkShift',
+  'update:WorkShift',
+  'delete:WorkShift',
+  // Sanctions disciplinaires (mise à pied) et départs.
+  'read:EmployeeSanction',
+  'create:EmployeeSanction',
+  'update:EmployeeSanction',
+  'delete:EmployeeSanction',
+  'read:EmployeeDeparture',
+  'create:EmployeeDeparture',
+  'update:EmployeeDeparture',
+  'delete:EmployeeDeparture',
 ] as const;

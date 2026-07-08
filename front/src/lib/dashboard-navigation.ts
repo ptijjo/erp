@@ -4,6 +4,7 @@ import {
   BarChart3,
   Building2,
   ClipboardList,
+  ContactRound,
   Factory,
   FolderTree,
   History,
@@ -62,9 +63,16 @@ export function hasAnalyticsAccess(me: Me): boolean {
   );
 }
 
+/** Filiale : catalogue vente assigné (requis pour la caisse). */
+export function subsidiaryHasSalesCatalog(me: Me): boolean {
+  if (me.organizationType !== "SUBSIDIARY") return true;
+  return me.hasSalesCatalog;
+}
+
 /** Filiale : voir l’entrée menu Caisse (lecture ou exploitation). */
 export function canSeeCaisseNav(me: Me): boolean {
   if (isMainOrganization(me)) return false;
+  if (!subsidiaryHasSalesCatalog(me)) return false;
   return (
     hasMePermission(me, "read", "SessionCaisse") ||
     hasMePermission(me, "read", "Vente") ||
@@ -76,6 +84,7 @@ export function canSeeCaisseNav(me: Me): boolean {
 /** Filiale : ouvrir une session et/ou encaisser des ventes. */
 export function canOperateCaisse(me: Me): boolean {
   if (isMainOrganization(me)) return false;
+  if (!subsidiaryHasSalesCatalog(me)) return false;
   return (
     hasMePermission(me, "create", "Vente") ||
     hasMePermission(me, "create", "SessionCaisse")
@@ -90,6 +99,7 @@ export function canAccessCaisse(me: Me): boolean {
 /** Filiale : historique des sessions de caisse. */
 export function canReadSessionCaisseHistory(me: Me): boolean {
   if (isMainOrganization(me)) return false;
+  if (!subsidiaryHasSalesCatalog(me)) return false;
   return hasMePermission(me, "read", "SessionCaisse");
 }
 
@@ -104,6 +114,12 @@ const baseNavItems: NavItem[] = [
     label: "Utilisateurs",
     href: "/dashboard/utilisateurs",
     icon: Users,
+    requiredPermission: { action: "read", subject: "User" },
+  },
+  {
+    label: "Annuaire",
+    href: "/dashboard/annuaire",
+    icon: ContactRound,
     requiredPermission: { action: "read", subject: "User" },
   },
   {
@@ -262,6 +278,12 @@ const HQ_ADMIN_NAV: NavItem[] = [
     requiredPermission: { action: "read", subject: "User" },
   },
   {
+    label: "Annuaire",
+    href: "/dashboard/annuaire",
+    icon: ContactRound,
+    requiredPermission: { action: "read", subject: "User" },
+  },
+  {
     label: "Ressources humaines",
     href: "/dashboard/rh",
     icon: UserCircle,
@@ -328,6 +350,7 @@ const SECTION_BY_HREF: Record<string, string> = {
   "/dashboard": "accueil",
   "/dashboard/rapports": "accueil",
   "/dashboard/utilisateurs": "organisation",
+  "/dashboard/annuaire": "organisation",
   "/dashboard/rh": "rh",
   "/dashboard/organisations": "organisation",
   "/dashboard/produits": "catalogue",

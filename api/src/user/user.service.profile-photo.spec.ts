@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ImageProcessorService } from '../storage/image-processor.service';
 import { R2ObjectStorageService } from '../storage/r2-object-storage.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
+import { EmployeeService } from '../hr/employee.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 const viewer: AuthenticatedUser = {
@@ -94,6 +95,10 @@ describe('UserService profile photo', () => {
             }),
           },
         },
+        {
+          provide: EmployeeService,
+          useValue: { provisionForNewUser: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -129,6 +134,10 @@ describe('UserService profile photo', () => {
               can: () => false,
             }),
           },
+        },
+        {
+          provide: EmployeeService,
+          useValue: { provisionForNewUser: jest.fn() },
         },
       ],
     }).compile();

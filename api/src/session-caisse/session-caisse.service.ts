@@ -25,6 +25,7 @@ import {
   type SessionCaisseCurrentDto,
   type SessionCaisseWithDetails,
 } from './session-caisse.types';
+import { assertSubsidiaryHasSalesCatalog } from '../product/product-subsidiary-scope.util';
 
 @Injectable()
 export class SessionCaisseService {
@@ -35,6 +36,7 @@ export class SessionCaisseService {
     viewer: AuthenticatedUser,
   ): Promise<SessionCaisseCurrentDto> {
     const orgId = this.requireSubsidiaryViewer(viewer);
+    await assertSubsidiaryHasSalesCatalog(this.prisma, orgId);
 
     const existing = await this.prisma.sessionCaisse.findFirst({
       where: {
@@ -207,6 +209,7 @@ export class SessionCaisseService {
   /** Session ouverte obligatoire pour encaisser (filiale). */
   async requireOpenSessionForViewer(viewer: AuthenticatedUser) {
     const orgId = this.requireSubsidiaryViewer(viewer);
+    await assertSubsidiaryHasSalesCatalog(this.prisma, orgId);
     const session = await this.prisma.sessionCaisse.findFirst({
       where: {
         userId: viewer.sub,

@@ -22,6 +22,7 @@ import { RedisService } from '../redis/redis.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomBytes } from 'node:crypto';
 import { AuthSessionSettings } from './auth-session-settings.service';
+import { subsidiaryHasAssignedSalesCatalog } from '../product/product-subsidiary-scope.util';
 import { isFullAccessRoleName } from '../casl/define-ability';
 
 function envPositiveInt(name: string, fallback: number): number {
@@ -278,11 +279,19 @@ export class AuthService {
       throw new NotFoundException('Utilisateur ou organisation introuvable');
     }
     const permissionSnapshot = await this.resolvePermissionSnapshot(jwtUser);
+    const hasSalesCatalog =
+      jwtUser.organizationType === 'MAIN'
+        ? true
+        : await subsidiaryHasAssignedSalesCatalog(
+            this.prisma,
+            jwtUser.organisationId,
+          );
     return {
       ...jwtUser,
       organisationName: row.organization.name,
       permissionMode: permissionSnapshot.permissionMode,
       permissions: permissionSnapshot.permissions,
+      hasSalesCatalog,
     };
   }
 

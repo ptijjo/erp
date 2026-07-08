@@ -214,7 +214,14 @@ export default function AddUserForm() {
             Pour la maison mère <strong>VIFAA</strong>, sélectionnez d’abord un{" "}
             <strong>pôle</strong>, puis un rôle rattaché à ce pôle.
           </>
-        ) : null}
+        ) : (
+          <>
+            {" "}
+            Pour une <strong>filiale</strong>, une fiche employé active est
+            créée automatiquement et liée à ce compte (complétez ensuite le
+            poste et le département dans les RH).
+          </>
+        )}
       </p>
 
       {errors.root && (

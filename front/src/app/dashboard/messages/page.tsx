@@ -35,7 +35,15 @@ import type {
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { cn } from "~/lib/utils";
 
-type MainView = "empty" | "compose" | "thread";
+function contactSubtitle(c: MessagingContactDto): string {
+  const parts = [
+    c.organization.name,
+    c.role.name,
+    c.position,
+    c.department?.name,
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
 
 export default function MessagesPage() {
   const { data: me } = useMe();
@@ -553,10 +561,7 @@ function ComposePanel({
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{displayName(composeTo)}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {composeTo.organization.name}
-                  {composeTo.role.pole
-                    ? ` · ${composeTo.role.pole.name}`
-                    : ""}
+                  {contactSubtitle(composeTo)}
                 </p>
               </div>
               <Button
@@ -589,8 +594,7 @@ function ComposePanel({
                             {displayName(c)}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {c.organization.name}
-                            {c.role.pole ? ` · ${c.role.pole.name}` : ""}
+                            {contactSubtitle(c)}
                           </p>
                         </div>
                       </button>

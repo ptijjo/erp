@@ -100,6 +100,47 @@ enum LeaveType {
   UNPAID_LEAVE // Sans solde
 }
 
+/// Statut d’un créneau de planning (emploi du temps filiale).
+enum WorkShiftStatus {
+  PLANNED
+  CONFIRMED
+  CANCELLED
+}
+
+/// Nature d’un créneau : travail effectif (vert) ou pause (bleu).
+enum WorkShiftKind {
+  WORK
+  BREAK
+}
+
+/// Jour de la semaine (planning hebdomadaire récurrent).
+enum WeekDay {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+/// Type de sanction disciplinaire (mise à pied = SUSPENSION avec période).
+enum EmployeeSanctionType {
+  WARNING // Avertissement
+  SUSPENSION // Mise à pied
+  LAYOFF // Licenciement disciplinaire
+}
+
+/// Motif de départ d’un employé (fin de collaboration).
+enum EmployeeDepartureReason {
+  RESIGNATION // Démission
+  DISMISSAL // Licenciement
+  END_OF_CONTRACT // Fin de contrat
+  RETIREMENT // Retraite
+  ABANDONMENT // Abandon de poste
+  OTHER
+}
+
 enum VenteStatut {
   DRAFT
   CONFIRMED
@@ -194,28 +235,28 @@ model User {
   roleId String
   role   Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
-  loginAttempts  LoginAttempt[]
-  auditLogs      AuditLog[]
-  stockOrders    StockOrder[]
-  ventes         Vente[]
-  venteReturns   VenteReturn[]
-  sessionsCaisseOpened SessionCaisse[] @relation("SessionCaisseOpenedBy")
-  sessionsCaisseClosed SessionCaisse[] @relation("SessionCaisseClosedBy")
-  stockTransfersRequested StockTransfer[]
-  stockMovementsRecorded  StockMovement[]
-  budgetExpenses              BudgetExpense[]
-  budgetsSubmitted            Budget[]                  @relation("BudgetSubmittedBy")
-  budgetsApproved             Budget[]                  @relation("BudgetApprovedBy")
-  budgetsRejected             Budget[]                  @relation("BudgetRejectedBy")
-  budgetSupplementsRequested  BudgetSupplementRequest[] @relation("BudgetSupplementRequestedBy")
-  budgetSupplementsReviewed   BudgetSupplementRequest[] @relation("BudgetSupplementReviewedBy")
-  budgetSupplementsDecided    BudgetSupplementRequest[] @relation("BudgetSupplementDecidedBy")
-  notifications               Notification[]
-  accountingPeriodClosures    AccountingPeriodClosure[] @relation("AccountingPeriodClosedBy")
-  messageThreadParticipants   MessageThreadParticipant[]
-  messagesSent                Message[]
-  tasksAssigned               Task[] @relation("TaskAssignee")
-  tasksCreated                Task[] @relation("TaskCreatedBy")
+  loginAttempts              LoginAttempt[]
+  auditLogs                  AuditLog[]
+  stockOrders                StockOrder[]
+  ventes                     Vente[]
+  venteReturns               VenteReturn[]
+  sessionsCaisseOpened       SessionCaisse[]            @relation("SessionCaisseOpenedBy")
+  sessionsCaisseClosed       SessionCaisse[]            @relation("SessionCaisseClosedBy")
+  stockTransfersRequested    StockTransfer[]
+  stockMovementsRecorded     StockMovement[]
+  budgetExpenses             BudgetExpense[]
+  budgetsSubmitted           Budget[]                   @relation("BudgetSubmittedBy")
+  budgetsApproved            Budget[]                   @relation("BudgetApprovedBy")
+  budgetsRejected            Budget[]                   @relation("BudgetRejectedBy")
+  budgetSupplementsRequested BudgetSupplementRequest[]  @relation("BudgetSupplementRequestedBy")
+  budgetSupplementsReviewed  BudgetSupplementRequest[]  @relation("BudgetSupplementReviewedBy")
+  budgetSupplementsDecided   BudgetSupplementRequest[]  @relation("BudgetSupplementDecidedBy")
+  notifications              Notification[]
+  accountingPeriodClosures   AccountingPeriodClosure[]  @relation("AccountingPeriodClosedBy")
+  messageThreadParticipants  MessageThreadParticipant[]
+  messagesSent               Message[]
+  tasksAssigned              Task[]                     @relation("TaskAssignee")
+  tasksCreated               Task[]                     @relation("TaskCreatedBy")
 
   /// Fiche RH optionnelle (auth / rôles / permissions restent sur `User`).
   employee Employee?
@@ -235,7 +276,7 @@ model Pole {
 
 model Role {
   id          String    @id @default(uuid())
-  name        String    @unique
+  name        String
   description String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -252,6 +293,7 @@ model Role {
   users           User[]
   permissionRoles PermissionRole[]
 
+  @@unique([name, organizationScopeId], map: "Role_name_organizationScopeId_key")
   @@index([poleId])
 }
 
@@ -282,19 +324,23 @@ model Organization {
   venteReturns      VenteReturn[]
   sessionsCaisse    SessionCaisse[]
   stockMovements    StockMovement[]
-  stockTransfersOut StockTransfer[] @relation("StockTransferFrom")
-  stockTransfersIn  StockTransfer[] @relation("StockTransferTo")
+  stockTransfersOut StockTransfer[]               @relation("StockTransferFrom")
+  stockTransfersIn  StockTransfer[]               @relation("StockTransferTo")
   heritageAssets    HeritageAsset[]
   legalContracts    LegalContract[]
   productionOrders  ProductionOrder[]
   /// Budgets où cette organisation est la filiale concernée.
   budgets           Budget[]
 
-  departments   Department[]
-  employees     Employee[]
-  leaveRequests LeaveRequest[]
-  leaveBalances LeaveBalance[]
-  notifications Notification[]
+  departments              Department[]
+  employees                Employee[]
+  leaveRequests            LeaveRequest[]
+  leaveBalances            LeaveBalance[]
+  workShifts               WorkShift[]
+  recurringWorkShifts      RecurringWorkShift[]
+  employeeSanctions        EmployeeSanction[]
+  employeeDepartures       EmployeeDeparture[]
+  notifications            Notification[]
   accountingPeriodClosures AccountingPeriodClosure[]
   tasks                    Task[]
 
@@ -467,17 +513,17 @@ model Product {
 
 /// Session de caisse : fond d’ouverture, ventes du service, clôture avec écart.
 model SessionCaisse {
-  id        String             @id @default(uuid())
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id        String              @id @default(uuid())
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
   statut    SessionCaisseStatut @default(OUVERTE)
-  openedAt  DateTime           @default(now())
+  openedAt  DateTime            @default(now())
   closedAt  DateTime?
 
-  fondOuverture Decimal
-  fondCloture   Decimal?
+  fondOuverture      Decimal
+  fondCloture        Decimal?
   /// Écart à la clôture : fond déclaré − (fond ouverture + encaissements espèces).
-  ecartCloture  Decimal?
+  ecartCloture       Decimal?
   commentaireCloture String?
 
   /// Totaux figés à la clôture.
@@ -506,11 +552,11 @@ model SessionCaisse {
 
 /// Vente en point de vente (filiale) — brouillon puis confirmation avec décrément stock.
 model Vente {
-  id        String      @id @default(uuid())
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  status    VenteStatut @default(DRAFT)
-  totalAmount Decimal   @default(0)
+  id           String      @id @default(uuid())
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  status       VenteStatut @default(DRAFT)
+  totalAmount  Decimal     @default(0)
   numeroTicket Int?
 
   organizationId String
@@ -555,11 +601,11 @@ model VenteLine {
 
 /// Paiements enregistrés à la confirmation (plusieurs modes possibles).
 model VentePaiement {
-  id        String       @id @default(uuid())
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id           String       @id @default(uuid())
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
   modePaiement ModePaiement
-  amount    Decimal
+  amount       Decimal
 
   venteId String
   vente   Vente  @relation(fields: [venteId], references: [id], onDelete: Cascade)
@@ -646,13 +692,13 @@ model Budget {
   approvedByUserId String?
   approvedBy       User?     @relation("BudgetApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
 
-  rejectedAt        DateTime?
-  rejectedByUserId  String?
-  rejectedBy        User?     @relation("BudgetRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
-  rejectionReason   String?
+  rejectedAt       DateTime?
+  rejectedByUserId String?
+  rejectedBy       User?     @relation("BudgetRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  rejectionReason  String?
 
-  lines               BudgetLine[]
-  supplementRequests  BudgetSupplementRequest[]
+  lines              BudgetLine[]
+  supplementRequests BudgetSupplementRequest[]
 
   @@unique([subsidiaryOrganizationId, year, month])
   @@index([subsidiaryOrganizationId])
@@ -667,7 +713,7 @@ model BudgetLine {
   budgetId String
   budget   Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 
-  nature        BudgetLineNature @default(FIXED)
+  nature        BudgetLineNature   @default(FIXED)
   category      BudgetLineCategory
   /// Libellé métier (ex. « Loyer siège »).
   label         String
@@ -728,7 +774,7 @@ model BudgetExpense {
   recordedBy       User?   @relation(fields: [recordedByUserId], references: [id], onDelete: SetNull)
 
   /// Renseigné lorsque la sortie provient d’une commande stock confirmée.
-  stockOrderId String?    @unique
+  stockOrderId String?     @unique
   stockOrder   StockOrder? @relation(fields: [stockOrderId], references: [id], onDelete: SetNull)
 
   @@index([budgetLineId])
@@ -783,6 +829,13 @@ model Employee {
   contracts      EmploymentContract[]
   salaries       EmployeeSalary[]
 
+  workShifts         WorkShift[]
+  recurringShifts    RecurringWorkShift[]
+  sanctions          EmployeeSanction[]
+  sanctionsDecided   EmployeeSanction[]   @relation("SanctionDecidedBy")
+  departure          EmployeeDeparture?
+  departuresRecorded EmployeeDeparture[]  @relation("DepartureRecordedBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -796,7 +849,7 @@ model LeaveRequest {
   startDate DateTime
   endDate   DateTime
   reason    String?
-  type      LeaveType @default(PAID_LEAVE)
+  type      LeaveType   @default(PAID_LEAVE)
   status    LeaveStatus @default(PENDING)
 
   employeeId String
@@ -880,6 +933,106 @@ model EmployeeSalary {
   @@index([organizationId])
 }
 
+/// Créneau de planning (emploi du temps) — réservé aux filiales (piloté par le directeur de la filiale).
+model WorkShift {
+  id      String          @id @default(uuid())
+  startAt DateTime
+  endAt   DateTime
+  status  WorkShiftStatus @default(PLANNED)
+  kind    WorkShiftKind   @default(WORK)
+  note    String?
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([organizationId])
+  @@index([startAt])
+}
+
+/// Modèle d’horaire hebdomadaire récurrent (emploi du temps type) — réservé aux filiales.
+/// Les créneaux concrets `WorkShift` sont générés à partir de ces modèles semaine par semaine.
+model RecurringWorkShift {
+  id          String        @id @default(uuid())
+  dayOfWeek   WeekDay
+  /// Heure de début en minutes depuis minuit (0–1439).
+  startMinute Int
+  /// Heure de fin en minutes depuis minuit (1–1440).
+  endMinute   Int
+  kind        WorkShiftKind @default(WORK)
+  active      Boolean       @default(true)
+  note        String?
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([organizationId])
+}
+
+/// Sanction disciplinaire datée (avertissement, mise à pied, licenciement).
+model EmployeeSanction {
+  id        String               @id @default(uuid())
+  type      EmployeeSanctionType
+  reason    String
+  startDate DateTime
+  /// `null` pour un avertissement ou une mise à pied à durée indéterminée.
+  endDate   DateTime?
+  note      String?
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Employé (RH / directeur) ayant prononcé la sanction.
+  decidedById String?
+  decidedBy   Employee? @relation("SanctionDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([organizationId])
+  @@index([type])
+}
+
+/// Départ d’un employé (un seul par fiche) : passe l’employé en `TERMINATED`.
+model EmployeeDeparture {
+  id            String                  @id @default(uuid())
+  reason        EmployeeDepartureReason
+  departureDate DateTime
+  note          String?
+
+  employeeId String   @unique
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Employé (RH / directeur) ayant enregistré le départ.
+  recordedById String?
+  recordedBy   Employee? @relation("DepartureRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
 enum NotificationType {
   LEAVE_REQUEST_PENDING
   STOCK_LOW_AFTER_SALE
@@ -949,11 +1102,11 @@ model MessageThread {
 }
 
 model MessageThreadParticipant {
-  id         String    @id @default(uuid())
+  id         String        @id @default(uuid())
   threadId   String
   thread     MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
   userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastReadAt DateTime?
 
   @@unique([threadId, userId])
@@ -977,13 +1130,13 @@ model Message {
 
 /// Journal des mouvements de stock (traçabilité filiale).
 model StockMovement {
-  id             String            @id @default(uuid())
-  createdAt      DateTime          @default(now())
-  quantityDelta  Int
-  type           StockMovementType
-  referenceType  String?
-  referenceId    String?
-  label          String?
+  id            String            @id @default(uuid())
+  createdAt     DateTime          @default(now())
+  quantityDelta Int
+  type          StockMovementType
+  referenceType String?
+  referenceId   String?
+  label         String?
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1033,10 +1186,10 @@ model StockTransfer {
 
 /// Retour / avoir sur une vente confirmée (réintègre le stock).
 model VenteReturn {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  reason    String?
-  totalAmount Decimal @default(0)
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  reason      String?
+  totalAmount Decimal  @default(0)
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1149,10 +1302,10 @@ model Task {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   assigneeUserId String?
-  assignee       User? @relation("TaskAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+  assignee       User?   @relation("TaskAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
 
   createdByUserId String
-  createdBy       User @relation("TaskCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdBy       User   @relation("TaskCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
 
   /// Scope POLE : code pôle maison mère (ex. Pole_FINANCE).
   poleCode String?

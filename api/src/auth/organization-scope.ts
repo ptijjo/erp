@@ -14,6 +14,17 @@ export function assertMainOrganizationOnly(user: AuthenticatedUser): void {
   }
 }
 
+/** Réservé aux utilisateurs de filiale (ex. planning / emploi du temps). */
+export function assertSubsidiaryOrganizationOnly(
+  user: AuthenticatedUser,
+): void {
+  if (isMainOrganizationUser(user)) {
+    throw new ForbiddenException(
+      'La gestion du planning est réservée aux filiales.',
+    );
+  }
+}
+
 /** Accès à une ressource rattachée à une organisation (filiale ou maison mère). */
 export function assertOrganizationResourceAccess(
   user: AuthenticatedUser,

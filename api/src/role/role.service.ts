@@ -11,6 +11,19 @@ import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
 import { isFullAccessRoleName } from '../casl/define-ability';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { isMainOrganizationUser } from '../auth/organization-scope';
+import { roleNameScopeWhere } from './role-scope.util';
+
+const roleListInclude = {
+  organizationScope: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      organizationType: true,
+    },
+  },
+  pole: { select: { id: true, name: true, code: true } },
+} as const;
 
 @Injectable()
 export class RoleService {
@@ -84,9 +97,13 @@ export class RoleService {
     }
   }
 
-  public getAllRoles = async (viewer: AuthenticatedUser): Promise<Role[]> => {
+  public getAllRoles = async (viewer: AuthenticatedUser) => {
     const where = this.buildRoleListWhere(viewer);
-    return await this.prisma.role.findMany({ where });
+    return await this.prisma.role.findMany({
+      where,
+      include: roleListInclude,
+      orderBy: [{ organizationScope: { name: 'asc' } }, { name: 'asc' }],
+    });
   };
 
   public getRoleById = async (
@@ -108,17 +125,21 @@ export class RoleService {
     data: CreateRoleDto,
     viewer: AuthenticatedUser,
   ): Promise<Role> => {
-    const existingRole = await this.prisma.role.findUnique({
-      where: { name: data.name },
-    });
-    if (existingRole) {
-      throw new BadRequestException('Role already exists');
-    }
     const effectiveOrganizationScopeId = isMainOrganizationUser(viewer)
       ? isFullAccessRoleName(viewer.role.name)
         ? data.organizationScopeId
         : viewer.organisationId
       : viewer.organisationId;
+
+    const scopeIdForUnique = effectiveOrganizationScopeId ?? null;
+    const existingRole = await this.prisma.role.findFirst({
+      where: roleNameScopeWhere(data.name, scopeIdForUnique),
+    });
+    if (existingRole) {
+      throw new BadRequestException(
+        'Un rôle avec ce nom existe déjà pour cette organisation',
+      );
+    }
 
     let scopeOrgType: OrganizationType | null = null;
     if (effectiveOrganizationScopeId) {
@@ -197,11 +218,13 @@ export class RoleService {
           'Le nom de ce rôle système ne peut pas être modifié',
         );
       }
-      const existingRoleWithSameName = await this.prisma.role.findUnique({
-        where: { name: data.name },
+      const existingRoleWithSameName = await this.prisma.role.findFirst({
+        where: roleNameScopeWhere(data.name, existingRole.organizationScopeId),
       });
-      if (existingRoleWithSameName) {
-        throw new BadRequestException('Role with this name already exists');
+      if (existingRoleWithSameName && existingRoleWithSameName.id !== id) {
+        throw new BadRequestException(
+          'Un rôle avec ce nom existe déjà pour cette organisation',
+        );
       }
     }
     return await this.prisma.role.update({ where: { id }, data });

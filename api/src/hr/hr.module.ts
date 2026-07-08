@@ -7,6 +7,10 @@ import { LeaveRequestService } from './leave-request.service';
 import { LeaveBalanceService } from './leave-balance.service';
 import { EmploymentContractService } from './employment-contract.service';
 import { EmployeeSalaryService } from './employee-salary.service';
+import { WorkShiftService } from './work-shift.service';
+import { RecurringWorkShiftService } from './recurring-work-shift.service';
+import { EmployeeSanctionService } from './employee-sanction.service';
+import { EmployeeDepartureService } from './employee-departure.service';
 
 @Module({
   imports: [PrismaModule],
@@ -18,6 +22,10 @@ import { EmployeeSalaryService } from './employee-salary.service';
     LeaveBalanceService,
     EmploymentContractService,
     EmployeeSalaryService,
+    WorkShiftService,
+    RecurringWorkShiftService,
+    EmployeeSanctionService,
+    EmployeeDepartureService,
   ],
   exports: [
     DepartmentService,
@@ -26,6 +34,10 @@ import { EmployeeSalaryService } from './employee-salary.service';
     LeaveBalanceService,
     EmploymentContractService,
     EmployeeSalaryService,
+    WorkShiftService,
+    RecurringWorkShiftService,
+    EmployeeSanctionService,
+    EmployeeDepartureService,
   ],
 })
 export class HrModule {}

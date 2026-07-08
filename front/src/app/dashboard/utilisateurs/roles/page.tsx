@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -8,13 +8,19 @@ import {
   ListChecks,
   Pencil,
   Plus,
+  Search,
   ShieldPlus,
   Trash2,
 } from "lucide-react";
 
 import { DashboardTitleBar } from "~/components/layout/dashboard-title-bar";
 import { TableScroll } from "~/components/layout/table-scroll";
-import { hasMePermission, isAdminUser, useMe } from "~/hooks/use-me";
+import {
+  hasMePermission,
+  isAdminUser,
+  isMainOrganization,
+  useMe,
+} from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { RoleDto } from "~/lib/api-types";
 import {
@@ -26,11 +32,28 @@ import {
 
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { isFullAccessRole } from "../_lib/full-access-roles";
+import { roleOrganizationLabel } from "../_lib/user-form-roles";
+
+function matchesRoleSearch(role: RoleDto, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const orgLabel = roleOrganizationLabel(role).toLowerCase();
+  const poleLabel = role.pole?.name?.toLowerCase() ?? "";
+  const poleCode = role.pole?.code?.toLowerCase() ?? "";
+  return (
+    role.name.toLowerCase().includes(q) ||
+    (role.description?.toLowerCase().includes(q) ?? false) ||
+    orgLabel.includes(q) ||
+    poleLabel.includes(q) ||
+    poleCode.includes(q)
+  );
+}
 
 export default function RolesListPage() {
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const catalogAdminOnly = me != null && isAdminUser(me);
+  const viewerIsMain = me != null && isMainOrganization(me);
   const canCreatePermission =
     catalogAdminOnly &&
     me != null &&
@@ -41,6 +64,8 @@ export default function RolesListPage() {
   const canUpdateRole = me != null && hasMePermission(me, "update", "Role");
   const canDeleteRole = me != null && hasMePermission(me, "delete", "Role");
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [organizationFilter, setOrganizationFilter] = useState("");
 
   const { data: roles = [], isLoading, isError } = useQuery({
     queryKey: ["role"] as const,
@@ -63,9 +88,40 @@ export default function RolesListPage() {
     },
   });
 
-  const sorted = [...roles].sort((a, b) =>
-    a.name.localeCompare(b.name, "fr"),
-  );
+  const organizationOptions = useMemo(() => {
+    const fromRoles = new Map<string, string>();
+    for (const role of roles) {
+      if (role.organizationScope) {
+        fromRoles.set(
+          role.organizationScope.id,
+          role.organizationScope.name,
+        );
+      }
+    }
+    const sorted = [...fromRoles.entries()].sort((a, b) =>
+      a[1].localeCompare(b[1], "fr"),
+    );
+    return sorted;
+  }, [roles]);
+
+  const filtered = useMemo(() => {
+    return roles
+      .filter((r) => {
+        if (organizationFilter === "") return true;
+        if (organizationFilter === "__global__") {
+          return r.organizationScopeId === null;
+        }
+        return r.organizationScopeId === organizationFilter;
+      })
+      .filter((r) => matchesRoleSearch(r, search))
+      .sort((a, b) => {
+        const orgA = roleOrganizationLabel(a);
+        const orgB = roleOrganizationLabel(b);
+        const byOrg = orgA.localeCompare(orgB, "fr");
+        if (byOrg !== 0) return byOrg;
+        return a.name.localeCompare(b.name, "fr");
+      });
+  }, [roles, search, organizationFilter]);
 
   return (
     <main className={`${dashboardMainClass} gap-6`}>
@@ -110,6 +166,43 @@ export default function RolesListPage() {
         }
       />
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative min-w-0 flex-1 sm:max-w-md">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-gray-400"
+            strokeWidth={1.75}
+          />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher par nom, description, organisation ou pôle…"
+            className="h-11 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm text-[#2D323E] shadow-sm outline-none focus:border-[#FF8C00] focus:ring-2 focus:ring-[#FF8C00]/25"
+          />
+        </div>
+        {viewerIsMain ? (
+          <div className="min-w-48">
+            <label htmlFor="role-org-filter" className="sr-only">
+              Filtrer par organisation
+            </label>
+            <select
+              id="role-org-filter"
+              value={organizationFilter}
+              onChange={(e) => setOrganizationFilter(e.target.value)}
+              className="h-11 w-full cursor-pointer rounded-xl border border-gray-200 bg-white px-3 text-sm text-[#2D323E] shadow-sm outline-none focus:border-[#FF8C00] focus:ring-2 focus:ring-[#FF8C00]/25"
+            >
+              <option value="">Toutes les organisations</option>
+              <option value="__global__">Global (système)</option>
+              {organizationOptions.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+      </div>
+
       {deleteError && (
         <p className="text-sm text-red-600" role="alert">
           {deleteError}
@@ -126,9 +219,13 @@ export default function RolesListPage() {
         <p className="flex flex-1 items-center justify-center text-gray-600">
           Chargement…
         </p>
-      ) : sorted.length === 0 ? (
+      ) : roles.length === 0 ? (
         <p className="flex flex-1 items-center justify-center text-gray-600">
           Aucun rôle.
+        </p>
+      ) : filtered.length === 0 ? (
+        <p className="flex flex-1 items-center justify-center text-gray-600">
+          Aucun rôle ne correspond à ce filtre.
         </p>
       ) : (
         <TableScroll className="border-gray-200">
@@ -136,6 +233,9 @@ export default function RolesListPage() {
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="px-4 py-3 font-semibold text-gray-900">Nom</th>
+                <th className="px-4 py-3 font-semibold text-gray-900">
+                  Organisation
+                </th>
                 <th className="px-4 py-3 font-semibold text-gray-900">
                   Description
                 </th>
@@ -145,13 +245,23 @@ export default function RolesListPage() {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((r) => (
+              {filtered.map((r) => (
                 <tr
                   key={r.id}
                   className="border-b border-gray-100 hover:bg-gray-50/80"
                 >
-                  <td className="px-4 py-3 font-mono font-medium text-[#2D323E]">
-                    {r.name}
+                  <td className="px-4 py-3">
+                    <div className="font-mono font-medium text-[#2D323E]">
+                      {r.name}
+                    </div>
+                    {r.pole ? (
+                      <div className="mt-0.5 text-xs text-gray-500">
+                        Pôle : {r.pole.name}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">
+                    {roleOrganizationLabel(r)}
                   </td>
                   <td className="max-w-md px-4 py-3 text-gray-700">
                     {r.description ?? "—"}
@@ -159,7 +269,8 @@ export default function RolesListPage() {
                   <td className="px-4 py-3">
                     {!canUpdatePermission && !canUpdateRole && !canDeleteRole ? (
                       <span className="text-xs text-gray-500">—</span>
-                    ) : isFullAccessRole(r.name) ? (
+                    ) : isFullAccessRole(r.name) &&
+                      r.organizationScopeId === null ? (
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-gray-500">
                           Accès total (système)
@@ -200,7 +311,7 @@ export default function RolesListPage() {
                             onClick={() => {
                               if (
                                 !window.confirm(
-                                  `Supprimer le rôle « ${r.name} » ? Impossible s’il est encore attribué à des utilisateurs.`,
+                                  `Supprimer le rôle « ${r.name} » (${roleOrganizationLabel(r)}) ? Impossible s’il est encore attribué à des utilisateurs.`,
                                 )
                               ) {
                                 return;

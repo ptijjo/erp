@@ -39,6 +39,7 @@ import { MailModule } from './mail/mail.module';
 import { CronModule } from './cron/cron.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { DirectoryModule } from './directory/directory.module';
 import { ActionsModule } from './actions/actions.module';
 import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
 
@@ -81,6 +82,7 @@ import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
     CronModule,
     RealtimeModule,
     MessagingModule,
+    DirectoryModule,
     ActionsModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],

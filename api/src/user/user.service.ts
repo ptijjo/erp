@@ -31,6 +31,7 @@ import { OrganizationType } from '../generated/prisma/client';
 import { ImageProcessorService } from '../storage/image-processor.service';
 import { R2ObjectStorageService } from '../storage/r2-object-storage.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
+import { EmployeeService } from '../hr/employee.service';
 
 export type {
   SafeUserDetail,
@@ -60,6 +61,7 @@ export class UserService {
     private readonly imageProcessor: ImageProcessorService,
     private readonly objectStorage: R2ObjectStorageService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
+    private readonly employeeService: EmployeeService,
   ) {}
 
   /**
@@ -286,6 +288,14 @@ export class UserService {
       user.lastName !== undefined && user.lastName.trim() !== ''
         ? user.lastName.trim()
         : undefined;
+    const org = await this.prisma.organization.findUnique({
+      where: { id: effectiveOrgId },
+      select: { organizationType: true },
+    });
+    if (!org) {
+      throw new NotFoundException('Organisation introuvable');
+    }
+
     const newUser = await this.prisma.user.create({
       data: {
         email: user.email,
@@ -300,6 +310,17 @@ export class UserService {
       },
       include: { role: true },
     });
+
+    if (org.organizationType === OrganizationType.SUBSIDIARY) {
+      await this.employeeService.provisionForNewUser({
+        userId: newUser.id,
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        organizationId: effectiveOrgId,
+      });
+    }
+
     const { password: _p, ...rest } = newUser;
     return rest;
   };

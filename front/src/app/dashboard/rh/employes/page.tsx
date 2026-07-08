@@ -23,15 +23,20 @@ export default function EmployesPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchDraft, setSearchDraft] = useState("");
+  const [activeOnly, setActiveOnly] = useState(true);
 
   const { data: me, isPending: mePending } = useMe();
   const canRead = me != null && hasMePermission(me, "read", "Employee");
   const canCreate = me != null && hasMePermission(me, "create", "Employee");
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["hr", "employees", page, search] as const,
+    queryKey: ["hr", "employees", page, search, activeOnly] as const,
     queryFn: () =>
-      fetchHrPage<EmployeeDto>("/hr/employees", { page, search: search || undefined }),
+      fetchHrPage<EmployeeDto>("/hr/employees", {
+        page,
+        search: search || undefined,
+        status: activeOnly ? "ACTIVE" : undefined,
+      }),
     enabled: !mePending && canRead,
   });
 
@@ -81,6 +86,18 @@ export default function EmployesPage() {
           <Button type="submit" variant="secondary" size="sm">
             Filtrer
           </Button>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={activeOnly}
+              onChange={(e) => {
+                setActiveOnly(e.target.checked);
+                setPage(1);
+              }}
+              className="size-4 rounded border-input"
+            />
+            Actifs seulement
+          </label>
           {search ? (
             <Button
               type="button"
@@ -113,6 +130,7 @@ export default function EmployesPage() {
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="px-4 py-3 font-semibold">Nom</th>
+                  <th className="px-4 py-3 font-semibold">Rôle</th>
                   <th className="px-4 py-3 font-semibold">Poste</th>
                   <th className="px-4 py-3 font-semibold">Département</th>
                   <th className="px-4 py-3 font-semibold">Statut</th>
@@ -135,6 +153,9 @@ export default function EmployesPage() {
                   >
                     <td className="px-4 py-3 font-medium">
                       {employeeDisplayName(e)}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {e.user?.role?.name ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {e.position ?? "—"}

@@ -4,6 +4,7 @@ import { mockPrismaServiceProvider } from '../test/mocks/prisma-service.mock';
 import { ImageProcessorService } from '../storage/image-processor.service';
 import { R2ObjectStorageService } from '../storage/r2-object-storage.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
+import { EmployeeService } from '../hr/employee.service';
 
 describe('UserService', () => {
   let service: UserService;
@@ -32,6 +33,10 @@ describe('UserService', () => {
         {
           provide: CaslAbilityFactory,
           useValue: { createForUser: jest.fn() },
+        },
+        {
+          provide: EmployeeService,
+          useValue: { provisionForNewUser: jest.fn() },
         },
       ],
     }).compile();

@@ -20,6 +20,10 @@ import { LeaveRequestService } from './leave-request.service';
 import { LeaveBalanceService } from './leave-balance.service';
 import { EmploymentContractService } from './employment-contract.service';
 import { EmployeeSalaryService } from './employee-salary.service';
+import { WorkShiftService } from './work-shift.service';
+import { RecurringWorkShiftService } from './recurring-work-shift.service';
+import { EmployeeSanctionService } from './employee-sanction.service';
+import { EmployeeDepartureService } from './employee-departure.service';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto';
 import { CreateEmployeeDto, UpdateEmployeeDto } from './dto/employee.dto';
 import {
@@ -38,6 +42,24 @@ import {
   CreateEmployeeSalaryDto,
   UpdateEmployeeSalaryDto,
 } from './dto/employee-salary.dto';
+import {
+  CreateWorkShiftDto,
+  UpdateWorkShiftDto,
+  WorkShiftCalendarQueryDto,
+} from './dto/work-shift.dto';
+import {
+  CreateEmployeeSanctionDto,
+  UpdateEmployeeSanctionDto,
+} from './dto/employee-sanction.dto';
+import {
+  CreateEmployeeDepartureDto,
+  UpdateEmployeeDepartureDto,
+} from './dto/employee-departure.dto';
+import {
+  CreateRecurringWorkShiftDto,
+  GenerateWeekDto,
+  UpdateRecurringWorkShiftDto,
+} from './dto/recurring-work-shift.dto';
 import { HrEmployeeScopedListQueryDto, HrListQueryDto } from './dto/hr-list-query.dto';
 import { EnsureLeaveBalanceDto } from './dto/ensure-leave-balance.dto';
 import { PaginationQueryDto } from '../lib/pagination-query.dto';
@@ -52,6 +74,10 @@ export class HrController {
     private readonly leaveBalanceService: LeaveBalanceService,
     private readonly employmentContractService: EmploymentContractService,
     private readonly employeeSalaryService: EmployeeSalaryService,
+    private readonly workShiftService: WorkShiftService,
+    private readonly recurringWorkShiftService: RecurringWorkShiftService,
+    private readonly employeeSanctionService: EmployeeSanctionService,
+    private readonly employeeDepartureService: EmployeeDepartureService,
   ) {}
 
   @Get('departments')
@@ -347,5 +373,207 @@ export class HrController {
     @CurrentUser() viewer: AuthenticatedUser,
   ) {
     return this.employeeSalaryService.remove(id, viewer);
+  }
+
+  @Get('work-shifts')
+  @CheckPolicies({ action: 'read', subject: 'WorkShift' })
+  findAllWorkShifts(
+    @Query() query: HrEmployeeScopedListQueryDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.workShiftService.findAll(viewer, query);
+  }
+
+  @Get('work-shifts/calendar')
+  @CheckPolicies({ action: 'read', subject: 'WorkShift' })
+  findWorkShiftsCalendar(
+    @Query() query: WorkShiftCalendarQueryDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.workShiftService.findCalendar(viewer, query);
+  }
+
+  @Get('work-shifts/:id')
+  @CheckPolicies({ action: 'read', subject: 'WorkShift' })
+  findOneWorkShift(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.workShiftService.findOne(id, viewer);
+  }
+
+  @Post('work-shifts')
+  @CheckPolicies({ action: 'create', subject: 'WorkShift' })
+  createWorkShift(
+    @Body() dto: CreateWorkShiftDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.workShiftService.create(dto, viewer);
+  }
+
+  @Patch('work-shifts/:id')
+  @CheckPolicies({ action: 'update', subject: 'WorkShift' })
+  updateWorkShift(
+    @Param('id') id: string,
+    @Body() dto: UpdateWorkShiftDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.workShiftService.update(id, dto, viewer);
+  }
+
+  @Delete('work-shifts/:id')
+  @CheckPolicies({ action: 'delete', subject: 'WorkShift' })
+  removeWorkShift(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.workShiftService.remove(id, viewer);
+  }
+
+  @Post('work-shifts/generate')
+  @CheckPolicies({ action: 'create', subject: 'WorkShift' })
+  generateWorkShiftsWeek(
+    @Body() dto: GenerateWeekDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.workShiftService.generateWeek(viewer, dto);
+  }
+
+  @Get('recurring-work-shifts')
+  @CheckPolicies({ action: 'read', subject: 'WorkShift' })
+  findAllRecurringWorkShifts(
+    @Query() query: HrEmployeeScopedListQueryDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.recurringWorkShiftService.findAll(viewer, query);
+  }
+
+  @Get('recurring-work-shifts/:id')
+  @CheckPolicies({ action: 'read', subject: 'WorkShift' })
+  findOneRecurringWorkShift(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.recurringWorkShiftService.findOne(id, viewer);
+  }
+
+  @Post('recurring-work-shifts')
+  @CheckPolicies({ action: 'create', subject: 'WorkShift' })
+  createRecurringWorkShift(
+    @Body() dto: CreateRecurringWorkShiftDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.recurringWorkShiftService.create(dto, viewer);
+  }
+
+  @Patch('recurring-work-shifts/:id')
+  @CheckPolicies({ action: 'update', subject: 'WorkShift' })
+  updateRecurringWorkShift(
+    @Param('id') id: string,
+    @Body() dto: UpdateRecurringWorkShiftDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.recurringWorkShiftService.update(id, dto, viewer);
+  }
+
+  @Delete('recurring-work-shifts/:id')
+  @CheckPolicies({ action: 'delete', subject: 'WorkShift' })
+  removeRecurringWorkShift(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.recurringWorkShiftService.remove(id, viewer);
+  }
+
+  @Get('sanctions')
+  @CheckPolicies({ action: 'read', subject: 'EmployeeSanction' })
+  findAllSanctions(
+    @Query() query: HrEmployeeScopedListQueryDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.employeeSanctionService.findAll(viewer, query);
+  }
+
+  @Get('sanctions/:id')
+  @CheckPolicies({ action: 'read', subject: 'EmployeeSanction' })
+  findOneSanction(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.employeeSanctionService.findOne(id, viewer);
+  }
+
+  @Post('sanctions')
+  @CheckPolicies({ action: 'create', subject: 'EmployeeSanction' })
+  createSanction(
+    @Body() dto: CreateEmployeeSanctionDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.employeeSanctionService.create(dto, viewer);
+  }
+
+  @Patch('sanctions/:id')
+  @CheckPolicies({ action: 'update', subject: 'EmployeeSanction' })
+  updateSanction(
+    @Param('id') id: string,
+    @Body() dto: UpdateEmployeeSanctionDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.employeeSanctionService.update(id, dto, viewer);
+  }
+
+  @Delete('sanctions/:id')
+  @CheckPolicies({ action: 'delete', subject: 'EmployeeSanction' })
+  removeSanction(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.employeeSanctionService.remove(id, viewer);
+  }
+
+  @Get('departures')
+  @CheckPolicies({ action: 'read', subject: 'EmployeeDeparture' })
+  findAllDepartures(
+    @Query() query: HrEmployeeScopedListQueryDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.employeeDepartureService.findAll(viewer, query);
+  }
+
+  @Get('departures/:id')
+  @CheckPolicies({ action: 'read', subject: 'EmployeeDeparture' })
+  findOneDeparture(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.employeeDepartureService.findOne(id, viewer);
+  }
+
+  @Post('departures')
+  @CheckPolicies({ action: 'create', subject: 'EmployeeDeparture' })
+  createDeparture(
+    @Body() dto: CreateEmployeeDepartureDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.employeeDepartureService.create(dto, viewer);
+  }
+
+  @Patch('departures/:id')
+  @CheckPolicies({ action: 'update', subject: 'EmployeeDeparture' })
+  updateDeparture(
+    @Param('id') id: string,
+    @Body() dto: UpdateEmployeeDepartureDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.employeeDepartureService.update(id, dto, viewer);
+  }
+
+  @Delete('departures/:id')
+  @CheckPolicies({ action: 'delete', subject: 'EmployeeDeparture' })
+  removeDeparture(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.employeeDepartureService.remove(id, viewer);
   }
 }

@@ -1,9 +1,14 @@
 import type {
+  EmployeeDepartureReasonDto,
+  EmployeeSanctionTypeDto,
   EmployeeStatusDto,
   EmploymentContractStatusDto,
   EmploymentContractTypeDto,
   LeaveStatusDto,
   LeaveTypeDto,
+  WeekDayDto,
+  WorkShiftKindDto,
+  WorkShiftStatusDto,
 } from "~/lib/api-types";
 
 export const EMPLOYEE_STATUS_LABEL: Record<EmployeeStatusDto, string> = {
@@ -60,6 +65,71 @@ export const CONTRACT_TYPE_OPTIONS = Object.entries(
 export const CONTRACT_STATUS_OPTIONS = Object.entries(
   CONTRACT_STATUS_LABEL,
 ) as [EmploymentContractStatusDto, string][];
+
+export const WORK_SHIFT_STATUS_LABEL: Record<WorkShiftStatusDto, string> = {
+  PLANNED: "Planifié",
+  CONFIRMED: "Confirmé",
+  CANCELLED: "Annulé",
+};
+
+export const WORK_SHIFT_STATUS_OPTIONS = Object.entries(
+  WORK_SHIFT_STATUS_LABEL,
+) as [WorkShiftStatusDto, string][];
+
+export const WORK_SHIFT_KIND_LABEL: Record<WorkShiftKindDto, string> = {
+  WORK: "Travail",
+  BREAK: "Pause",
+};
+
+export const WORK_SHIFT_KIND_OPTIONS = Object.entries(
+  WORK_SHIFT_KIND_LABEL,
+) as [WorkShiftKindDto, string][];
+
+export const WEEK_DAY_LABEL: Record<WeekDayDto, string> = {
+  MONDAY: "Lundi",
+  TUESDAY: "Mardi",
+  WEDNESDAY: "Mercredi",
+  THURSDAY: "Jeudi",
+  FRIDAY: "Vendredi",
+  SATURDAY: "Samedi",
+  SUNDAY: "Dimanche",
+};
+
+/** Ordre lundi → dimanche (aligné sur la génération API). */
+export const WEEK_DAY_OPTIONS = [
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+  "SUNDAY",
+].map((d) => [d, WEEK_DAY_LABEL[d as WeekDayDto]]) as [WeekDayDto, string][];
+
+export const SANCTION_TYPE_LABEL: Record<EmployeeSanctionTypeDto, string> = {
+  WARNING: "Avertissement",
+  SUSPENSION: "Mise à pied",
+  LAYOFF: "Licenciement",
+};
+
+export const SANCTION_TYPE_OPTIONS = Object.entries(SANCTION_TYPE_LABEL) as [
+  EmployeeSanctionTypeDto,
+  string,
+][];
+
+export const DEPARTURE_REASON_LABEL: Record<EmployeeDepartureReasonDto, string> =
+  {
+    RESIGNATION: "Démission",
+    DISMISSAL: "Licenciement",
+    END_OF_CONTRACT: "Fin de contrat",
+    RETIREMENT: "Retraite",
+    ABANDONMENT: "Abandon de poste",
+    OTHER: "Autre",
+  };
+
+export const DEPARTURE_REASON_OPTIONS = Object.entries(
+  DEPARTURE_REASON_LABEL,
+) as [EmployeeDepartureReasonDto, string][];
 
 /** Règles métier congés (alignées API `leave-balance.rules.ts`). */
 export const LEAVE_POLICY_SUMMARY =

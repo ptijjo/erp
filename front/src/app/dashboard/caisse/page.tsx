@@ -24,6 +24,7 @@ import { hasMePermission, useMe } from "~/hooks/use-me";
 import {
   canOperateCaisse,
   canSeeCaisseNav,
+  subsidiaryHasSalesCatalog,
 } from "~/lib/dashboard-navigation";
 import { api } from "~/lib/api";
 import type {
@@ -361,6 +362,24 @@ export default function CaissePage() {
   const anySessionDraftWithLines = sessionDrafts.some(
     (draft) => draft.lines.length > 0,
   );
+
+  if (me && !subsidiaryHasSalesCatalog(me)) {
+    return (
+      <PageShell>
+        <PageHeader
+          title="Caisse"
+          description="Votre filiale n’a pas de catalogue vente."
+        />
+        <p className="mt-4 max-w-lg text-sm text-muted-foreground">
+          La caisse n’est disponible que lorsque la maison mère vous a affecté
+          au moins une <strong className="text-foreground">catégorie</strong> ou
+          un <strong className="text-foreground">produit</strong> dans votre
+          catalogue. Sans produits à vendre, aucune session de caisse n’est
+          proposée aux utilisateurs de votre filiale.
+        </p>
+      </PageShell>
+    );
+  }
 
   if (!canViewCaisse) {
     return (

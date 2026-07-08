@@ -81,18 +81,26 @@ export class SeederService implements OnModuleInit {
         Logger.log(`Pôle assuré : ${poleDef.code}`);
       }
 
-      const adminRole = await this.prisma.role.upsert({
-        where: { name: 'ADMIN' },
-        create: {
-          name: 'ADMIN',
-          description: 'Rôle administrateur (global)',
-        },
-        update: {
-          description: 'Rôle administrateur (global)',
-          organizationScopeId: null,
-          poleId: null,
-        },
+      let adminRole = await this.prisma.role.findFirst({
+        where: { name: 'ADMIN', organizationScopeId: null },
       });
+      if (!adminRole) {
+        adminRole = await this.prisma.role.create({
+          data: {
+            name: 'ADMIN',
+            description: 'Rôle administrateur (global)',
+          },
+        });
+      } else {
+        adminRole = await this.prisma.role.update({
+          where: { id: adminRole.id },
+          data: {
+            description: 'Rôle administrateur (global)',
+            organizationScopeId: null,
+            poleId: null,
+          },
+        });
+      }
       Logger.log('Rôle ADMIN assuré (sans périmètre organisation)');
 
       for (const name of CASL_SEED_PERMISSION_NAMES) {
@@ -117,7 +125,12 @@ export class SeederService implements OnModuleInit {
         );
         const poleId = poleDef ? poleIdByCode.get(poleDef.code) : null;
         await this.prisma.role.upsert({
-          where: { name: def.name },
+          where: {
+            name_organizationScopeId: {
+              name: def.name,
+              organizationScopeId: organization.id,
+            },
+          },
           create: {
             name: def.name,
             description: def.description,
@@ -133,8 +146,13 @@ export class SeederService implements OnModuleInit {
         Logger.log(`Rôle direction maison mère assuré : ${def.name}`);
       }
 
-      const provisionRole = await this.prisma.role.findUnique({
-        where: { name: seedAdminRoleName },
+      const provisionScopeId =
+        seedAdminRoleName === 'ADMIN' ? null : organization.id;
+      const provisionRole = await this.prisma.role.findFirst({
+        where: {
+          name: seedAdminRoleName,
+          organizationScopeId: provisionScopeId,
+        },
       });
       if (!provisionRole) {
         throw new Error(
@@ -186,6 +204,7 @@ export class SeederService implements OnModuleInit {
         const directorRoles = await this.prisma.role.findMany({
           where: {
             name: { in: ['DIRECTOR_GENERAL', 'DIRECTOR_OPERATIONS'] },
+            organizationScopeId: organization.id,
           },
           select: { id: true },
         });
@@ -366,8 +385,11 @@ export class SeederService implements OnModuleInit {
       const supplierRoles = await this.prisma.role.findMany({
         where: {
           OR: [
-            { name: 'ADMIN' },
-            { name: { in: [...directorRoleNames] } },
+            { name: 'ADMIN', organizationScopeId: null },
+            {
+              name: { in: [...directorRoleNames] },
+              organizationScopeId: organization.id,
+            },
           ],
         },
         select: { id: true },
@@ -423,14 +445,23 @@ export class SeederService implements OnModuleInit {
         );
       }
 
-      const budgetWriteRoleNames = [
-        'ADMIN',
-        'DIRECTOR_GENERAL',
-        'DIRECTOR_OPERATIONS',
-        'DIRECTOR_FINANCE',
-      ] as const;
+
       const budgetWriteRoles = await this.prisma.role.findMany({
-        where: { name: { in: [...budgetWriteRoleNames] } },
+        where: {
+          OR: [
+            { name: 'ADMIN', organizationScopeId: null },
+            {
+              name: {
+                in: [
+                  'DIRECTOR_GENERAL',
+                  'DIRECTOR_OPERATIONS',
+                  'DIRECTOR_FINANCE',
+                ],
+              },
+              organizationScopeId: organization.id,
+            },
+          ],
+        },
         select: { id: true },
       });
       const budgetWritePermNames = [
@@ -615,7 +646,12 @@ export class SeederService implements OnModuleInit {
       }
 
       const hrDirectorRole = await this.prisma.role.findUnique({
-        where: { name: 'DIRECTOR_HR' },
+        where: {
+          name_organizationScopeId: {
+            name: 'DIRECTOR_HR',
+            organizationScopeId: organization.id,
+          },
+        },
         select: { id: true },
       });
       if (hrDirectorRole) {
@@ -645,6 +681,16 @@ export class SeederService implements OnModuleInit {
           'create:EmployeeSalary',
           'update:EmployeeSalary',
           'delete:EmployeeSalary',
+          // Sanctions et départs : gérés aussi par le DRH maison mère.
+          // Le planning (WorkShift) reste réservé aux filiales (directeur de filiale).
+          'read:EmployeeSanction',
+          'create:EmployeeSanction',
+          'update:EmployeeSanction',
+          'delete:EmployeeSanction',
+          'read:EmployeeDeparture',
+          'create:EmployeeDeparture',
+          'update:EmployeeDeparture',
+          'delete:EmployeeDeparture',
         ] as const;
         for (const permName of hrPermissionNames) {
           const perm = await this.prisma.permission.findUnique({
@@ -768,8 +814,12 @@ export class SeederService implements OnModuleInit {
           'DIRECTOR_OPERATIONS',
           'DIRECTOR_FINANCE',
         ]) {
-          const role = await this.prisma.role.findUnique({
-            where: { name: roleName },
+          const role = await this.prisma.role.findFirst({
+            where: {
+              name: roleName,
+              organizationScopeId:
+                roleName === 'ADMIN' ? null : organization.id,
+            },
           });
           if (!role) continue;
           await this.prisma.permissionRole.upsert({
@@ -822,7 +872,12 @@ export class SeederService implements OnModuleInit {
       ];
       for (const link of poleModuleLinks) {
         const role = await this.prisma.role.findUnique({
-          where: { name: link.roleName },
+          where: {
+            name_organizationScopeId: {
+              name: link.roleName,
+              organizationScopeId: organization.id,
+            },
+          },
         });
         if (!role) continue;
         for (const permName of link.permissions) {

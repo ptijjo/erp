@@ -29,12 +29,27 @@ export type OrganizationCatalogDto = {
   productIds: string[];
 };
 
+export type RolePoleSummaryDto = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+export type RoleOrganizationScopeDto = {
+  id: string;
+  name: string;
+  slug: string;
+  organizationType: string;
+};
+
 export type RoleDto = {
   id: string;
   name: string;
   description: string | null;
   organizationScopeId: string | null;
   poleId: string | null;
+  organizationScope?: RoleOrganizationScopeDto | null;
+  pole?: RolePoleSummaryDto | null;
 };
 
 export type PermissionDto = {
@@ -68,12 +83,6 @@ export type PermissionRoleDto = {
   roleId: string;
   permissionId: string;
   permission: PermissionDto;
-};
-
-export type RolePoleSummaryDto = {
-  id: string;
-  code: string;
-  name: string;
 };
 
 export type UserListItemDto = {
@@ -508,6 +517,9 @@ export type MessagingContactDto = {
     name: string;
     pole: { code: string; name: string } | null;
   };
+  employeeId: string | null;
+  position: string | null;
+  department: { id: string; name: string } | null;
 };
 
 export type MessageSenderDto = {
@@ -683,7 +695,26 @@ export type EmployeeDto = {
     email: string;
     firstName: string | null;
     lastName: string | null;
+    role?: { name: string };
   } | null;
+};
+
+/** GET `/directory/search` — collaborateurs actifs (fiche RH + rôle applicatif). */
+export type DirectoryEntryDto = {
+  employeeId: string | null;
+  userId: string | null;
+  email: string | null;
+  firstName: string;
+  lastName: string;
+  position: string | null;
+  status: "ACTIVE";
+  department: { id: string; name: string } | null;
+  organization: { id: string; name: string; slug: string };
+  role: {
+    name: string;
+    pole: { code: string; name: string } | null;
+  } | null;
+  profilePhotoUrl: string | null;
 };
 
 export type LeaveRequestDto = {
@@ -742,6 +773,93 @@ export type EmployeeSalaryDto = {
   createdAt: string;
   updatedAt: string;
   employee: HrEmployeeSummaryDto;
+};
+
+export type WorkShiftStatusDto = "PLANNED" | "CONFIRMED" | "CANCELLED";
+
+/** Nature d’un créneau : travail (vert) ou pause (bleu). */
+export type WorkShiftKindDto = "WORK" | "BREAK";
+
+/** GET `/hr/work-shifts` — planning (emploi du temps), réservé aux filiales. */
+export type WorkShiftDto = {
+  id: string;
+  startAt: string;
+  endAt: string;
+  status: WorkShiftStatusDto;
+  kind: WorkShiftKindDto;
+  note: string | null;
+  employeeId: string;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+  employee: HrEmployeeSummaryDto & { organizationId: string };
+};
+
+export type WeekDayDto =
+  | "MONDAY"
+  | "TUESDAY"
+  | "WEDNESDAY"
+  | "THURSDAY"
+  | "FRIDAY"
+  | "SATURDAY"
+  | "SUNDAY";
+
+/** GET `/hr/recurring-work-shifts` — modèles hebdomadaires récurrents (planning type). */
+export type RecurringWorkShiftDto = {
+  id: string;
+  dayOfWeek: WeekDayDto;
+  startMinute: number;
+  endMinute: number;
+  kind: WorkShiftKindDto;
+  active: boolean;
+  note: string | null;
+  employeeId: string;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+  employee: HrEmployeeSummaryDto & { organizationId: string };
+};
+
+export type EmployeeSanctionTypeDto = "WARNING" | "SUSPENSION" | "LAYOFF";
+
+/** GET `/hr/sanctions` — sanctions disciplinaires (mise à pied). */
+export type EmployeeSanctionDto = {
+  id: string;
+  type: EmployeeSanctionTypeDto;
+  reason: string;
+  startDate: string;
+  endDate: string | null;
+  note: string | null;
+  employeeId: string;
+  organizationId: string;
+  decidedById: string | null;
+  createdAt: string;
+  updatedAt: string;
+  employee: HrEmployeeSummaryDto & { organizationId: string };
+  decidedBy: HrEmployeeSummaryDto | null;
+};
+
+export type EmployeeDepartureReasonDto =
+  | "RESIGNATION"
+  | "DISMISSAL"
+  | "END_OF_CONTRACT"
+  | "RETIREMENT"
+  | "ABANDONMENT"
+  | "OTHER";
+
+/** GET `/hr/departures` — départs des employés. */
+export type EmployeeDepartureDto = {
+  id: string;
+  reason: EmployeeDepartureReasonDto;
+  departureDate: string;
+  note: string | null;
+  employeeId: string;
+  organizationId: string;
+  recordedById: string | null;
+  createdAt: string;
+  updatedAt: string;
+  employee: HrEmployeeSummaryDto & { organizationId: string };
+  recordedBy: HrEmployeeSummaryDto | null;
 };
 
 export type BudgetExpenseDto = {

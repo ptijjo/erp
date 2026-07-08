@@ -9,7 +9,10 @@ import {
   assertOrganizationResourceAccess,
   isMainOrganizationUser,
 } from '../auth/organization-scope';
-import { assertProductUsableForOrganization } from '../product/product-subsidiary-scope.util';
+import {
+  assertProductUsableForOrganization,
+  assertSubsidiaryHasSalesCatalog,
+} from '../product/product-subsidiary-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   OrganizationType,
@@ -43,6 +46,7 @@ export class VenteService {
 
   async create(viewer: AuthenticatedUser): Promise<VenteWithDetails> {
     const orgId = this.requireSubsidiaryViewer(viewer);
+    await assertSubsidiaryHasSalesCatalog(this.prisma, orgId);
     await this.accountingPeriodService.assertPeriodOpenForDate(
       orgId,
       new Date(),

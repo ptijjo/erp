@@ -3,10 +3,11 @@ import { UserService } from './user.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 import { CaslModule } from '../casl/casl.module';
+import { HrModule } from '../hr/hr.module';
 import { UserController } from './user.controller';
 
 @Module({
-  imports: [PrismaModule, StorageModule, CaslModule],
+  imports: [PrismaModule, StorageModule, CaslModule, HrModule],
   providers: [UserService],
   exports: [UserService],
   controllers: [UserController],

@@ -236,6 +236,10 @@ export function AddEmployeeForm() {
             {...register("email")}
             className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
           />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Si l’email correspond à un compte utilisateur de la même organisation,
+            la fiche employé sera liée automatiquement.
+          </p>
         </div>
         <div>
           <label htmlFor="emp-phone" className="mb-1 block text-sm font-medium">
@@ -319,20 +323,23 @@ export function AddEmployeeForm() {
       {canReadUser ? (
         <div>
           <label htmlFor="emp-user" className="mb-1 block text-sm font-medium">
-            Compte utilisateur lié
+            Compte utilisateur lié (optionnel)
           </label>
           <select
             id="emp-user"
             {...register("userId")}
             className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
           >
-            <option value="">— Aucun —</option>
+            <option value="">— Liaison auto par email —</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.email}
               </option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Laissez vide pour lier via l’email, ou choisissez un compte manuellement.
+          </p>
         </div>
       ) : null}
 

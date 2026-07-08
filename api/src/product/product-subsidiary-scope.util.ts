@@ -178,3 +178,30 @@ export async function assertProductUsableForOrganization(
     );
   }
 }
+
+/** La filiale a au moins une catégorie ou un produit dans son catalogue vente. */
+export async function subsidiaryHasAssignedSalesCatalog(
+  prisma: PrismaService,
+  organizationId: string,
+): Promise<boolean> {
+  const [categoryCount, productCount] = await Promise.all([
+    prisma.organizationCatalogCategory.count({ where: { organizationId } }),
+    prisma.organizationCatalogProduct.count({ where: { organizationId } }),
+  ]);
+  return categoryCount > 0 || productCount > 0;
+}
+
+export async function assertSubsidiaryHasSalesCatalog(
+  prisma: PrismaService,
+  organizationId: string,
+): Promise<void> {
+  const hasCatalog = await subsidiaryHasAssignedSalesCatalog(
+    prisma,
+    organizationId,
+  );
+  if (!hasCatalog) {
+    throw new ForbiddenException(
+      'La caisse est indisponible : votre filiale n’a aucune catégorie ni produit dans son catalogue. La maison mère doit d’abord vous affecter un catalogue.',
+    );
+  }
+}

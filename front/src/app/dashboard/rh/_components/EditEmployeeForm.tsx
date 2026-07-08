@@ -214,6 +214,9 @@ export function EditEmployeeForm({ employeeId }: Props) {
             {...register("email")}
             className="h-10 w-full rounded-lg border border-input px-3 text-sm"
           />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Modifier l’email peut relier ou délier le compte utilisateur correspondant.
+          </p>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Téléphone</label>
@@ -286,7 +289,7 @@ export function EditEmployeeForm({ employeeId }: Props) {
             {...register("userId")}
             className="h-10 w-full rounded-lg border border-input px-3 text-sm"
           >
-            <option value="">— Aucun —</option>
+            <option value="">— Liaison auto par email —</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.email}

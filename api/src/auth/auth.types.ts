@@ -27,6 +27,8 @@ export type MeResponse = AuthenticatedUser & {
   organisationName: string;
   permissionMode: 'FULL_ACCESS' | 'ROLE_PERMISSIONS' | 'FALLBACK_READ_ALL';
   permissions: string[];
+  /** Fille : au moins une catégorie ou un produit dans le catalogue vente. */
+  hasSalesCatalog: boolean;
 };
 
 export type SafeUserForSession = {

@@ -6,6 +6,10 @@ import { LeaveRequestService } from './leave-request.service';
 import { LeaveBalanceService } from './leave-balance.service';
 import { EmploymentContractService } from './employment-contract.service';
 import { EmployeeSalaryService } from './employee-salary.service';
+import { WorkShiftService } from './work-shift.service';
+import { RecurringWorkShiftService } from './recurring-work-shift.service';
+import { EmployeeSanctionService } from './employee-sanction.service';
+import { EmployeeDepartureService } from './employee-departure.service';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
 import { PoliciesGuard } from '../casl/policies.guard';
 import { allowAllGuard } from '../test/mocks/guards.mock';
@@ -86,6 +90,48 @@ describe('HrController', () => {
         },
         {
           provide: EmployeeSalaryService,
+          useValue: {
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
+        },
+        {
+          provide: WorkShiftService,
+          useValue: {
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            findCalendar: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+            generateWeek: jest.fn(),
+          },
+        },
+        {
+          provide: RecurringWorkShiftService,
+          useValue: {
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
+        },
+        {
+          provide: EmployeeSanctionService,
+          useValue: {
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
+        },
+        {
+          provide: EmployeeDepartureService,
           useValue: {
             findAll: jest.fn(),
             findOne: jest.fn(),

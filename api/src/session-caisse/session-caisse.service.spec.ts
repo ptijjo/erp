@@ -2,7 +2,7 @@ jest.mock('../prisma/prisma.service', () => ({
   PrismaService: class PrismaService {},
 }));
 
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SessionCaisseService } from './session-caisse.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,6 +23,8 @@ describe('SessionCaisseService', () => {
   let service: SessionCaisseService;
   let findFirst: jest.Mock;
   let create: jest.Mock;
+  let catalogCategoryCount: jest.Mock;
+  let catalogProductCount: jest.Mock;
 
   beforeEach(async () => {
     findFirst = jest.fn().mockResolvedValue(null);
@@ -37,6 +39,8 @@ describe('SessionCaisseService', () => {
       user: { id: 'u-sub', email: 'x@y.z', firstName: null, lastName: null },
       closedBy: null,
     }));
+    catalogCategoryCount = jest.fn().mockResolvedValue(1);
+    catalogProductCount = jest.fn().mockResolvedValue(0);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -46,6 +50,8 @@ describe('SessionCaisseService', () => {
           useValue: {
             sessionCaisse: { findFirst, create, findUnique: jest.fn() },
             vente: { count: jest.fn() },
+            organizationCatalogCategory: { count: catalogCategoryCount },
+            organizationCatalogProduct: { count: catalogProductCount },
           },
         },
       ],
@@ -59,6 +65,15 @@ describe('SessionCaisseService', () => {
     await expect(
       service.open({ fondOuverture: 1000 }, subsidiaryViewer),
     ).rejects.toBeInstanceOf(BadRequestException);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('refuse l’ouverture sans catalogue vente assigné', async () => {
+    catalogCategoryCount.mockResolvedValue(0);
+    catalogProductCount.mockResolvedValue(0);
+    await expect(
+      service.open({ fondOuverture: 1000 }, subsidiaryViewer),
+    ).rejects.toBeInstanceOf(ForbiddenException);
     expect(create).not.toHaveBeenCalled();
   });
 

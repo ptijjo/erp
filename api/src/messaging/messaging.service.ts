@@ -9,6 +9,8 @@ import { MessageThreadScope, type Prisma } from '../generated/prisma/client';
 import { RealtimeHubService } from '../realtime/realtime-hub.service';
 import { MessagingPolicyService } from './messaging-policy.service';
 import type { CreateThreadDto, SendMessageDto } from './dto/messaging.dto';
+import { DirectoryService } from '../directory/directory.service';
+import type { MessagingContactDto } from './messaging.types';
 
 const messagingUserPublicSelect = {
   id: true,
@@ -46,41 +48,45 @@ export class MessagingService {
     private readonly prisma: PrismaService,
     private readonly policy: MessagingPolicyService,
     private readonly realtimeHub: RealtimeHubService,
+    private readonly directoryService: DirectoryService,
   ) {}
 
   async searchContacts(
     viewer: AuthenticatedUser,
     query: string,
     limit = 20,
-  ) {
-    const q = query.trim();
-    const users = await this.prisma.user.findMany({
-      where: {
-        deletedAt: null,
-        id: { not: viewer.sub },
-        OR: [
-          { email: { contains: q, mode: 'insensitive' } },
-          { firstName: { contains: q, mode: 'insensitive' } },
-          { lastName: { contains: q, mode: 'insensitive' } },
-        ],
-      },
-      take: Math.min(limit, 50),
-      select: {
-        ...messagingUserPublicSelect,
-        organizationId: true,
-        organization: { select: { name: true, organizationType: true } },
-        role: {
-          select: { name: true, pole: { select: { code: true, name: true } } },
-        },
-      },
-    });
+  ): Promise<MessagingContactDto[]> {
+    const entries = await this.directoryService.search(viewer, query, limit);
+    const eligible: MessagingContactDto[] = [];
 
-    const eligible: typeof users = [];
-    for (const u of users) {
+    for (const entry of entries) {
+      if (!entry.userId || entry.userId === viewer.sub) {
+        continue;
+      }
       try {
-        const peer = await this.policy.loadPeer(u.id);
+        const peer = await this.policy.loadPeer(entry.userId);
         this.policy.assertCanExchange(viewer, peer);
-        eligible.push(u);
+        eligible.push({
+          id: entry.userId,
+          email: entry.email ?? peer.email,
+          firstName: entry.firstName,
+          lastName: entry.lastName,
+          profilePhotoUrl: entry.profilePhotoUrl,
+          organizationId: entry.organization.id,
+          organization: {
+            name: entry.organization.name,
+            organizationType: peer.organizationType,
+          },
+          role: entry.role ?? {
+            name: peer.roleName,
+            pole: peer.poleCode
+              ? { code: peer.poleCode, name: peer.poleCode }
+              : null,
+          },
+          employeeId: entry.employeeId,
+          position: entry.position,
+          department: entry.department,
+        });
       } catch {
         /* non éligible */
       }

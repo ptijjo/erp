@@ -47,6 +47,7 @@ describe('EmployeeService', () => {
   let employeeDelete: jest.Mock;
   let departmentFindUnique: jest.Mock;
   let userFindUnique: jest.Mock;
+  let userUpdate: jest.Mock;
 
   beforeEach(async () => {
     employeeFindMany = jest.fn();
@@ -57,6 +58,7 @@ describe('EmployeeService', () => {
     employeeDelete = jest.fn();
     departmentFindUnique = jest.fn();
     userFindUnique = jest.fn();
+    userUpdate = jest.fn().mockResolvedValue({});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -79,7 +81,7 @@ describe('EmployeeService', () => {
               delete: employeeDelete,
             },
             department: { findUnique: departmentFindUnique },
-            user: { findUnique: userFindUnique },
+            user: { findUnique: userFindUnique, update: userUpdate },
           },
         },
       ],
@@ -145,6 +147,16 @@ describe('EmployeeService', () => {
       organizationId: 'org-sub',
       hireDate,
     });
+    employeeFindUnique.mockResolvedValue({
+      id: 'e1',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      organizationId: 'org-sub',
+      hireDate,
+      department: null,
+      manager: null,
+      user: null,
+    });
     await service.create(
       { firstName: 'Ada', lastName: 'Lovelace', hireDate },
       subsidiaryViewer,
@@ -156,10 +168,53 @@ describe('EmployeeService', () => {
     );
   });
 
+  it('lie automatiquement un utilisateur par email', async () => {
+    userFindUnique.mockResolvedValue({
+      id: 'user-1',
+      organizationId: 'org-sub',
+      deletedAt: null,
+    });
+    employeeFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'e1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        organizationId: 'org-sub',
+        department: null,
+        manager: null,
+        user: { id: 'user-1', email: 'ada@test.local', firstName: 'Ada', lastName: 'Lovelace', role: { name: 'MANAGER' } },
+      });
+    employeeCreate.mockResolvedValue({
+      id: 'e1',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      organizationId: 'org-sub',
+      hireDate,
+      userId: 'user-1',
+    });
+    await service.create(
+      {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        hireDate,
+        email: 'ada@test.local',
+      },
+      subsidiaryViewer,
+    );
+    expect(employeeCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ userId: 'user-1' }),
+      }),
+    );
+    expect(userUpdate).toHaveBeenCalled();
+  });
+
   it('refuse un userId déjà lié à un autre employé', async () => {
     userFindUnique.mockResolvedValue({
       id: 'user-1',
       organizationId: 'org-sub',
+      deletedAt: null,
     });
     employeeFindUnique.mockResolvedValue({ id: 'other-emp' });
     await expect(

@@ -31,13 +31,25 @@ import {
   type PaginatedResult,
 } from '../lib/pagination';
 import { LeaveBalanceService } from './leave-balance.service';
+import {
+  resolveUserIdForEmployeeLink,
+  syncUserProfileFromEmployee,
+} from './employee-user-link.util';
 
 const employeeInclude = {
   department: { select: { id: true, name: true } },
   manager: {
     select: { id: true, firstName: true, lastName: true },
   },
-  user: { select: { id: true, email: true, firstName: true, lastName: true } },
+  user: {
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      role: { select: { name: true } },
+    },
+  },
 } as const;
 
 @Injectable()
@@ -49,7 +61,12 @@ export class EmployeeService {
 
   async findAll(
     viewer: AuthenticatedUser,
-    paginationInput: { page?: number; limit?: number; search?: string },
+    paginationInput: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: string;
+    },
   ): Promise<
     PaginatedResult<
       Prisma.EmployeeGetPayload<{ include: typeof employeeInclude }>
@@ -70,7 +87,15 @@ export class EmployeeService {
         { firstName: { contains: q, mode: 'insensitive' } },
         { lastName: { contains: q, mode: 'insensitive' } },
         { email: { contains: q, mode: 'insensitive' } },
+        { position: { contains: q, mode: 'insensitive' } },
+        { department: { name: { contains: q, mode: 'insensitive' } } },
+        { user: { email: { contains: q, mode: 'insensitive' } } },
+        { user: { role: { name: { contains: q, mode: 'insensitive' } } } },
       ];
+    }
+    const statusFilter = paginationInput.status?.trim();
+    if (statusFilter) {
+      where.status = statusFilter as EmployeeStatus;
     }
     const [items, total] = await Promise.all([
       this.prisma.employee.findMany({
@@ -104,13 +129,19 @@ export class EmployeeService {
     );
     await this.validateDepartmentId(dto.departmentId, organizationId, viewer);
     await this.validateManagerId(dto.managerId, organizationId, viewer);
-    await this.validateUserLink(dto.userId, organizationId, undefined);
+
+    const email = dto.email?.trim() || undefined;
+    const linkedUserId = await resolveUserIdForEmployeeLink(this.prisma, {
+      userId: dto.userId,
+      email: email ?? null,
+      organizationId,
+    });
 
     const created = await this.prisma.employee.create({
       data: {
         firstName: dto.firstName.trim(),
         lastName: dto.lastName.trim(),
-        email: dto.email?.trim() || null,
+        email: email ?? null,
         phone: dto.phone?.trim() || null,
         position: dto.position?.trim() || null,
         status: (dto.status as EmployeeStatus) ?? EmployeeStatus.ACTIVE,
@@ -119,10 +150,19 @@ export class EmployeeService {
         organizationId,
         departmentId: dto.departmentId ?? null,
         managerId: dto.managerId ?? null,
-        userId: dto.userId ?? null,
+        userId: linkedUserId,
       },
       include: employeeInclude,
     });
+
+    if (linkedUserId) {
+      await syncUserProfileFromEmployee(
+        this.prisma,
+        linkedUserId,
+        created.firstName,
+        created.lastName,
+      );
+    }
 
     await this.leaveBalanceService.ensureForEmployee(
       created.id,
@@ -130,7 +170,7 @@ export class EmployeeService {
       dto.hireDate,
     );
 
-    return created;
+    return this.findOne(created.id, viewer);
   }
 
   async update(id: string, dto: UpdateEmployeeDto, viewer: AuthenticatedUser) {
@@ -154,15 +194,23 @@ export class EmployeeService {
         id,
       );
     }
-    if (dto.userId !== undefined) {
-      await this.validateUserLink(
-        dto.userId,
-        existing.organizationId,
-        id,
-      );
+
+    const nextFirstName = dto.firstName?.trim() ?? existing.firstName;
+    const nextLastName = dto.lastName?.trim() ?? existing.lastName;
+    const nextEmail =
+      dto.email !== undefined ? dto.email?.trim() || null : existing.email;
+
+    let linkedUserId = existing.userId;
+    if (dto.userId !== undefined || dto.email !== undefined) {
+      linkedUserId = await resolveUserIdForEmployeeLink(this.prisma, {
+        userId: dto.userId !== undefined ? dto.userId : existing.userId,
+        email: nextEmail,
+        organizationId: existing.organizationId,
+        employeeId: id,
+      });
     }
 
-    return this.prisma.employee.update({
+    const updated = await this.prisma.employee.update({
       where: { id },
       data: {
         ...(dto.firstName !== undefined
@@ -189,9 +237,73 @@ export class EmployeeService {
           ? { departmentId: dto.departmentId }
           : {}),
         ...(dto.managerId !== undefined ? { managerId: dto.managerId } : {}),
-        ...(dto.userId !== undefined ? { userId: dto.userId } : {}),
+        ...(dto.userId !== undefined || dto.email !== undefined
+          ? { userId: linkedUserId }
+          : {}),
       },
       include: employeeInclude,
+    });
+
+    if (linkedUserId) {
+      await syncUserProfileFromEmployee(
+        this.prisma,
+        linkedUserId,
+        nextFirstName,
+        nextLastName,
+      );
+    }
+
+    return updated;
+  }
+
+  /** Crée une fiche employé ACTIVE pour un nouvel utilisateur filiale (si absente). */
+  async provisionForNewUser(params: {
+    userId: string;
+    email: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    organizationId: string;
+  }) {
+    const existing = await this.prisma.employee.findUnique({
+      where: { userId: params.userId },
+      select: { id: true },
+    });
+    if (existing) {
+      return existing;
+    }
+
+    const email = params.email.trim().toLowerCase();
+    const byEmail = await this.prisma.employee.findFirst({
+      where: {
+        organizationId: params.organizationId,
+        email: { equals: email, mode: 'insensitive' },
+      },
+      select: { id: true, userId: true },
+    });
+    if (byEmail) {
+      if (!byEmail.userId) {
+        return this.prisma.employee.update({
+          where: { id: byEmail.id },
+          data: { userId: params.userId },
+        });
+      }
+      return byEmail;
+    }
+
+    const firstName =
+      params.firstName?.trim() || email.split('@')[0] || 'Collaborateur';
+    const lastName = params.lastName?.trim() || '—';
+
+    return this.prisma.employee.create({
+      data: {
+        firstName,
+        lastName,
+        email,
+        status: EmployeeStatus.ACTIVE,
+        hireDate: new Date(),
+        organizationId: params.organizationId,
+        userId: params.userId,
+      },
     });
   }
 
@@ -239,35 +351,6 @@ export class EmployeeService {
     if (manager.organizationId !== organizationId) {
       throw new BadRequestException(
         'Le manager doit appartenir à la même organisation.',
-      );
-    }
-  }
-
-  private async validateUserLink(
-    userId: string | null | undefined,
-    organizationId: string,
-    employeeId: string | undefined,
-  ): Promise<void> {
-    if (!userId) return;
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, organizationId: true },
-    });
-    if (!user) {
-      throw new BadRequestException('Utilisateur introuvable.');
-    }
-    if (user.organizationId !== organizationId) {
-      throw new BadRequestException(
-        'L’utilisateur doit appartenir à la même organisation que l’employé.',
-      );
-    }
-    const linked = await this.prisma.employee.findUnique({
-      where: { userId },
-      select: { id: true },
-    });
-    if (linked && linked.id !== employeeId) {
-      throw new BadRequestException(
-        'Cet utilisateur est déjà rattaché à un autre employé.',
       );
     }
   }

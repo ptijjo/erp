@@ -7,6 +7,7 @@ export type HrListParams = {
   limit?: number;
   search?: string;
   employeeId?: string;
+  status?: string;
 };
 
 export function hrListQueryParams(
@@ -21,6 +22,9 @@ export function hrListQueryParams(
   }
   if (params.employeeId) {
     out.employeeId = params.employeeId;
+  }
+  if (params.status) {
+    out.status = params.status;
   }
   return out;
 }

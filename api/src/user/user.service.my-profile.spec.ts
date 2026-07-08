@@ -5,6 +5,7 @@ import { mockPrismaServiceProvider } from '../test/mocks/prisma-service.mock';
 import { ImageProcessorService } from '../storage/image-processor.service';
 import { R2ObjectStorageService } from '../storage/r2-object-storage.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
+import { EmployeeService } from '../hr/employee.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 describe('UserService.updateMyProfile', () => {
@@ -50,6 +51,10 @@ describe('UserService.updateMyProfile', () => {
         {
           provide: CaslAbilityFactory,
           useValue: { createForUser: jest.fn() },
+        },
+        {
+          provide: EmployeeService,
+          useValue: { provisionForNewUser: jest.fn() },
         },
       ],
     }).compile();
@@ -176,6 +181,10 @@ describe('UserService.update identity fields', () => {
         {
           provide: CaslAbilityFactory,
           useValue: { createForUser: jest.fn() },
+        },
+        {
+          provide: EmployeeService,
+          useValue: { provisionForNewUser: jest.fn() },
         },
       ],
     }).compile();

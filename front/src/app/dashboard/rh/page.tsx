@@ -5,13 +5,16 @@ import {
   Building2,
   CalendarClock,
   CalendarDays,
+  CalendarRange,
+  DoorOpen,
+  Gavel,
   Users,
 } from "lucide-react";
 
 import { PageHeader } from "~/components/layout/page-header";
 import { PageShell } from "~/components/layout/page-shell";
 import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { hasMePermission, useMe } from "~/hooks/use-me";
+import { hasMePermission, isMainOrganization, useMe } from "~/hooks/use-me";
 
 type RhModule = {
   title: string;
@@ -19,6 +22,8 @@ type RhModule = {
   href: string;
   icon: typeof Users;
   subject: string;
+  /** Réservé aux filiales (ex. planning piloté par le directeur de filiale). */
+  subsidiaryOnly?: boolean;
 };
 
 const RH_MODULES: RhModule[] = [
@@ -37,6 +42,14 @@ const RH_MODULES: RhModule[] = [
     subject: "Department",
   },
   {
+    title: "Planning",
+    description: "Emploi du temps et créneaux de travail",
+    href: "/dashboard/rh/planning",
+    icon: CalendarRange,
+    subject: "WorkShift",
+    subsidiaryOnly: true,
+  },
+  {
     title: "Demandes de congé",
     description: "Demandes et validations",
     href: "/dashboard/rh/conges",
@@ -50,14 +63,30 @@ const RH_MODULES: RhModule[] = [
     icon: CalendarClock,
     subject: "LeaveBalance",
   },
+  {
+    title: "Sanctions",
+    description: "Avertissements et mises à pied",
+    href: "/dashboard/rh/sanctions",
+    icon: Gavel,
+    subject: "EmployeeSanction",
+  },
+  {
+    title: "Départs",
+    description: "Sorties et fins de collaboration",
+    href: "/dashboard/rh/departs",
+    icon: DoorOpen,
+    subject: "EmployeeDeparture",
+  },
 ];
 
 export default function RhHubPage() {
   const { data: me, isPending } = useMe();
 
-  const tiles = RH_MODULES.filter(
-    (m) => me != null && hasMePermission(me, "read", m.subject),
-  );
+  const tiles = RH_MODULES.filter((m) => {
+    if (me == null) return false;
+    if (m.subsidiaryOnly && isMainOrganization(me)) return false;
+    return hasMePermission(me, "read", m.subject);
+  });
 
   return (
     <PageShell>

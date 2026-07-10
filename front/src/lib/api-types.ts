@@ -401,13 +401,6 @@ export type BudgetLineDto = {
   remainingFcfa?: number;
 };
 
-export type PaginationMetaDto = {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-};
-
 export type PaginatedBudgetsDto = {
   items: BudgetDto[];
   meta: PaginationMetaDto;

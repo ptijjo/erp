@@ -51,8 +51,11 @@ export class LegalService {
         organizationId: dto.organizationId,
         title: dto.title.trim(),
         partyName: dto.partyName.trim(),
+        contractType: dto.contractType?.trim() || null,
         startDate: dto.startDate ? new Date(dto.startDate) : null,
         endDate: dto.endDate ? new Date(dto.endDate) : null,
+        renewalAlertDays: dto.renewalAlertDays ?? null,
+        documentUrl: dto.documentUrl?.trim() || null,
         status: (dto.status as LegalContractStatus | undefined) ?? 'DRAFT',
         notes: dto.notes?.trim() || null,
       },
@@ -69,11 +72,20 @@ export class LegalService {
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.partyName !== undefined ? { partyName: dto.partyName.trim() } : {}),
+        ...(dto.contractType !== undefined
+          ? { contractType: dto.contractType?.trim() || null }
+          : {}),
         ...(dto.startDate !== undefined
           ? { startDate: dto.startDate ? new Date(dto.startDate) : null }
           : {}),
         ...(dto.endDate !== undefined
           ? { endDate: dto.endDate ? new Date(dto.endDate) : null }
+          : {}),
+        ...(dto.renewalAlertDays !== undefined
+          ? { renewalAlertDays: dto.renewalAlertDays }
+          : {}),
+        ...(dto.documentUrl !== undefined
+          ? { documentUrl: dto.documentUrl?.trim() || null }
           : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),

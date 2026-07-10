@@ -16,6 +16,13 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import type { Stock, Prisma } from '../generated/prisma/client';
 import { OrganizationType } from '../generated/prisma/client';
+import type { PaginationQueryDto } from '../lib/pagination-query.dto';
+import {
+  buildPaginationMeta,
+  paginationSkip,
+  resolvePagination,
+  type PaginatedResult,
+} from '../lib/pagination';
 
 function productIdFromStockCreateInput(
   data: Prisma.StockCreateInput,
@@ -49,7 +56,10 @@ export class StockService {
     }
   }
 
-  async findAll(viewer: AuthenticatedUser): Promise<Stock[]> {
+  async findAll(
+    viewer: AuthenticatedUser,
+    query: PaginationQueryDto = {},
+  ): Promise<PaginatedResult<Stock>> {
     const where: Prisma.StockWhereInput = {
       organization: { organizationType: OrganizationType.SUBSIDIARY },
     };
@@ -60,18 +70,25 @@ export class StockService {
         viewer,
       );
     }
-    return this.prisma.stock.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        product: {
-          include: {
-            productSuppliers: { include: { supplier: true } },
+    const { page, limit } = resolvePagination(query);
+    const [items, total] = await Promise.all([
+      this.prisma.stock.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          product: {
+            include: {
+              productSuppliers: { include: { supplier: true } },
+            },
           },
+          organization: true,
         },
-        organization: true,
-      },
-    });
+        skip: paginationSkip(page, limit),
+        take: limit,
+      }),
+      this.prisma.stock.count({ where }),
+    ]);
+    return { items, meta: buildPaginationMeta(total, page, limit) };
   }
 
   async findOne(id: string, viewer: AuthenticatedUser): Promise<Stock> {

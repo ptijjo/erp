@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -20,6 +21,7 @@ import { PoliciesGuard } from '../casl/policies.guard';
 import { PROFILE_AVATAR_MAX_INPUT_BYTES } from '../storage/image-processor.service';
 import { UserService } from './user.service';
 import { CreateUserDto, UpdateMyProfileDto, UpdateUserDto } from './dto/user.dto';
+import { PaginationQueryDto } from '../lib/pagination-query.dto';
 
 @Controller('user')
 export class UserController {
@@ -28,8 +30,11 @@ export class UserController {
   @Get('')
   @UseGuards(JwtAuthGuard, PoliciesGuard)
   @CheckPolicies({ action: 'read', subject: 'User' })
-  getUsers(@CurrentUser() viewer: AuthenticatedUser) {
-    return this.userService.findAll(viewer);
+  getUsers(
+    @CurrentUser() viewer: AuthenticatedUser,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.userService.findAll(viewer, query);
   }
 
   @Patch('me/profile')

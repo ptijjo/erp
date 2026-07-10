@@ -2,10 +2,14 @@ import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 export class CreateLegalContractDto {
@@ -21,12 +25,29 @@ export class CreateLegalContractDto {
   partyName!: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  contractType?: string;
+
+  @IsOptional()
   @IsDateString()
   startDate?: string;
 
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  @Type(() => Number)
+  renewalAlertDays?: number;
+
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(500)
+  documentUrl?: string;
 
   @IsOptional()
   @IsIn(['DRAFT', 'ACTIVE', 'EXPIRED', 'TERMINATED'])
@@ -50,12 +71,29 @@ export class UpdateLegalContractDto {
   partyName?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  contractType?: string;
+
+  @IsOptional()
   @IsDateString()
   startDate?: string;
 
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  @Type(() => Number)
+  renewalAlertDays?: number;
+
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(500)
+  documentUrl?: string;
 
   @IsOptional()
   @IsIn(['DRAFT', 'ACTIVE', 'EXPIRED', 'TERMINATED'])

@@ -19,7 +19,8 @@ import { DesktopOnly, MobileOnly } from "~/components/layout/viewport";
 import { TableScroll } from "~/components/layout/table-scroll";
 import { hasMePermission, isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
-import type { CategoryDto, ProductDto } from "~/lib/api-types";
+import type { CategoryDto, PaginatedResponse, ProductDto } from "~/lib/api-types";
+import { extractApiList, FULL_LIST_QUERY } from "~/lib/api-list";
 import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
 
@@ -78,8 +79,11 @@ export default function ProduitsPage() {
   const { data: products = [], isLoading, isError } = useQuery({
     queryKey: ["product"] as const,
     queryFn: async () => {
-      const { data } = await api.get<ProductDto[]>("/product");
-      return data;
+      const { data } = await api.get<ProductDto[] | PaginatedResponse<ProductDto>>(
+        "/product",
+        FULL_LIST_QUERY,
+      );
+      return extractApiList(data);
     },
     enabled: !mePending && canReadProduct,
   });

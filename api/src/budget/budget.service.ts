@@ -156,21 +156,29 @@ export class BudgetService {
       );
     }
 
-    const linesWithUsage = await Promise.all(
-      row.lines.map(async (line) => {
-        const agg = await this.prisma.budgetExpense.aggregate({
-          where: { budgetLineId: line.id },
-          _sum: { amount: true },
-        });
-        const spentFcfa = Number(agg._sum.amount ?? 0);
+    const linesWithUsage = await (async () => {
+      const lineIds = row.lines.map((line) => line.id);
+      if (lineIds.length === 0) {
+        return [];
+      }
+      const grouped = await this.prisma.budgetExpense.groupBy({
+        by: ['budgetLineId'],
+        where: { budgetLineId: { in: lineIds } },
+        _sum: { amount: true },
+      });
+      const spentByLine = new Map(
+        grouped.map((g) => [g.budgetLineId, Number(g._sum.amount ?? 0)]),
+      );
+      return row.lines.map((line) => {
+        const spentFcfa = spentByLine.get(line.id) ?? 0;
         const plannedFcfa = Number(line.amountPlanned);
         return {
           ...line,
           spentFcfa,
           remainingFcfa: Math.max(0, plannedFcfa - spentFcfa),
         };
-      }),
-    );
+      });
+    })();
 
     return { ...row, lines: linesWithUsage };
   }

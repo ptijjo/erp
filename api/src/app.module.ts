@@ -42,9 +42,16 @@ import { MessagingModule } from './messaging/messaging.module';
 import { DirectoryModule } from './directory/directory.module';
 import { ActionsModule } from './actions/actions.module';
 import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
+import { CacheModule } from './cache/cache.module';
+import { SensitiveFieldsInterceptor } from './common/sensitive-fields.interceptor';
+import { StrategyModule } from './strategy/strategy.module';
+import { MarketingModule } from './marketing/marketing.module';
+import { SpiritualModule } from './spiritual/spiritual.module';
+import { AccountingModule } from './accounting/accounting.module';
 
 @Module({
   imports: [
+    CacheModule,
     AuditModule,
     AuthModule,
     CaslModule,
@@ -84,6 +91,10 @@ import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
     MessagingModule,
     DirectoryModule,
     ActionsModule,
+    StrategyModule,
+    MarketingModule,
+    SpiritualModule,
+    AccountingModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -110,6 +121,10 @@ import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditContextInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: SensitiveFieldsInterceptor,
     },
   ],
 })

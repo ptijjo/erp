@@ -8,6 +8,7 @@ import { ToastHost } from "~/components/layout/toast-host";
 import { AppSidebar } from "~/components/layout/app-sidebar";
 import { DashboardLoading } from "~/components/layout/dashboard-loading";
 import { SidebarProvider } from "~/components/layout/sidebar-context";
+import { SubsidiaryProvider } from "~/providers/subsidiary-context";
 import { dashboardHomePath, useMe } from "~/hooks/use-me";
 
 const FIRST_LOGIN_PATH = "/dashboard/first-login";
@@ -48,17 +49,19 @@ export default function DashboardLayout({
   }
 
   return (
-    <SidebarProvider>
-      <ToastHost />
-      <section className="flex h-screen w-full flex-col overflow-hidden bg-background">
-        <AppHeader showMenu={!isFirstLoginRoute} />
-        <section className="relative flex min-h-0 flex-1">
-          {!isFirstLoginRoute ? <AppSidebar /> : null}
-          <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-muted/30">
-            {children}
+    <SubsidiaryProvider>
+      <SidebarProvider>
+        <ToastHost />
+        <section className="flex h-screen w-full flex-col overflow-hidden bg-background">
+          <AppHeader showMenu={!isFirstLoginRoute} />
+          <section className="relative flex min-h-0 flex-1">
+            {!isFirstLoginRoute ? <AppSidebar /> : null}
+            <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-muted/30">
+              {children}
+            </section>
           </section>
         </section>
-      </section>
-    </SidebarProvider>
+      </SidebarProvider>
+    </SubsidiaryProvider>
   );
 }

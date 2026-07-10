@@ -18,6 +18,7 @@ import { UserService } from '../user/user.service';
 import { RedisService } from '../redis/redis.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthSessionSettings } from './auth-session-settings.service';
+import { mockAppCacheServiceProvider } from '../test/mocks/app-cache.mock';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -95,6 +96,7 @@ describe('AuthService', () => {
             refreshRedisKey: (t: string) => `refresh:${t}`,
           },
         },
+        mockAppCacheServiceProvider,
       ],
     }).compile();
 

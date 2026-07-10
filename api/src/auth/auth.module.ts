@@ -10,12 +10,14 @@ import { ConfigService } from '@nestjs/config';
 import { RedisModule } from '../redis/redis.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthSessionSettings } from './auth-session-settings.service';
+import { CacheModule } from '../cache/cache.module';
 
 @Module({
   providers: [AuthSessionSettings, AuthService, LocalStrategy, JwtStrategy],
   imports: [
     PrismaModule,
     RedisModule,
+    CacheModule,
     UserModule,
     PassportModule,
     JwtModule.registerAsync({

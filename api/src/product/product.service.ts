@@ -12,21 +12,38 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import type { Product, Prisma } from '../generated/prisma/client';
 import { productCatalogWhereForViewer } from './product-subsidiary-scope.util';
+import type { PaginationQueryDto } from '../lib/pagination-query.dto';
+import {
+  buildPaginationMeta,
+  paginationSkip,
+  resolvePagination,
+  type PaginatedResult,
+} from '../lib/pagination';
 
 @Injectable()
 export class ProductService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(viewer: AuthenticatedUser): Promise<Product[]> {
+  async findAll(
+    viewer: AuthenticatedUser,
+    query: PaginationQueryDto = {},
+  ): Promise<PaginatedResult<Product>> {
     const where = await productCatalogWhereForViewer(this.prisma, viewer);
-    return this.prisma.product.findMany({
-      where,
-      orderBy: { name: 'asc' },
-      include: {
-        category: true,
-        productSuppliers: { include: { supplier: true } },
-      },
-    });
+    const { page, limit } = resolvePagination(query);
+    const [items, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        include: {
+          category: true,
+          productSuppliers: { include: { supplier: true } },
+        },
+        skip: paginationSkip(page, limit),
+        take: limit,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+    return { items, meta: buildPaginationMeta(total, page, limit) };
   }
 
   async findOne(id: string, viewer: AuthenticatedUser): Promise<Product> {

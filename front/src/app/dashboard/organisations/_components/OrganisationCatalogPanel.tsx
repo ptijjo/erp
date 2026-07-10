@@ -9,8 +9,10 @@ import { api } from "~/lib/api";
 import type {
   CategoryDto,
   OrganizationCatalogDto,
+  PaginatedResponse,
   ProductDto,
 } from "~/lib/api-types";
+import { extractApiList, FULL_LIST_QUERY } from "~/lib/api-list";
 
 import { categoryOptionsForSelect } from "../../produits/_lib/category-labels";
 
@@ -238,8 +240,11 @@ export default function OrganisationCatalogPanel({
   const { data: products = [] } = useQuery({
     queryKey: ["product"] as const,
     queryFn: async () => {
-      const { data } = await api.get<ProductDto[]>("/product");
-      return data;
+      const { data } = await api.get<ProductDto[] | PaginatedResponse<ProductDto>>(
+        "/product",
+        FULL_LIST_QUERY,
+      );
+      return extractApiList(data);
     },
     enabled: open,
   });

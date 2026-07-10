@@ -717,7 +717,11 @@ export class SeederService implements OnModuleInit {
       }
 
       const allRoles = await this.prisma.role.findMany({ select: { id: true } });
-      for (const permName of ['read:Notification', 'update:Notification'] as const) {
+      for (const permName of [
+        'read:Notification',
+        'update:Notification',
+        'read:SpiritualArticle',
+      ] as const) {
         const perm = await this.prisma.permission.findUnique({
           where: { name: permName },
         });
@@ -867,6 +871,51 @@ export class SeederService implements OnModuleInit {
             'create:ProductionOrder',
             'update:ProductionOrder',
             'delete:ProductionOrder',
+          ],
+        },
+        {
+          roleName: 'DIRECTOR_STRATEGY_DEVELOPMENT',
+          permissions: [
+            'read:StrategyProject',
+            'create:StrategyProject',
+            'update:StrategyProject',
+            'delete:StrategyProject',
+          ],
+        },
+        {
+          roleName: 'DIRECTOR_MARKETING_COMMUNICATION',
+          permissions: [
+            'read:MarketingCampaign',
+            'create:MarketingCampaign',
+            'update:MarketingCampaign',
+            'delete:MarketingCampaign',
+          ],
+        },
+        {
+          roleName: 'DIRECTOR_TRADITIONAL_SPIRITUAL',
+          permissions: [
+            'read:SpiritualEvent',
+            'create:SpiritualEvent',
+            'update:SpiritualEvent',
+            'delete:SpiritualEvent',
+            'read:SpiritualArticle',
+            'create:SpiritualArticle',
+            'update:SpiritualArticle',
+            'delete:SpiritualArticle',
+          ],
+        },
+        {
+          roleName: 'DIRECTOR_FINANCE',
+          permissions: [
+            'read:ChartAccount',
+            'create:ChartAccount',
+            'update:ChartAccount',
+            'delete:ChartAccount',
+            'read:JournalEntry',
+            'create:JournalEntry',
+            'update:JournalEntry',
+            'delete:JournalEntry',
+            'manage:JournalEntry',
           ],
         },
       ];

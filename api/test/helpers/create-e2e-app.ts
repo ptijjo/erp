@@ -15,7 +15,12 @@ import { HrModule } from '../../src/hr/hr.module';
 import { AnalyticsModule } from '../../src/analytics/analytics.module';
 import { VenteModule } from '../../src/vente/vente.module';
 import { SessionCaisseModule } from '../../src/session-caisse/session-caisse.module';
+import { CacheModule } from '../../src/cache/cache.module';
+import { MailModule } from '../../src/mail/mail.module';
+import { RealtimeModule } from '../../src/realtime/realtime.module';
+import { NotificationModule } from '../../src/notification/notification.module';
 import { InMemoryRedisService } from './in-memory-redis.service';
+import { applyE2ePrismaDefaults } from './e2e-prisma-defaults';
 import type { AuthPrismaMock } from './auth-prisma.mock';
 
 const e2eConfig = () => ({
@@ -40,10 +45,15 @@ export async function createAuthE2eApp(
   prismaMock: AuthPrismaMock,
 ): Promise<E2eAppContext> {
   const redis = new InMemoryRedisService();
+  applyE2ePrismaDefaults(prismaMock);
 
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({ isGlobal: true, load: [e2eConfig] }),
+      CacheModule,
+      MailModule,
+      RealtimeModule,
+      NotificationModule,
       CaslModule,
       AuthModule,
       PoleModule,

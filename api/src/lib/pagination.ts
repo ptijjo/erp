@@ -1,6 +1,6 @@
 /** Taille de page par défaut et plafond pour les listes API. */
 export const DEFAULT_PAGE_SIZE = 20;
-export const MAX_PAGE_SIZE = 20;
+export const MAX_PAGE_SIZE = 100;
 
 export type PaginationParams = {
   page: number;

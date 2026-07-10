@@ -74,7 +74,16 @@ export default function FirstLoginPage() {
       router.replace(profile ? dashboardHomePath(profile) : "/dashboard");
     },
     onError: (err) => {
-      setError("root", { message: errorMessage(err) });
+      const message = errorMessage(err);
+      if (
+        message.includes("déjà défini") ||
+        message.includes("deja defini")
+      ) {
+        void queryClient.invalidateQueries({ queryKey: meQueryKey });
+        router.replace("/");
+        return;
+      }
+      setError("root", { message });
     },
   });
 

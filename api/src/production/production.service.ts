@@ -59,6 +59,9 @@ export class ProductionService {
         title: dto.title.trim(),
         quantity: dto.quantity,
         productId: dto.productId ?? null,
+        materialCost: dto.materialCost ?? null,
+        laborCost: dto.laborCost ?? null,
+        bomNotes: dto.bomNotes?.trim() || null,
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         status: (dto.status as ProductionOrderStatus | undefined) ?? 'PLANNED',
         notes: dto.notes?.trim() || null,
@@ -82,6 +85,11 @@ export class ProductionService {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.quantity !== undefined ? { quantity: dto.quantity } : {}),
         ...(dto.productId !== undefined ? { productId: dto.productId } : {}),
+        ...(dto.materialCost !== undefined ? { materialCost: dto.materialCost } : {}),
+        ...(dto.laborCost !== undefined ? { laborCost: dto.laborCost } : {}),
+        ...(dto.bomNotes !== undefined
+          ? { bomNotes: dto.bomNotes?.trim() || null }
+          : {}),
         ...(dto.scheduledAt !== undefined
           ? { scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null }
           : {}),

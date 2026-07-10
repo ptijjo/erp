@@ -3,6 +3,18 @@
  * (Decimal → string, Date → ISO).
  */
 
+export type PaginationMetaDto = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type PaginatedResponse<T> = {
+  items: T[];
+  meta: PaginationMetaDto;
+};
+
 export type OrganizationDto = {
   id: string;
   name: string;
@@ -943,6 +955,217 @@ export type ProductionOrderDto = {
   organizationId: string;
   productId: string | null;
   product: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StrategyProjectStatusDto =
+  | "PLANNED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type StrategyProjectDto = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: StrategyProjectStatusDto;
+  priority: number;
+  targetDate: string | null;
+  budgetEstimate: string | null;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MarketingCampaignStatusDto =
+  | "DRAFT"
+  | "ACTIVE"
+  | "PAUSED"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type MarketingCampaignDto = {
+  id: string;
+  title: string;
+  channel: string;
+  description: string | null;
+  status: MarketingCampaignStatusDto;
+  startDate: string | null;
+  endDate: string | null;
+  budget: string | null;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SpiritualEventStatusDto =
+  | "PLANNED"
+  | "CONFIRMED"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type SpiritualEventDto = {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  eventDate: string | null;
+  status: SpiritualEventStatusDto;
+  publishedAt: string | null;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SpiritualParticipationResponseDto =
+  | "PENDING"
+  | "ACCEPTED"
+  | "DECLINED";
+
+export type SpiritualEventInvitationDto = {
+  id: string;
+  response: SpiritualParticipationResponseDto;
+  respondedAt: string | null;
+  event: Pick<
+    SpiritualEventDto,
+    | "id"
+    | "title"
+    | "description"
+    | "location"
+    | "eventDate"
+    | "status"
+    | "publishedAt"
+  >;
+};
+
+export type SpiritualParticipationSummaryDto = {
+  accepted: number;
+  declined: number;
+  pending: number;
+  withoutEmployeeRecord: number;
+  likelyAttendance: number;
+  excluded: number;
+  totalInvited: number;
+};
+
+export type SpiritualEventParticipationRowDto = {
+  id: string;
+  response: SpiritualParticipationResponseDto;
+  respondedAt: string | null;
+  userId: string;
+  employeeId: string | null;
+  employee: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    organizationId: string;
+    userId: string | null;
+    organization: { id: string; name: string };
+  } | null;
+  user: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    organizationId: string;
+    organization: { id: string; name: string };
+  };
+};
+
+export type SpiritualEventParticipationsDto = {
+  event: Pick<
+    SpiritualEventDto,
+    "id" | "title" | "eventDate" | "location" | "publishedAt"
+  >;
+  summary: SpiritualParticipationSummaryDto;
+  participations: SpiritualEventParticipationRowDto[];
+};
+
+export type SpiritualPublishResultDto = {
+  event: SpiritualEventDto;
+  groupWide: boolean;
+  invitationsSent: number;
+  invitationsByOrganization: {
+    organizationId: string;
+    name: string;
+    count: number;
+  }[];
+  mainOrganizationCount: number;
+  subsidiaryCount: number;
+  employeesWithoutAccount: number;
+  totalEmployees: number;
+};
+
+export type SpiritualArticleStatusDto = "DRAFT" | "PUBLISHED";
+
+export type SpiritualArticleAuthorDto = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePhotoUrl: string | null;
+};
+
+export type SpiritualArticleDto = {
+  id: string;
+  title: string;
+  content: string;
+  coverImageUrl: string | null;
+  status: SpiritualArticleStatusDto;
+  publishedAt: string | null;
+  organizationId: string;
+  authorUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  organization: { id: string; name: string; slug: string };
+  author: SpiritualArticleAuthorDto;
+};
+
+export type ChartAccountTypeDto =
+  | "ASSET"
+  | "LIABILITY"
+  | "EQUITY"
+  | "REVENUE"
+  | "EXPENSE";
+
+export type ChartAccountDto = {
+  id: string;
+  code: string;
+  name: string;
+  accountType: ChartAccountTypeDto;
+  isActive: boolean;
+  parentId: string | null;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type JournalEntryStatusDto = "DRAFT" | "POSTED";
+
+export type JournalEntryLineDto = {
+  id: string;
+  label: string | null;
+  debit: string;
+  credit: string;
+  chartAccountId: string;
+  chartAccount?: {
+    id: string;
+    code: string;
+    name: string;
+    accountType: ChartAccountTypeDto;
+  };
+};
+
+export type JournalEntryDto = {
+  id: string;
+  entryDate: string;
+  reference: string | null;
+  description: string | null;
+  status: JournalEntryStatusDto;
+  organizationId: string;
+  lines: JournalEntryLineDto[];
   createdAt: string;
   updatedAt: string;
 };

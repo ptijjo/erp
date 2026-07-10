@@ -16,8 +16,10 @@ import type {
   DepartmentDto,
   EmployeeDto,
   OrganizationDto,
+  PaginatedResponse,
   UserListItemDto,
 } from "~/lib/api-types";
+import { extractApiList, FULL_LIST_QUERY } from "~/lib/api-list";
 import { apiErrorMessage } from "~/lib/api-error-message";
 import {
   hasMePermission,
@@ -75,8 +77,10 @@ export function AddEmployeeForm() {
   const { data: users = [] } = useQuery({
     queryKey: ["user"] as const,
     queryFn: async () => {
-      const { data } = await api.get<UserListItemDto[]>("/user");
-      return data;
+      const { data } = await api.get<
+        UserListItemDto[] | PaginatedResponse<UserListItemDto>
+      >("/user", FULL_LIST_QUERY);
+      return extractApiList(data);
     },
     enabled: canCreate && canReadUser,
   });

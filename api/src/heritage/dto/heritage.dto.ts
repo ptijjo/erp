@@ -1,9 +1,13 @@
 import { Type } from 'class-transformer';
 import {
+  IsDateString,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  IsUrl,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -27,9 +31,33 @@ export class CreateHeritageAssetDto {
   location?: string;
 
   @IsOptional()
+  @IsDateString()
+  acquiredAt?: string;
+
+  @IsOptional()
   @Min(0)
   @Type(() => Number)
   value?: number;
+
+  @IsOptional()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  depreciationRate?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  maintenanceNotes?: string;
+
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(500)
+  documentUrl?: string;
+
+  @IsOptional()
+  @IsDateString()
+  lastInventoryAt?: string;
 
   @IsOptional()
   @IsIn(['ACTIVE', 'MAINTENANCE', 'RETIRED'])
@@ -53,9 +81,33 @@ export class UpdateHeritageAssetDto {
   location?: string;
 
   @IsOptional()
+  @IsDateString()
+  acquiredAt?: string;
+
+  @IsOptional()
   @Min(0)
   @Type(() => Number)
   value?: number;
+
+  @IsOptional()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  depreciationRate?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  maintenanceNotes?: string;
+
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(500)
+  documentUrl?: string;
+
+  @IsOptional()
+  @IsDateString()
+  lastInventoryAt?: string;
 
   @IsOptional()
   @IsIn(['ACTIVE', 'MAINTENANCE', 'RETIRED'])

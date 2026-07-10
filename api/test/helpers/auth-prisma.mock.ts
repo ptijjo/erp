@@ -68,6 +68,7 @@ export type AuthPrismaMock = {
     update?: jest.Mock;
     count?: jest.Mock;
     aggregate?: jest.Mock;
+    groupBy?: jest.Mock;
   };
   venteLine?: {
     findMany?: jest.Mock;
@@ -129,6 +130,46 @@ export type AuthPrismaMock = {
     update?: jest.Mock;
     delete?: jest.Mock;
   };
+  strategyProject?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
+  marketingCampaign?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
+  spiritualEvent?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
+  chartAccount?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    findFirst?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
+  journalEntry?: {
+    findMany?: jest.Mock;
+    findUnique?: jest.Mock;
+    create?: jest.Mock;
+    update?: jest.Mock;
+    delete?: jest.Mock;
+  };
+  organizationCatalogCategory?: { count?: jest.Mock };
+  organizationCatalogProduct?: { count?: jest.Mock };
+  accountingPeriodClosure?: { findFirst?: jest.Mock };
+  stockMovement?: { create?: jest.Mock };
 };
 
 export function createAuthPrismaMock(

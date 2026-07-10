@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
@@ -31,6 +32,7 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function NotificationsBell() {
+  const router = useRouter();
   const { data: me } = useMe();
   const queryClient = useQueryClient();
   const canRead = me != null && hasMePermission(me, "read", "Notification");
@@ -115,7 +117,32 @@ export function NotificationsBell() {
             <DropdownMenuItem
               key={n.id}
               className="flex flex-col items-start gap-1"
-              onClick={() => markRead.mutate(n.id)}
+              onClick={() => {
+                markRead.mutate(n.id);
+                if (
+                  n.type === "SPIRITUAL_EVENT_INVITATION" ||
+                  (n.metadata &&
+                    typeof n.metadata === "object" &&
+                    "href" in n.metadata &&
+                    typeof (n.metadata as { href?: unknown }).href ===
+                      "string" &&
+                    (
+                      (n.metadata as { href: string }).href.startsWith(
+                        "/dashboard/evenements-spirituels",
+                      ) ||
+                      (n.metadata as { href: string }).href.startsWith(
+                        "/dashboard/spiritualite",
+                      )
+                    ))
+                ) {
+                  router.push(
+                    n.type === "SPIRITUAL_EVENT_INVITATION"
+                      ? "/dashboard/evenements-spirituels"
+                      : ((n.metadata as { href?: string }).href ??
+                          "/dashboard/spiritualite"),
+                  );
+                }
+              }}
             >
               <div className="flex w-full items-start justify-between gap-2">
                 <span className="font-medium">{n.title}</span>

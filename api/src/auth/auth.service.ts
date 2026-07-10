@@ -24,6 +24,10 @@ import { randomBytes } from 'node:crypto';
 import { AuthSessionSettings } from './auth-session-settings.service';
 import { subsidiaryHasAssignedSalesCatalog } from '../product/product-subsidiary-scope.util';
 import { isFullAccessRoleName } from '../casl/define-ability';
+import { AppCacheService } from '../cache/app-cache.service';
+import { authUserCacheKey } from '../casl/define-ability';
+
+const AUTH_USER_CACHE_TTL_SECONDS = 300;
 
 function envPositiveInt(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -64,6 +68,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly sessionSettings: AuthSessionSettings,
+    private readonly cache: AppCacheService,
   ) {}
 
   private failKey(ip: string) {
@@ -113,11 +118,23 @@ export class AuthService {
 
   /** Recharge l’utilisateur en base (rôle, pôle, organisation à jour). */
   async resolveAuthenticatedUser(userId: string): Promise<AuthenticatedUser> {
+    const cacheKey = authUserCacheKey(userId);
+    const cached = await this.cache.getJson<AuthenticatedUser>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const row = await this.userService.findUserByIdWithRoleAndOrg(userId);
     if (!row?.password) {
       throw new UnauthorizedException();
     }
-    return toAuthenticatedUser(this.toSessionUser(row));
+    const user = toAuthenticatedUser(this.toSessionUser(row));
+    await this.cache.setJson(cacheKey, user, AUTH_USER_CACHE_TTL_SECONDS);
+    return user;
+  }
+
+  async invalidateUserCache(userId: string): Promise<void> {
+    await this.cache.del(authUserCacheKey(userId));
   }
 
   /**
@@ -263,6 +280,7 @@ export class AuthService {
       data: { password: hashed, firstLogin: false },
       include: UserService.sessionInclude,
     });
+    await this.invalidateUserCache(userId);
     return this.issueSession(this.toSessionUser(updated));
   }
 
@@ -272,6 +290,7 @@ export class AuthService {
     const row = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
+        firstLogin: true,
         organization: { select: { name: true } },
       },
     });
@@ -288,6 +307,7 @@ export class AuthService {
           );
     return {
       ...jwtUser,
+      firstLogin: row.firstLogin,
       organisationName: row.organization.name,
       permissionMode: permissionSnapshot.permissionMode,
       permissions: permissionSnapshot.permissions,

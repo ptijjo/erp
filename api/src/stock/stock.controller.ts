@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -20,6 +21,7 @@ import {
   UpdateStockDto,
   UpsertStockDto,
 } from './dto/stock.dto';
+import { PaginationQueryDto } from '../lib/pagination-query.dto';
 
 @Controller('stock')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
@@ -42,8 +44,11 @@ export class StockController {
 
   @Get()
   @CheckPolicies({ action: 'read', subject: 'Stock' })
-  findAll(@CurrentUser() viewer: AuthenticatedUser) {
-    return this.stockService.findAll(viewer);
+  findAll(
+    @CurrentUser() viewer: AuthenticatedUser,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.stockService.findAll(viewer, query);
   }
 
   @Get(':id')

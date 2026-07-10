@@ -16,11 +16,12 @@ import {
 } from "lucide-react";
 
 import { DashboardTitleBar } from "~/components/layout/dashboard-title-bar";
+import { Button } from "~/components/ui/button";
 import { DesktopOnly, MobileOnly } from "~/components/layout/viewport";
 import { TableScroll } from "~/components/layout/table-scroll";
 import { hasMePermission, isAdminUser, isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
-import type { PoleDto, UserListItemDto } from "~/lib/api-types";
+import type { PaginatedResponse, PoleDto, UserListItemDto } from "~/lib/api-types";
 import {
   dashboardActionLinkMuted,
   dashboardActionLinkOutline,
@@ -56,6 +57,8 @@ function UserSortIcon({
 
 export default function UtilisateursPage() {
   const router = useRouter();
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
   const [sortBy, setSortBy] = useState<UserSortColumn>("organization");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const { data: me, isPending: mePending } = useMe();
@@ -69,14 +72,20 @@ export default function UtilisateursPage() {
   const showPolesSection =
     canReadPole && me != null && isMainOrganization(me);
 
-  const { data: users = [], isLoading, isError } = useQuery({
-    queryKey: ["user"] as const,
+  const { data: usersPage, isLoading, isError } = useQuery({
+    queryKey: ["user", page, pageSize] as const,
     queryFn: async () => {
-      const { data } = await api.get<UserListItemDto[]>("/user");
+      const { data } = await api.get<PaginatedResponse<UserListItemDto>>(
+        "/user",
+        { params: { page, limit: pageSize } },
+      );
       return data;
     },
     enabled: !mePending && canReadUser,
   });
+
+  const users = usersPage?.items ?? [];
+  const paginationMeta = usersPage?.meta;
 
   const {
     data: poles = [],
@@ -348,6 +357,41 @@ export default function UtilisateursPage() {
           </table>
           </TableScroll>
           </DesktopOnly>
+          {paginationMeta && paginationMeta.totalPages > 1 ? (
+            <div className="flex items-center justify-between gap-4 pt-2">
+              <p className="text-sm text-gray-600">
+                Page {paginationMeta.page} sur {paginationMeta.totalPages} (
+                {paginationMeta.total} utilisateur
+                {paginationMeta.total > 1 ? "s" : ""})
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1 || isLoading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Précédent
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    page >= paginationMeta.totalPages || isLoading
+                  }
+                  onClick={() =>
+                    setPage((p) =>
+                      Math.min(paginationMeta.totalPages, p + 1),
+                    )
+                  }
+                >
+                  Suivant
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </main>

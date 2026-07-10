@@ -159,14 +159,14 @@ describe('HR (e2e)', () => {
     );
   });
 
-  it('rejette limit > 20', async () => {
+  it('rejette limit > 100', async () => {
     const agent = request.agent(app.getHttpServer());
     await agent
       .post('/auth/login')
       .send({ email: E2E_TEST_EMAIL, password: E2E_TEST_PASSWORD })
       .expect(200);
 
-    await agent.get('/hr/departments?limit=50').expect(400);
+    await agent.get('/hr/departments?limit=150').expect(400);
   });
 
   it('POST /hr/departments crée un département (maison mère)', async () => {

@@ -7,7 +7,9 @@ import sharp from 'sharp';
 import type { ProcessedAvatarImage } from './storage.types';
 
 const AVATAR_MAX_EDGE_PX = 512;
+const ARTICLE_COVER_MAX_WIDTH_PX = 1600;
 const AVATAR_WEBP_QUALITY = 80;
+const ARTICLE_COVER_WEBP_QUALITY = 85;
 const MAX_INPUT_BYTES = 5 * 1024 * 1024;
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -41,16 +43,45 @@ export class ImageProcessorService {
   async processProfileAvatar(
     file: Express.Multer.File,
   ): Promise<ProcessedAvatarImage> {
+    return this.processToWebp(file, {
+      maxWidth: AVATAR_MAX_EDGE_PX,
+      maxHeight: AVATAR_MAX_EDGE_PX,
+      fit: 'cover',
+      quality: AVATAR_WEBP_QUALITY,
+    });
+  }
+
+  async processArticleCover(
+    file: Express.Multer.File,
+  ): Promise<ProcessedAvatarImage> {
+    return this.processToWebp(file, {
+      maxWidth: ARTICLE_COVER_MAX_WIDTH_PX,
+      maxHeight: ARTICLE_COVER_MAX_WIDTH_PX,
+      fit: 'inside',
+      quality: ARTICLE_COVER_WEBP_QUALITY,
+    });
+  }
+
+  private async processToWebp(
+    file: Express.Multer.File,
+    opts: {
+      maxWidth: number;
+      maxHeight: number;
+      fit: 'cover' | 'inside';
+      quality: number;
+    },
+  ): Promise<ProcessedAvatarImage> {
     this.assertUploadableImage(file);
 
     try {
       const pipeline = sharp(file.buffer, { failOn: 'none' })
         .rotate()
-        .resize(AVATAR_MAX_EDGE_PX, AVATAR_MAX_EDGE_PX, {
-          fit: 'cover',
+        .resize(opts.maxWidth, opts.maxHeight, {
+          fit: opts.fit,
           position: 'centre',
+          withoutEnlargement: true,
         })
-        .webp({ quality: AVATAR_WEBP_QUALITY });
+        .webp({ quality: opts.quality });
 
       const { data, info } = await pipeline.toBuffer({
         resolveWithObject: true,
@@ -66,7 +97,7 @@ export class ImageProcessorService {
       };
     } catch (err) {
       this.logger.warn(
-        `Échec traitement avatar Sharp: ${err instanceof Error ? err.message : String(err)}`,
+        `Échec traitement image Sharp: ${err instanceof Error ? err.message : String(err)}`,
       );
       throw new BadRequestException(
         'Impossible de traiter cette image. Vérifiez le fichier.',

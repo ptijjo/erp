@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, LogOut, Menu, UserRound, Volume2, VolumeX } from "lucide-react";
 
+import { SubsidiarySelector } from "~/app/dashboard/_components/SubsidiarySelector";
 import { UserProfileAvatar } from "~/app/dashboard/utilisateurs/_components/UserProfileAvatar";
 import { userDisplayName } from "~/app/dashboard/utilisateurs/_lib/user-display";
 import { Badge } from "~/components/ui/badge";
@@ -104,6 +105,7 @@ export function AppHeader({ showMenu = true }: AppHeaderProps) {
       </div>
 
       <div className="flex items-center gap-3">
+        {isMainOrganization(me) ? <SubsidiarySelector /> : null}
         <RealtimeBridge />
         <MessagesBell />
         <NotificationsBell />
@@ -128,7 +130,7 @@ export function AppHeader({ showMenu = true }: AppHeaderProps) {
               size="md"
               className="size-8 ring-0 ring-offset-0"
             />
-            <span className="hidden max-w-[12rem] truncate text-sm font-medium md:inline">
+            <span className="hidden max-w-48 truncate text-sm font-medium md:inline">
               {displayName}
             </span>
           </Link>

@@ -97,7 +97,7 @@ describe('DepartmentService', () => {
     count.mockResolvedValue(50);
     await service.findAll(mainViewer, { page: 2, limit: 100 });
     expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ skip: 20, take: 20 }),
+      expect.objectContaining({ skip: 100, take: 100 }),
     );
   });
 

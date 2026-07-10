@@ -8,10 +8,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionRole } from '../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { isMainOrganizationUser } from '../auth/organization-scope';
+import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 
 @Injectable()
 export class PermissionRoleService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly caslAbilityFactory: CaslAbilityFactory,
+  ) {}
+
+  private async invalidateRoleCache(roleId: string): Promise<void> {
+    await this.caslAbilityFactory.invalidateRole(roleId);
+  }
 
   private assertRoleReadableByViewer(
     viewer: AuthenticatedUser,
@@ -105,12 +113,14 @@ export class PermissionRoleService {
     if (exists) {
       throw new BadRequestException('Cette permission est déjà assignée au rôle');
     }
-    return this.prisma.permissionRole.create({
+    const row = await this.prisma.permissionRole.create({
       data: {
         permission: { connect: { id: permissionId } },
         role: { connect: { id: roleId } },
       },
     });
+    await this.invalidateRoleCache(roleId);
+    return row;
   }
 
   async unlink(
@@ -127,6 +137,7 @@ export class PermissionRoleService {
       throw new NotFoundException('Liaison permission / rôle introuvable');
     }
     await this.prisma.permissionRole.delete({ where: { id: row.id } });
+    await this.invalidateRoleCache(roleId);
     return row;
   }
 

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -16,6 +17,7 @@ import { CheckPolicies } from '../casl/check-policies.decorator';
 import { PoliciesGuard } from '../casl/policies.guard';
 import { ProductService } from './product.service';
 import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
+import { PaginationQueryDto } from '../lib/pagination-query.dto';
 
 @Controller('product')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
@@ -33,8 +35,11 @@ export class ProductController {
 
   @Get()
   @CheckPolicies({ action: 'read', subject: 'Product' })
-  findAll(@CurrentUser() viewer: AuthenticatedUser) {
-    return this.productService.findAll(viewer);
+  findAll(
+    @CurrentUser() viewer: AuthenticatedUser,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.productService.findAll(viewer, query);
   }
 
   @Get(':id')

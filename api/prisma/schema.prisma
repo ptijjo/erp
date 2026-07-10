@@ -195,6 +195,52 @@ enum ProductionOrderStatus {
   CANCELLED
 }
 
+enum StrategyProjectStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MarketingCampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum SpiritualEventStatus {
+  PLANNED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum SpiritualEventParticipationResponse {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum SpiritualArticleStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ChartAccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+}
+
 enum TaskStatus {
   TODO
   IN_PROGRESS
@@ -257,6 +303,8 @@ model User {
   messagesSent               Message[]
   tasksAssigned              Task[]                     @relation("TaskAssignee")
   tasksCreated               Task[]                     @relation("TaskCreatedBy")
+  spiritualEventParticipations SpiritualEventParticipation[]
+  spiritualArticlesAuthored    SpiritualArticle[]            @relation("SpiritualArticleAuthor")
 
   /// Fiche RH optionnelle (auth / rôles / permissions restent sur `User`).
   employee Employee?
@@ -343,6 +391,12 @@ model Organization {
   notifications            Notification[]
   accountingPeriodClosures AccountingPeriodClosure[]
   tasks                    Task[]
+  strategyProjects         StrategyProject[]
+  marketingCampaigns       MarketingCampaign[]
+  spiritualEvents          SpiritualEvent[]
+  spiritualArticles        SpiritualArticle[]
+  chartAccounts            ChartAccount[]
+  journalEntries           JournalEntry[]
 
   @@index([organizationType])
 }
@@ -835,6 +889,7 @@ model Employee {
   sanctionsDecided   EmployeeSanction[]   @relation("SanctionDecidedBy")
   departure          EmployeeDeparture?
   departuresRecorded EmployeeDeparture[]  @relation("DepartureRecordedBy")
+  spiritualEventParticipations SpiritualEventParticipation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1038,6 +1093,8 @@ enum NotificationType {
   STOCK_LOW_AFTER_SALE
   BUDGET_PENDING_APPROVAL
   BUDGET_UTILIZATION_WARNING
+  SPIRITUAL_EVENT_INVITATION
+  SPIRITUAL_ARTICLE_PUBLISHED
 }
 
 /// Alerte in-app pour l’utilisateur connecté.
@@ -1225,15 +1282,19 @@ model VenteReturnLine {
 
 /// Patrimoine / actifs (pôle architecture & héritage).
 model HeritageAsset {
-  id          String              @id @default(uuid())
-  name        String
-  description String?
-  location    String?
-  acquiredAt  DateTime?
-  value       Decimal?
-  status      HeritageAssetStatus @default(ACTIVE)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id                String              @id @default(uuid())
+  name              String
+  description       String?
+  location          String?
+  acquiredAt        DateTime?
+  value             Decimal?
+  depreciationRate  Decimal?
+  maintenanceNotes  String?
+  documentUrl       String?
+  lastInventoryAt   DateTime?
+  status            HeritageAssetStatus @default(ACTIVE)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1244,15 +1305,18 @@ model HeritageAsset {
 
 /// Contrats juridiques (pôle legal).
 model LegalContract {
-  id        String              @id @default(uuid())
-  title     String
-  partyName String
-  startDate DateTime?
-  endDate   DateTime?
-  status    LegalContractStatus @default(DRAFT)
-  notes     String?
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
+  id               String              @id @default(uuid())
+  title            String
+  partyName        String
+  contractType     String?
+  startDate        DateTime?
+  endDate          DateTime?
+  renewalAlertDays Int?
+  documentUrl      String?
+  status           LegalContractStatus @default(DRAFT)
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1264,15 +1328,18 @@ model LegalContract {
 
 /// Ordre de production (pôle production).
 model ProductionOrder {
-  id          String                @id @default(uuid())
-  title       String
-  quantity    Int
-  status      ProductionOrderStatus @default(PLANNED)
-  scheduledAt DateTime?
-  completedAt DateTime?
-  notes       String?
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  id           String                @id @default(uuid())
+  title        String
+  quantity     Int
+  materialCost Decimal?
+  laborCost    Decimal?
+  bomNotes     String?
+  status       ProductionOrderStatus @default(PLANNED)
+  scheduledAt  DateTime?
+  completedAt  DateTime?
+  notes        String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1283,6 +1350,182 @@ model ProductionOrder {
   @@index([organizationId])
   @@index([status])
   @@index([productId])
+}
+
+/// Projet stratégique (pôle stratégie & développement).
+model StrategyProject {
+  id             String                @id @default(uuid())
+  title          String
+  description    String?
+  status         StrategyProjectStatus @default(PLANNED)
+  priority       Int                   @default(3)
+  targetDate     DateTime?
+  budgetEstimate Decimal?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([targetDate])
+}
+
+/// Campagne marketing (pôle marketing & communication).
+model MarketingCampaign {
+  id          String                 @id @default(uuid())
+  title       String
+  channel     String
+  description String?
+  status      MarketingCampaignStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Decimal?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([startDate])
+}
+
+/// Événement cultuel / spirituel (pôle cultes traditionnels).
+model SpiritualEvent {
+  id          String               @id @default(uuid())
+  title       String
+  description String?
+  location    String?
+  eventDate   DateTime?
+  status      SpiritualEventStatus @default(PLANNED)
+  /// Date d’envoi des invitations à tous les employés actifs du groupe.
+  publishedAt DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  participations SpiritualEventParticipation[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([eventDate])
+  @@index([publishedAt])
+}
+
+/// Participation d’un employé à un événement spirituel (réponse individuelle).
+model SpiritualEventParticipation {
+  id          String                            @id @default(uuid())
+  response    SpiritualEventParticipationResponse @default(PENDING)
+  respondedAt DateTime?
+  createdAt   DateTime                          @default(now())
+  updatedAt   DateTime                          @updatedAt
+
+  eventId String
+  event   SpiritualEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  /// Fiche RH liée si elle existe (filiales, etc.).
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  /// Compte ERP invité (obligatoire pour répondre en ligne).
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+  @@index([employeeId])
+  @@index([response])
+}
+
+/// Article / actualité du canal spiritualité (pôle cultes traditionnels).
+model SpiritualArticle {
+  id            String                 @id @default(uuid())
+  title         String
+  content       String
+  coverImageUrl String?
+  status        SpiritualArticleStatus @default(DRAFT)
+  publishedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  authorUserId String
+  author       User   @relation("SpiritualArticleAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([publishedAt])
+  @@index([authorUserId])
+}
+
+/// Compte du plan comptable (par organisation).
+model ChartAccount {
+  id          String           @id @default(uuid())
+  code        String
+  name        String
+  accountType ChartAccountType
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  parentId String?
+  parent   ChartAccount?  @relation("ChartAccountHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children ChartAccount[] @relation("ChartAccountHierarchy")
+
+  journalLines JournalEntryLine[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([accountType])
+  @@index([parentId])
+}
+
+/// Écriture comptable (journal).
+model JournalEntry {
+  id          String             @id @default(uuid())
+  entryDate   DateTime
+  reference   String?
+  description String?
+  status      JournalEntryStatus @default(DRAFT)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  lines JournalEntryLine[]
+
+  @@index([organizationId])
+  @@index([entryDate])
+  @@index([status])
+}
+
+/// Ligne d’écriture comptable (débit / crédit).
+model JournalEntryLine {
+  id     String  @id @default(uuid())
+  label  String?
+  debit  Decimal @default(0)
+  credit Decimal @default(0)
+
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+
+  chartAccountId String
+  chartAccount   ChartAccount @relation(fields: [chartAccountId], references: [id], onDelete: Restrict)
+
+  @@index([journalEntryId])
+  @@index([chartAccountId])
 }
 
 /// Tâche manuelle de l’agenda « Mes actions » (actions système agrégées côté API).

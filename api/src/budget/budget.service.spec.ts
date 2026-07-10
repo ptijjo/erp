@@ -82,7 +82,7 @@ describe('BudgetService', () => {
   let update: jest.Mock;
   let deleteBudget: jest.Mock;
   let count: jest.Mock;
-  let budgetExpenseAggregate: jest.Mock;
+  let budgetExpenseGroupBy: jest.Mock;
   let organizationFindUnique: jest.Mock;
   let transactionCreate: jest.Mock;
   let transaction: jest.Mock;
@@ -99,9 +99,7 @@ describe('BudgetService', () => {
     );
     deleteBudget = jest.fn().mockResolvedValue(budgetRow);
     count = jest.fn().mockResolvedValue(1);
-    budgetExpenseAggregate = jest
-      .fn()
-      .mockResolvedValue({ _sum: { amount: 0 } });
+    budgetExpenseGroupBy = jest.fn().mockResolvedValue([]);
     organizationFindUnique = jest.fn().mockResolvedValue({
       organizationType: 'SUBSIDIARY',
     });
@@ -127,7 +125,7 @@ describe('BudgetService', () => {
               delete: deleteBudget,
               count,
             },
-            budgetExpense: { aggregate: budgetExpenseAggregate },
+            budgetExpense: { groupBy: budgetExpenseGroupBy },
             organization: { findUnique: organizationFindUnique },
             $transaction: transaction,
           },

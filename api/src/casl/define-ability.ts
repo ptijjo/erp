@@ -45,6 +45,12 @@ export const KNOWN_POLICY_SUBJECTS = [
   'HeritageAsset',
   'LegalContract',
   'ProductionOrder',
+  'StrategyProject',
+  'MarketingCampaign',
+  'SpiritualEvent',
+  'SpiritualArticle',
+  'ChartAccount',
+  'JournalEntry',
   'Supplier',
   'Budget',
   'BudgetExpense',
@@ -156,18 +162,43 @@ export async function buildAbilityFromDatabase(
     return defineAbilityFor(user);
   }
 
+  const names = links.map((row) => row.permission.name);
+  return buildAbilityFromPermissionNames(user, names);
+}
+
+/** Construit une ability CASL à partir des noms de permissions (cache Redis). */
+export function buildAbilityFromPermissionNames(
+  user: AuthenticatedUser,
+  permissionNames: string[],
+): AppAbility {
+  if (isFullAccessRoleName(user.role.name)) {
+    return defineAbilityFor(user);
+  }
+
+  if (permissionNames.length === 0) {
+    return defineAbilityFor(user);
+  }
+
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
 
   if (user.organizationType === 'MAIN') {
     grantReadAllSubjectsExceptAuditLog(can);
   }
 
-  for (const row of links) {
-    const parsed = parsePermissionName(row.permission.name);
+  for (const name of permissionNames) {
+    const parsed = parsePermissionName(name);
     if (parsed) {
       applyParsedRule(can, parsed.action, parsed.subject);
     }
   }
 
   return build();
+}
+
+export function caslCacheKeyForRole(roleId: string): string {
+  return `casl:role:${roleId}`;
+}
+
+export function authUserCacheKey(userId: string): string {
+  return `auth:user:${userId}`;
 }

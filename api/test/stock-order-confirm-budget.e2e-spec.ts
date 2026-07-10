@@ -114,6 +114,7 @@ describe('StockOrder confirm + budget (e2e)', () => {
             .mockResolvedValueOnce(confirmedInclude),
         },
         stock: { upsert: jest.fn().mockResolvedValue({}) },
+        stockMovement: { create: jest.fn().mockResolvedValue({}) },
         budget: prismaMock.budget,
         budgetLine: prismaMock.budgetLine,
         budgetExpense: prismaMock.budgetExpense,

@@ -28,10 +28,12 @@ import {
 import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type {
+  PaginatedResponse,
   ProductDto,
   ProductionOrderDto,
   ProductionOrderStatusDto,
 } from "~/lib/api-types";
+import { extractApiList, FULL_LIST_QUERY } from "~/lib/api-list";
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { useScopedOrganizations } from "~/lib/use-scoped-organizations";
 
@@ -81,8 +83,11 @@ export default function ProductionPage() {
   const { data: products = [] } = useQuery({
     queryKey: ["product"] as const,
     queryFn: async () => {
-      const { data } = await api.get<ProductDto[]>("/product");
-      return data;
+      const { data } = await api.get<ProductDto[] | PaginatedResponse<ProductDto>>(
+        "/product",
+        FULL_LIST_QUERY,
+      );
+      return extractApiList(data);
     },
     enabled: canRead,
   });

@@ -32,6 +32,15 @@ import { ImageProcessorService } from '../storage/image-processor.service';
 import { R2ObjectStorageService } from '../storage/r2-object-storage.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { EmployeeService } from '../hr/employee.service';
+import { AppCacheService } from '../cache/app-cache.service';
+import { authUserCacheKey } from '../casl/define-ability';
+import type { PaginationQueryDto } from '../lib/pagination-query.dto';
+import {
+  buildPaginationMeta,
+  paginationSkip,
+  resolvePagination,
+  type PaginatedResult,
+} from '../lib/pagination';
 
 export type {
   SafeUserDetail,
@@ -62,7 +71,12 @@ export class UserService {
     private readonly objectStorage: R2ObjectStorageService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
     private readonly employeeService: EmployeeService,
+    private readonly cache: AppCacheService,
   ) {}
+
+  private async invalidateUserSessionCache(userId: string): Promise<void> {
+    await this.cache.del(authUserCacheKey(userId));
+  }
 
   /**
    * Filtre liste utilisateurs : filiales = **toujours** l’organisation du JWT (jamais de liste globale).
@@ -191,20 +205,31 @@ export class UserService {
 
   public findAll = async (
     viewer: AuthenticatedUser,
-  ): Promise<SafeUserPublic[]> => {
+    query: PaginationQueryDto = {},
+  ): Promise<PaginatedResult<SafeUserPublic>> => {
     const where = this.buildUserListWhere(viewer);
-    const users = await this.prisma.user.findMany({
-      where,
-      include: {
-        organization: true,
-        role: {
-          include: {
-            pole: { select: { id: true, code: true, name: true } },
+    const { page, limit } = resolvePagination(query);
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        include: {
+          organization: true,
+          role: {
+            include: {
+              pole: { select: { id: true, code: true, name: true } },
+            },
           },
         },
-      },
-    });
-    return users.map(({ password: _p, ...rest }): SafeUserPublic => rest);
+        orderBy: [{ organization: { name: 'asc' } }, { email: 'asc' }],
+        skip: paginationSkip(page, limit),
+        take: limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return {
+      items: users.map(({ password: _p, ...rest }): SafeUserPublic => rest),
+      meta: buildPaginationMeta(total, page, limit),
+    };
   };
 
   public findOne = async (
@@ -322,6 +347,7 @@ export class UserService {
     }
 
     const { password: _p, ...rest } = newUser;
+    await this.invalidateUserSessionCache(newUser.id);
     return rest;
   };
 
@@ -395,6 +421,11 @@ export class UserService {
       include: { role: true },
     });
     const { password: _p, ...rest } = updatedUser;
+    await this.invalidateUserSessionCache(id);
+    if (user.roleId !== undefined && user.roleId !== existingUser.roleId) {
+      await this.caslAbilityFactory.invalidateRole(existingUser.roleId);
+      await this.caslAbilityFactory.invalidateRole(user.roleId);
+    }
     return rest;
   };
 
@@ -427,6 +458,7 @@ export class UserService {
       );
     }
     await this.prisma.user.delete({ where: { id } });
+    await this.invalidateUserSessionCache(id);
     return {
       id: existingUser.id,
       email: existingUser.email,
@@ -559,6 +591,7 @@ export class UserService {
     });
 
     const { password: _p, ...rest } = updatedUser;
+    await this.invalidateUserSessionCache(userId);
     return rest;
   };
 }

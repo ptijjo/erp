@@ -52,7 +52,14 @@ export class HeritageService {
         name: dto.name.trim(),
         description: dto.description?.trim() || null,
         location: dto.location?.trim() || null,
+        acquiredAt: dto.acquiredAt ? new Date(dto.acquiredAt) : null,
         value: dto.value ?? null,
+        depreciationRate: dto.depreciationRate ?? null,
+        maintenanceNotes: dto.maintenanceNotes?.trim() || null,
+        documentUrl: dto.documentUrl?.trim() || null,
+        lastInventoryAt: dto.lastInventoryAt
+          ? new Date(dto.lastInventoryAt)
+          : null,
         status: (dto.status as HeritageAssetStatus | undefined) ?? 'ACTIVE',
       },
     });
@@ -73,7 +80,26 @@ export class HeritageService {
         ...(dto.location !== undefined
           ? { location: dto.location?.trim() || null }
           : {}),
+        ...(dto.acquiredAt !== undefined
+          ? { acquiredAt: dto.acquiredAt ? new Date(dto.acquiredAt) : null }
+          : {}),
         ...(dto.value !== undefined ? { value: dto.value } : {}),
+        ...(dto.depreciationRate !== undefined
+          ? { depreciationRate: dto.depreciationRate }
+          : {}),
+        ...(dto.maintenanceNotes !== undefined
+          ? { maintenanceNotes: dto.maintenanceNotes?.trim() || null }
+          : {}),
+        ...(dto.documentUrl !== undefined
+          ? { documentUrl: dto.documentUrl?.trim() || null }
+          : {}),
+        ...(dto.lastInventoryAt !== undefined
+          ? {
+              lastInventoryAt: dto.lastInventoryAt
+                ? new Date(dto.lastInventoryAt)
+                : null,
+            }
+          : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
       },
     });

@@ -28,6 +28,12 @@ export class R2ObjectStorageService {
     return `profile-photos/${userId}/${stamp}-${random}.webp`;
   }
 
+  buildSpiritualArticleCoverKey(articleId: string): string {
+    const stamp = Date.now();
+    const random = Math.random().toString(36).slice(2, 10);
+    return `spiritual-articles/${articleId}/${stamp}-${random}.webp`;
+  }
+
   resolvePublicUrl(key: string): string {
     const cfg = this.requireConfig();
     const base = cfg.publicBaseUrl.replace(/\/$/, '');
@@ -45,6 +51,13 @@ export class R2ObjectStorageService {
   }
 
   async uploadProfilePhoto(
+    key: string,
+    image: ProcessedAvatarImage,
+  ): Promise<R2UploadResult> {
+    return this.uploadImage(key, image);
+  }
+
+  async uploadImage(
     key: string,
     image: ProcessedAvatarImage,
   ): Promise<R2UploadResult> {

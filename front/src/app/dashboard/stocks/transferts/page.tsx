@@ -27,7 +27,8 @@ import {
 } from "~/components/ui/select";
 import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
-import type { StockDto, StockTransferDto } from "~/lib/api-types";
+import type { PaginatedResponse, StockDto, StockTransferDto } from "~/lib/api-types";
+import { extractApiList, FULL_LIST_QUERY } from "~/lib/api-list";
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { useScopedOrganizations } from "~/lib/use-scoped-organizations";
 
@@ -74,8 +75,11 @@ export default function StockTransfertsPage() {
   const { data: stocks = [] } = useQuery({
     queryKey: ["stock"] as const,
     queryFn: async () => {
-      const { data } = await api.get<StockDto[]>("/stock");
-      return data;
+      const { data } = await api.get<StockDto[] | PaginatedResponse<StockDto>>(
+        "/stock",
+        FULL_LIST_QUERY,
+      );
+      return extractApiList(data);
     },
     enabled: canCreate && Boolean(effectiveFromOrgId),
   });

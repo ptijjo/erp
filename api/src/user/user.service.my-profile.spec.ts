@@ -6,6 +6,7 @@ import { ImageProcessorService } from '../storage/image-processor.service';
 import { R2ObjectStorageService } from '../storage/r2-object-storage.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { EmployeeService } from '../hr/employee.service';
+import { mockAppCacheServiceProvider } from '../test/mocks/app-cache.mock';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 describe('UserService.updateMyProfile', () => {
@@ -56,6 +57,7 @@ describe('UserService.updateMyProfile', () => {
           provide: EmployeeService,
           useValue: { provisionForNewUser: jest.fn() },
         },
+        mockAppCacheServiceProvider,
       ],
     }).compile();
 
@@ -186,6 +188,7 @@ describe('UserService.update identity fields', () => {
           provide: EmployeeService,
           useValue: { provisionForNewUser: jest.fn() },
         },
+        mockAppCacheServiceProvider,
       ],
     }).compile();
 

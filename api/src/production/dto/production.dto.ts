@@ -28,6 +28,21 @@ export class CreateProductionOrderDto {
   productId?: string;
 
   @IsOptional()
+  @Min(0)
+  @Type(() => Number)
+  materialCost?: number;
+
+  @IsOptional()
+  @Min(0)
+  @Type(() => Number)
+  laborCost?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  bomNotes?: string;
+
+  @IsOptional()
   @IsDateString()
   scheduledAt?: string;
 
@@ -56,6 +71,21 @@ export class UpdateProductionOrderDto {
   @IsOptional()
   @IsUUID('4')
   productId?: string;
+
+  @IsOptional()
+  @Min(0)
+  @Type(() => Number)
+  materialCost?: number;
+
+  @IsOptional()
+  @Min(0)
+  @Type(() => Number)
+  laborCost?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  bomNotes?: string;
 
   @IsOptional()
   @IsDateString()

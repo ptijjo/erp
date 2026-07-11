@@ -91,6 +91,36 @@ export class NotificationService {
     );
   }
 
+  async notifyAllActiveUsers(
+    payload: Omit<CreateNotificationInput, 'userId' | 'organizationId'>,
+    options?: { excludeUserIds?: string[] },
+  ): Promise<void> {
+    const excludeUserIds = options?.excludeUserIds ?? [];
+    const users = await this.prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        ...(excludeUserIds.length > 0
+          ? { id: { notIn: excludeUserIds } }
+          : {}),
+      },
+      select: { id: true, organizationId: true },
+    });
+
+    const batchSize = 20;
+    for (let i = 0; i < users.length; i += batchSize) {
+      const batch = users.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map((user) =>
+          this.create({
+            ...payload,
+            userId: user.id,
+            organizationId: user.organizationId,
+          }),
+        ),
+      );
+    }
+  }
+
   async notifyMainUsersWithPermission(
     permissionName: string,
     payload: Omit<CreateNotificationInput, 'userId' | 'organizationId'>,

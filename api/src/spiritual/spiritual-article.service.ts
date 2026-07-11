@@ -131,7 +131,18 @@ export class SpiritualArticleService {
       include: articleInclude,
     });
 
-    await this.notifyGroupWide(updated);
+    await this.notificationService.notifyAllActiveUsers(
+      {
+        type: NotificationType.SPIRITUAL_ARTICLE_PUBLISHED,
+        title: 'Nouvel article — spiritualité',
+        body: `${this.buildArticleExcerpt(updated.title)}. Consultez le canal spiritualité.`,
+        metadata: {
+          spiritualArticleId: updated.id,
+          href: `/dashboard/spiritualite/${updated.id}`,
+        },
+      },
+      { excludeUserIds: [updated.authorUserId] },
+    );
 
     return updated;
   }
@@ -193,33 +204,7 @@ export class SpiritualArticleService {
     assertMainOrgPoleDomain(viewer, POLE_DOMAIN.TRADITIONAL);
   }
 
-  private async notifyGroupWide(article: {
-    id: string;
-    title: string;
-    organizationId: string;
-  }): Promise<void> {
-    const users = await this.prisma.user.findMany({
-      where: { deletedAt: null },
-      select: { id: true, organizationId: true },
-    });
-
-    const excerpt =
-      article.title.length > 80
-        ? `${article.title.slice(0, 77)}…`
-        : article.title;
-
-    for (const user of users) {
-      void this.notificationService.create({
-        userId: user.id,
-        type: NotificationType.SPIRITUAL_ARTICLE_PUBLISHED,
-        title: 'Nouvel article — spiritualité',
-        body: `${excerpt}. Consultez le canal spiritualité.`,
-        organizationId: user.organizationId,
-        metadata: {
-          spiritualArticleId: article.id,
-          href: `/dashboard/spiritualite/${article.id}`,
-        },
-      });
-    }
+  private buildArticleExcerpt(title: string): string {
+    return title.length > 80 ? `${title.slice(0, 77)}…` : title;
   }
 }

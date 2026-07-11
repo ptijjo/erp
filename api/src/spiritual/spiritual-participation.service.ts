@@ -387,19 +387,25 @@ export class SpiritualParticipationService {
       : 'date à préciser';
     const locationLabel = event.location?.trim() || 'lieu à préciser';
 
-    for (const user of users) {
-      void this.notificationService.create({
-        userId: user.id,
-        type: NotificationType.SPIRITUAL_EVENT_INVITATION,
-        title: 'Invitation — événement spirituel',
-        body: `${event.title} — ${dateLabel} — ${locationLabel}. Événement groupe (maison mère et filiales). Répondez dans « Événements spirituels ».`,
-        organizationId: user.organizationId,
-        metadata: {
-          spiritualEventId: event.id,
-          eventTitle: event.title,
-          href: '/dashboard/evenements-spirituels',
-        },
-      });
+    const batchSize = 20;
+    for (let i = 0; i < users.length; i += batchSize) {
+      const batch = users.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map((user) =>
+          this.notificationService.create({
+            userId: user.id,
+            type: NotificationType.SPIRITUAL_EVENT_INVITATION,
+            title: 'Invitation — événement spirituel',
+            body: `${event.title} — ${dateLabel} — ${locationLabel}. Événement groupe (maison mère et filiales). Répondez dans « Événements spirituels ».`,
+            organizationId: user.organizationId,
+            metadata: {
+              spiritualEventId: event.id,
+              eventTitle: event.title,
+              href: '/dashboard/evenements-spirituels',
+            },
+          }),
+        ),
+      );
     }
   }
 

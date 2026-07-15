@@ -102,7 +102,9 @@ export class MessagingController {
     const file = await this.attachmentService.downloadAttachment(id, viewer);
     const encodedName = encodeURIComponent(file.fileName);
     const disposition =
-      inline === 'true' && file.mimeType.startsWith('image/')
+      inline === 'true' &&
+      (file.mimeType.startsWith('image/') ||
+        file.mimeType === 'application/pdf')
         ? `inline; filename*=UTF-8''${encodedName}`
         : `attachment; filename*=UTF-8''${encodedName}`;
 

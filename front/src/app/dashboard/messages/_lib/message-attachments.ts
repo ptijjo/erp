@@ -20,6 +20,15 @@ export function isImageAttachment(mimeType: string): boolean {
   return mimeType.startsWith("image/");
 }
 
+export function isPdfAttachment(mimeType: string): boolean {
+  return mimeType === "application/pdf";
+}
+
+/** Image ou PDF : peuvent s’ouvrir en visionneuse sans téléchargement. */
+export function canPreviewAttachment(mimeType: string): boolean {
+  return isImageAttachment(mimeType) || isPdfAttachment(mimeType);
+}
+
 export function formatAttachmentSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} o`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;

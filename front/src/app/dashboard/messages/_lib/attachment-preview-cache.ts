@@ -61,6 +61,16 @@ export function clearAttachmentPreviewCache(): void {
   previewCache.clear();
 }
 
+/** Blob URL pour affichage inline (aperçu / visionneuse). À révoquer avec `URL.revokeObjectURL`. */
+export async function getAttachmentBlobUrl(
+  attachmentId: string,
+  mimeType: string,
+): Promise<string> {
+  const buffer = await fetchAttachmentBytes(attachmentId, true);
+  const blob = new Blob([buffer], { type: mimeType });
+  return URL.createObjectURL(blob);
+}
+
 export async function downloadAttachmentFile(
   attachmentId: string,
   fileName: string,

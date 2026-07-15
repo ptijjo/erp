@@ -15,7 +15,6 @@ import {
   Layers,
   LayoutDashboard,
   Megaphone,
-  Newspaper,
   Package,
   Receipt,
   Scale,
@@ -265,13 +264,7 @@ const baseNavItems: NavItem[] = [
     requiredPermission: { action: "read", subject: "Task" },
   },
   {
-    label: "Canal spiritualité",
-    href: "/dashboard/spiritualite",
-    icon: Newspaper,
-    requiredPermission: { action: "read", subject: "SpiritualArticle" },
-  },
-  {
-    label: "Événements spirituels",
+    label: "Événements",
     href: "/dashboard/evenements-spirituels",
     icon: Sparkles,
   },
@@ -298,13 +291,7 @@ const HQ_PRIMARY_NAV: NavItem[] = [
     requiredPermission: { action: "read", subject: "Task" },
   },
   {
-    label: "Canal spiritualité",
-    href: "/dashboard/spiritualite",
-    icon: Newspaper,
-    requiredPermission: { action: "read", subject: "SpiritualArticle" },
-  },
-  {
-    label: "Événements spirituels",
+    label: "Événements",
     href: "/dashboard/evenements-spirituels",
     icon: Sparkles,
   },

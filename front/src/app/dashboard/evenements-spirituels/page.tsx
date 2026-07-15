@@ -80,7 +80,7 @@ export default function EvenementsSpirituelsPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Événements spirituels"
+        title="Événements"
         description="Invitations du pôle spiritualité — événements groupe (maison mère et filiales)."
       />
 

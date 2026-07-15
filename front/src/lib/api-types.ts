@@ -535,6 +535,14 @@ export type MessageSenderDto = {
   profilePhotoUrl: string | null;
 };
 
+export type MessageAttachmentDto = {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+};
+
 export type MessageDto = {
   id: string;
   threadId: string;
@@ -542,6 +550,7 @@ export type MessageDto = {
   createdAt: string;
   senderId: string;
   sender: MessageSenderDto;
+  attachments?: MessageAttachmentDto[];
 };
 
 export type MessageThreadSummaryDto = {
@@ -1089,31 +1098,6 @@ export type SpiritualPublishResultDto = {
   subsidiaryCount: number;
   employeesWithoutAccount: number;
   totalEmployees: number;
-};
-
-export type SpiritualArticleStatusDto = "DRAFT" | "PUBLISHED";
-
-export type SpiritualArticleAuthorDto = {
-  id: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  profilePhotoUrl: string | null;
-};
-
-export type SpiritualArticleDto = {
-  id: string;
-  title: string;
-  content: string;
-  coverImageUrl: string | null;
-  status: SpiritualArticleStatusDto;
-  publishedAt: string | null;
-  organizationId: string;
-  authorUserId: string;
-  createdAt: string;
-  updatedAt: string;
-  organization: { id: string; name: string; slug: string };
-  author: SpiritualArticleAuthorDto;
 };
 
 export type ChartAccountTypeDto =

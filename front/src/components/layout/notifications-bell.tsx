@@ -126,20 +126,15 @@ export function NotificationsBell() {
                     "href" in n.metadata &&
                     typeof (n.metadata as { href?: unknown }).href ===
                       "string" &&
-                    (
-                      (n.metadata as { href: string }).href.startsWith(
-                        "/dashboard/evenements-spirituels",
-                      ) ||
-                      (n.metadata as { href: string }).href.startsWith(
-                        "/dashboard/spiritualite",
-                      )
+                    (n.metadata as { href: string }).href.startsWith(
+                      "/dashboard/evenements-spirituels",
                     ))
                 ) {
                   router.push(
                     n.type === "SPIRITUAL_EVENT_INVITATION"
                       ? "/dashboard/evenements-spirituels"
                       : ((n.metadata as { href?: string }).href ??
-                          "/dashboard/spiritualite"),
+                          "/dashboard/evenements-spirituels"),
                   );
                 }
               }}

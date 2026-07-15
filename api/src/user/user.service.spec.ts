@@ -6,6 +6,7 @@ import { R2ObjectStorageService } from '../storage/r2-object-storage.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { EmployeeService } from '../hr/employee.service';
 import { mockAppCacheServiceProvider } from '../test/mocks/app-cache.mock';
+import { mockMessagingAttachmentServiceProvider } from '../test/mocks/messaging-attachment-service.mock';
 
 describe('UserService', () => {
   let service: UserService;
@@ -39,6 +40,7 @@ describe('UserService', () => {
           provide: EmployeeService,
           useValue: { provisionForNewUser: jest.fn() },
         },
+        mockMessagingAttachmentServiceProvider,
         mockAppCacheServiceProvider,
       ],
     }).compile();

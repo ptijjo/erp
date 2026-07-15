@@ -223,11 +223,6 @@ enum SpiritualEventParticipationResponse {
   DECLINED
 }
 
-enum SpiritualArticleStatus {
-  DRAFT
-  PUBLISHED
-}
-
 enum ChartAccountType {
   ASSET
   LIABILITY
@@ -301,10 +296,10 @@ model User {
   accountingPeriodClosures   AccountingPeriodClosure[]  @relation("AccountingPeriodClosedBy")
   messageThreadParticipants  MessageThreadParticipant[]
   messagesSent               Message[]
+  messageAttachmentsUploaded MessageAttachment[]
   tasksAssigned              Task[]                     @relation("TaskAssignee")
   tasksCreated               Task[]                     @relation("TaskCreatedBy")
   spiritualEventParticipations SpiritualEventParticipation[]
-  spiritualArticlesAuthored    SpiritualArticle[]            @relation("SpiritualArticleAuthor")
 
   /// Fiche RH optionnelle (auth / rôles / permissions restent sur `User`).
   employee Employee?
@@ -394,7 +389,6 @@ model Organization {
   strategyProjects         StrategyProject[]
   marketingCampaigns       MarketingCampaign[]
   spiritualEvents          SpiritualEvent[]
-  spiritualArticles        SpiritualArticle[]
   chartAccounts            ChartAccount[]
   journalEntries           JournalEntry[]
 
@@ -1154,6 +1148,7 @@ model MessageThread {
 
   participants MessageThreadParticipant[]
   messages     Message[]
+  attachments  MessageAttachment[]
 
   @@index([updatedAt])
 }
@@ -1181,8 +1176,33 @@ model Message {
   senderId String
   sender   User   @relation(fields: [senderId], references: [id], onDelete: Restrict)
 
+  attachments MessageAttachment[]
+
   @@index([threadId, createdAt])
   @@index([senderId])
+}
+
+model MessageAttachment {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  threadId String
+  thread   MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  messageId String?
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  uploaderId String
+  uploader   User   @relation(fields: [uploaderId], references: [id], onDelete: Restrict)
+
+  storageKey String
+  fileName   String
+  mimeType   String
+  sizeBytes  Int
+
+  @@index([threadId])
+  @@index([messageId])
+  @@index([uploaderId])
 }
 
 /// Journal des mouvements de stock (traçabilité filiale).
@@ -1441,29 +1461,6 @@ model SpiritualEventParticipation {
   @@index([userId])
   @@index([employeeId])
   @@index([response])
-}
-
-/// Article / actualité du canal spiritualité (pôle cultes traditionnels).
-model SpiritualArticle {
-  id            String                 @id @default(uuid())
-  title         String
-  content       String
-  coverImageUrl String?
-  status        SpiritualArticleStatus @default(DRAFT)
-  publishedAt   DateTime?
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-
-  authorUserId String
-  author       User   @relation("SpiritualArticleAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
-
-  @@index([organizationId])
-  @@index([status])
-  @@index([publishedAt])
-  @@index([authorUserId])
 }
 
 /// Compte du plan comptable (par organisation).

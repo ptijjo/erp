@@ -1,5 +1,8 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
+  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
@@ -11,16 +14,31 @@ export class CreateThreadDto {
   recipientUserId!: string;
 
   @IsString()
-  @MinLength(1)
   @MaxLength(8000)
   body!: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsUUID('4', { each: true })
+  attachmentIds?: string[];
+}
+
+export class OpenThreadDto {
+  @IsUUID()
+  recipientUserId!: string;
 }
 
 export class SendMessageDto {
   @IsString()
-  @MinLength(1)
   @MaxLength(8000)
   body!: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsUUID('4', { each: true })
+  attachmentIds?: string[];
 }
 
 export class SearchContactsQueryDto {

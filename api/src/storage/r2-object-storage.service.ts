@@ -6,10 +6,16 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import type { ProcessedAvatarImage, R2UploadResult } from './storage.types';
+import type {
+  ProcessedAvatarImage,
+  R2ObjectBody,
+  R2PrivateUploadResult,
+  R2UploadResult,
+} from './storage.types';
 
 @Injectable()
 export class R2ObjectStorageService {
@@ -28,10 +34,13 @@ export class R2ObjectStorageService {
     return `profile-photos/${userId}/${stamp}-${random}.webp`;
   }
 
-  buildSpiritualArticleCoverKey(articleId: string): string {
-    const stamp = Date.now();
-    const random = Math.random().toString(36).slice(2, 10);
-    return `spiritual-articles/${articleId}/${stamp}-${random}.webp`;
+  buildMessageAttachmentKey(
+    threadId: string,
+    attachmentId: string,
+    extension: string,
+  ): string {
+    const safeExt = extension.startsWith('.') ? extension : `.${extension}`;
+    return `message-attachments/${threadId}/${attachmentId}${safeExt}`;
   }
 
   resolvePublicUrl(key: string): string {
@@ -86,6 +95,72 @@ export class R2ObjectStorageService {
     return { key, publicUrl: this.resolvePublicUrl(key) };
   }
 
+  async uploadPrivateFile(
+    key: string,
+    body: Buffer,
+    contentType: string,
+  ): Promise<R2PrivateUploadResult> {
+    this.requireConfig();
+    const client = this.getClient();
+
+    try {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: this.requireConfig().bucketName,
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+        }),
+      );
+    } catch (err) {
+      this.logger.error(
+        `Upload R2 privé échoué (${key}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw new InternalServerErrorException(
+        'Impossible d’enregistrer la pièce jointe sur le stockage.',
+      );
+    }
+
+    return { key };
+  }
+
+  async getObjectBody(key: string): Promise<R2ObjectBody> {
+    const cfg = this.requireConfig();
+    const client = this.getClient();
+
+    try {
+      const response = await client.send(
+        new GetObjectCommand({
+          Bucket: cfg.bucketName,
+          Key: key,
+        }),
+      );
+
+      if (!response.Body) {
+        throw new InternalServerErrorException(
+          'Fichier introuvable sur le stockage.',
+        );
+      }
+
+      const bytes = await response.Body.transformToByteArray();
+      return {
+        body: Buffer.from(bytes),
+        contentType: response.ContentType ?? 'application/octet-stream',
+        contentLength: response.ContentLength ?? bytes.byteLength,
+      };
+    } catch (err) {
+      if (err instanceof InternalServerErrorException) {
+        throw err;
+      }
+      this.logger.error(
+        `Lecture R2 échouée (${key}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw new InternalServerErrorException(
+        'Impossible de lire la pièce jointe sur le stockage.',
+      );
+    }
+  }
+
   async deleteByKey(key: string): Promise<void> {
     const cfg = this.requireConfig();
     const client = this.getClient();
@@ -102,6 +177,11 @@ export class R2ObjectStorageService {
         `Suppression R2 échouée (${key}): ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+  }
+
+  async deleteByKeys(keys: string[]): Promise<void> {
+    const uniqueKeys = [...new Set(keys.filter((key) => key.trim().length > 0))];
+    await Promise.all(uniqueKeys.map((key) => this.deleteByKey(key)));
   }
 
   async deleteByPublicUrl(url: string | null | undefined): Promise<void> {

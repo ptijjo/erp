@@ -1,9 +1,9 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import type { AuthenticatedUser } from '../auth/auth.types';
+} from '@nestjs/common';import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { MessageThreadScope, type Prisma } from '../generated/prisma/client';
 import { RealtimeHubService } from '../realtime/realtime-hub.service';
@@ -11,6 +11,7 @@ import { MessagingPolicyService } from './messaging-policy.service';
 import type { CreateThreadDto, SendMessageDto } from './dto/messaging.dto';
 import { DirectoryService } from '../directory/directory.service';
 import type { MessagingContactDto } from './messaging.types';
+import { MessagingAttachmentService } from './messaging-attachment.service';
 
 const messagingUserPublicSelect = {
   id: true,
@@ -18,6 +19,22 @@ const messagingUserPublicSelect = {
   firstName: true,
   lastName: true,
   profilePhotoUrl: true,
+} as const;
+
+const messageInclude = {
+  sender: {
+    select: messagingUserPublicSelect,
+  },
+  attachments: {
+    select: {
+      id: true,
+      fileName: true,
+      mimeType: true,
+      sizeBytes: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'asc' as const },
+  },
 } as const;
 
 const threadInclude = {
@@ -34,11 +51,7 @@ const threadInclude = {
   messages: {
     orderBy: { createdAt: 'desc' as const },
     take: 1,
-    include: {
-      sender: {
-        select: messagingUserPublicSelect,
-      },
-    },
+    include: messageInclude,
   },
 } as const;
 
@@ -49,6 +62,7 @@ export class MessagingService {
     private readonly policy: MessagingPolicyService,
     private readonly realtimeHub: RealtimeHubService,
     private readonly directoryService: DirectoryService,
+    private readonly attachmentService: MessagingAttachmentService,
   ) {}
 
   async searchContacts(
@@ -130,21 +144,50 @@ export class MessagingService {
       where: { threadId },
       orderBy: { createdAt: 'asc' },
       take: Math.min(limit, 200),
-      include: {
-        sender: {
-          select: messagingUserPublicSelect,
-        },
-      },
+      include: messageInclude,
     });
   }
 
+  async openDirectThread(recipientUserId: string, viewer: AuthenticatedUser) {
+    const peer = await this.policy.loadPeer(recipientUserId);
+    const scope = this.policy.assertCanExchange(viewer, peer);
+
+    const existing = await this.findDirectThread(viewer.sub, peer.id);
+    if (existing) {
+      return { threadId: existing.id, created: false };
+    }
+
+    const poleCode =
+      scope === MessageThreadScope.MAIN_INTRA_POLE
+        ? viewer.role.poleCode
+        : null;
+
+    const created = await this.prisma.messageThread.create({
+      data: {
+        scope,
+        poleCode,
+        participants: {
+          create: [{ userId: viewer.sub }, { userId: peer.id }],
+        },
+      },
+    });
+
+    return { threadId: created.id, created: true };
+  }
+
   async createThread(dto: CreateThreadDto, viewer: AuthenticatedUser) {
+    this.assertMessageContent(dto.body, dto.attachmentIds);
+
     const peer = await this.policy.loadPeer(dto.recipientUserId);
     const scope = this.policy.assertCanExchange(viewer, peer);
 
     const existing = await this.findDirectThread(viewer.sub, peer.id);
     if (existing) {
-      await this.sendMessage(existing.id, { body: dto.body }, viewer);
+      await this.sendMessage(
+        existing.id,
+        { body: dto.body, attachmentIds: dto.attachmentIds },
+        viewer,
+      );
       const thread = await this.getThread(existing.id, viewer);
       return { thread, created: false };
     }
@@ -154,38 +197,25 @@ export class MessagingService {
         ? viewer.role.poleCode
         : null;
 
-    const thread = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.messageThread.create({
-        data: {
-          scope,
-          poleCode,
-          participants: {
-            create: [{ userId: viewer.sub }, { userId: peer.id }],
-          },
+    const createdThread = await this.prisma.messageThread.create({
+      data: {
+        scope,
+        poleCode,
+        participants: {
+          create: [{ userId: viewer.sub }, { userId: peer.id }],
         },
-      });
-      await tx.message.create({
-        data: {
-          threadId: created.id,
-          senderId: viewer.sub,
-          body: dto.body.trim(),
-        },
-      });
-      return tx.messageThread.findUniqueOrThrow({
-        where: { id: created.id },
-        include: threadInclude,
-      });
+      },
     });
 
-    const payload = {
-      threadId: thread.id,
-      preview: dto.body.trim().slice(0, 120),
-    };
-    this.realtimeHub.emit(peer.id, 'message', payload);
-    this.realtimeHub.emit(viewer.sub, 'message', payload);
+    await this.sendMessage(
+      createdThread.id,
+      { body: dto.body, attachmentIds: dto.attachmentIds },
+      viewer,
+    );
 
+    const thread = await this.getThread(createdThread.id, viewer);
     return {
-      thread: this.mapThreadForViewer(thread, viewer.sub),
+      thread,
       created: true,
     };
   }
@@ -195,19 +225,15 @@ export class MessagingService {
     dto: SendMessageDto,
     viewer: AuthenticatedUser,
   ) {
+    this.assertMessageContent(dto.body, dto.attachmentIds);
     await this.assertParticipant(threadId, viewer.sub);
 
-    const message = await this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const row = await tx.message.create({
         data: {
           threadId,
           senderId: viewer.sub,
           body: dto.body.trim(),
-        },
-        include: {
-          sender: {
-            select: messagingUserPublicSelect,
-          },
         },
       });
       await tx.messageThread.update({
@@ -217,6 +243,20 @@ export class MessagingService {
       return row;
     });
 
+    if (dto.attachmentIds?.length) {
+      await this.attachmentService.linkAttachmentsToMessage(
+        threadId,
+        created.id,
+        dto.attachmentIds,
+        viewer,
+      );
+    }
+
+    const message = await this.prisma.message.findUniqueOrThrow({
+      where: { id: created.id },
+      include: messageInclude,
+    });
+
     const participants = await this.prisma.messageThreadParticipant.findMany({
       where: { threadId },
       select: { userId: true },
@@ -224,7 +264,7 @@ export class MessagingService {
     const payload = {
       threadId,
       messageId: message.id,
-      preview: message.body.slice(0, 120),
+      preview: this.buildMessagePreview(dto.body, dto.attachmentIds),
     };
     this.realtimeHub.emitToMany(
       participants.map((p) => p.userId),
@@ -233,6 +273,13 @@ export class MessagingService {
     );
 
     return message;
+  }
+
+  async deleteThread(threadId: string, viewer: AuthenticatedUser) {
+    await this.assertParticipant(threadId, viewer.sub);
+    await this.attachmentService.deleteAllAttachmentsForThread(threadId);
+    await this.prisma.messageThread.delete({ where: { id: threadId } });
+    return { ok: true };
   }
 
   async markThreadRead(threadId: string, viewer: AuthenticatedUser) {
@@ -277,6 +324,28 @@ export class MessagingService {
     if (!part) {
       throw new ForbiddenException('Accès à cette conversation refusé.');
     }
+  }
+
+  private assertMessageContent(body: string, attachmentIds?: string[]): void {
+    const hasText = body.trim().length > 0;
+    const hasAttachments = (attachmentIds?.length ?? 0) > 0;
+    if (!hasText && !hasAttachments) {
+      throw new BadRequestException(
+        'Le message doit contenir du texte ou au moins une pièce jointe.',
+      );
+    }
+  }
+
+  private buildMessagePreview(body: string, attachmentIds?: string[]): string {
+    const trimmed = body.trim();
+    if (trimmed.length > 0) {
+      return trimmed.slice(0, 120);
+    }
+    const count = attachmentIds?.length ?? 0;
+    if (count === 1) {
+      return 'Pièce jointe';
+    }
+    return `${count} pièces jointes`;
   }
 
   private mapThreadForViewer(

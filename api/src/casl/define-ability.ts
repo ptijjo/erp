@@ -48,7 +48,6 @@ export const KNOWN_POLICY_SUBJECTS = [
   'StrategyProject',
   'MarketingCampaign',
   'SpiritualEvent',
-  'SpiritualArticle',
   'ChartAccount',
   'JournalEntry',
   'Supplier',

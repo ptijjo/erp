@@ -396,7 +396,7 @@ export class SpiritualParticipationService {
             userId: user.id,
             type: NotificationType.SPIRITUAL_EVENT_INVITATION,
             title: 'Invitation — événement spirituel',
-            body: `${event.title} — ${dateLabel} — ${locationLabel}. Événement groupe (maison mère et filiales). Répondez dans « Événements spirituels ».`,
+            body: `${event.title} — ${dateLabel} — ${locationLabel}. Événement groupe (maison mère et filiales). Répondez dans « Événements ».`,
             organizationId: user.organizationId,
             metadata: {
               spiritualEventId: event.id,

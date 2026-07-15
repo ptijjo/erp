@@ -720,7 +720,6 @@ export class SeederService implements OnModuleInit {
       for (const permName of [
         'read:Notification',
         'update:Notification',
-        'read:SpiritualArticle',
       ] as const) {
         const perm = await this.prisma.permission.findUnique({
           where: { name: permName },
@@ -742,6 +741,7 @@ export class SeederService implements OnModuleInit {
         'read:Message',
         'create:Message',
         'update:Message',
+        'delete:Message',
       ] as const) {
         const perm = await this.prisma.permission.findUnique({
           where: { name: permName },
@@ -898,10 +898,6 @@ export class SeederService implements OnModuleInit {
             'create:SpiritualEvent',
             'update:SpiritualEvent',
             'delete:SpiritualEvent',
-            'read:SpiritualArticle',
-            'create:SpiritualArticle',
-            'update:SpiritualArticle',
-            'delete:SpiritualArticle',
           ],
         },
         {

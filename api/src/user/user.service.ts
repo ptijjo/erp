@@ -32,6 +32,7 @@ import { ImageProcessorService } from '../storage/image-processor.service';
 import { R2ObjectStorageService } from '../storage/r2-object-storage.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { EmployeeService } from '../hr/employee.service';
+import { MessagingAttachmentService } from '../messaging/messaging-attachment.service';
 import { AppCacheService } from '../cache/app-cache.service';
 import { authUserCacheKey } from '../casl/define-ability';
 import type { PaginationQueryDto } from '../lib/pagination-query.dto';
@@ -72,6 +73,7 @@ export class UserService {
     private readonly caslAbilityFactory: CaslAbilityFactory,
     private readonly employeeService: EmployeeService,
     private readonly cache: AppCacheService,
+    private readonly messagingAttachmentService: MessagingAttachmentService,
   ) {}
 
   private async invalidateUserSessionCache(userId: string): Promise<void> {
@@ -457,6 +459,13 @@ export class UserService {
         'Accès limité aux utilisateurs visibles pour votre périmètre (organisation / pôle).',
       );
     }
+
+    if (existingUser.profilePhotoUrl) {
+      await this.objectStorage.deleteByPublicUrl(existingUser.profilePhotoUrl);
+    }
+
+    await this.messagingAttachmentService.deleteAllThreadsForUser(id);
+
     await this.prisma.user.delete({ where: { id } });
     await this.invalidateUserSessionCache(id);
     return {

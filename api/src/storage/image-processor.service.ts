@@ -4,12 +4,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import sharp from 'sharp';
-import type { ProcessedAvatarImage } from './storage.types';
+import type { ProcessedAvatarImage, ProcessedMessageImage } from './storage.types';
 
 const AVATAR_MAX_EDGE_PX = 512;
-const ARTICLE_COVER_MAX_WIDTH_PX = 1600;
 const AVATAR_WEBP_QUALITY = 80;
-const ARTICLE_COVER_WEBP_QUALITY = 85;
+const MESSAGE_IMAGE_MAX_EDGE_PX = 2048;
+const MESSAGE_JPEG_QUALITY = 88;
 const MAX_INPUT_BYTES = 5 * 1024 * 1024;
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -51,15 +51,40 @@ export class ImageProcessorService {
     });
   }
 
-  async processArticleCover(
+  async processMessageAttachmentImage(
     file: Express.Multer.File,
-  ): Promise<ProcessedAvatarImage> {
-    return this.processToWebp(file, {
-      maxWidth: ARTICLE_COVER_MAX_WIDTH_PX,
-      maxHeight: ARTICLE_COVER_MAX_WIDTH_PX,
-      fit: 'inside',
-      quality: ARTICLE_COVER_WEBP_QUALITY,
-    });
+  ): Promise<ProcessedMessageImage> {
+    this.assertUploadableImage(file);
+
+    try {
+      const pipeline = sharp(file.buffer, { failOn: 'none' })
+        .rotate()
+        .resize(MESSAGE_IMAGE_MAX_EDGE_PX, MESSAGE_IMAGE_MAX_EDGE_PX, {
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .jpeg({ quality: MESSAGE_JPEG_QUALITY, mozjpeg: true });
+
+      const { data, info } = await pipeline.toBuffer({
+        resolveWithObject: true,
+      });
+
+      return {
+        buffer: data,
+        contentType: 'image/jpeg',
+        extension: 'jpg',
+        width: info.width,
+        height: info.height,
+        byteLength: data.byteLength,
+      };
+    } catch (err) {
+      this.logger.warn(
+        `Échec traitement image messagerie Sharp: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw new BadRequestException(
+        'Impossible de traiter cette image. Vérifiez le fichier.',
+      );
+    }
   }
 
   private async processToWebp(

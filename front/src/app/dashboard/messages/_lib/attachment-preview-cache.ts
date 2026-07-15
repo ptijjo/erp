@@ -31,9 +31,9 @@ async function fetchAttachmentBytes(
   );
 
   const buffer = response.data;
-  const contentType = (response.headers["content-type"] ?? "")
-    .split(";")[0]
-    ?.trim()
+  const rawContentType = response.headers["content-type"];
+  const contentType = (String(rawContentType ?? "").split(";")[0] ?? "")
+    .trim()
     .toLowerCase();
 
   if (contentType.includes("application/json") || buffer.byteLength === 0) {

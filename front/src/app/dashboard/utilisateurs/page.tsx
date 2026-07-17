@@ -68,6 +68,8 @@ export default function UtilisateursPage() {
   const canOpenRoles = me != null && hasMePermission(me, "read", "Role");
   const canReadPole = me != null && hasMePermission(me, "read", "Pole");
   const canCreatePole = me != null && hasMePermission(me, "create", "Pole");
+  const canUpdatePole = me != null && hasMePermission(me, "update", "Pole");
+  const canDeletePole = me != null && hasMePermission(me, "delete", "Pole");
   const catalogPermissionsAdmin = me != null && isAdminUser(me);
   const showPolesSection =
     canReadPole && me != null && isMainOrganization(me);
@@ -186,6 +188,8 @@ export default function UtilisateursPage() {
           polesLoading={polesLoading}
           polesError={polesError}
           canCreatePole={canCreatePole}
+          canUpdatePole={canUpdatePole}
+          canDeletePole={canDeletePole}
         />
       ) : null}
 

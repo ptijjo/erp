@@ -42,6 +42,7 @@ import { MessagingModule } from './messaging/messaging.module';
 import { DirectoryModule } from './directory/directory.module';
 import { ActionsModule } from './actions/actions.module';
 import { AuditContextInterceptor } from './prisma/audit-context.interceptor';
+import { RlsContextInterceptor } from './prisma/rls-context.interceptor';
 import { CacheModule } from './cache/cache.module';
 import { SensitiveFieldsInterceptor } from './common/sensitive-fields.interceptor';
 import { StrategyModule } from './strategy/strategy.module';
@@ -121,6 +122,10 @@ import { AccountingModule } from './accounting/accounting.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditContextInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RlsContextInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,

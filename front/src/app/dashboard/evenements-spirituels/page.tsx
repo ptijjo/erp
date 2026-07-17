@@ -81,7 +81,7 @@ export default function EvenementsSpirituelsPage() {
     <PageShell>
       <PageHeader
         title="Événements"
-        description="Invitations du pôle spiritualité — événements groupe (maison mère et filiales)."
+        description="Invitations aux événements du groupe (maison mère et filiales)."
       />
 
       <Card className="mt-6">

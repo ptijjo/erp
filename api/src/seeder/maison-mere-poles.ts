@@ -25,12 +25,6 @@ export const MAISON_MERE_POLES = [
     directorRoleName: 'DIRECTOR_LEGAL',
   },
   {
-    code: 'Pole_TRADITIONAL_SPIRITUAL',
-    name: 'Pôle cultes traditionnels et spirituels',
-    description: 'Gestion des cultes traditionnels et spirituels',
-    directorRoleName: 'DIRECTOR_TRADITIONAL_SPIRITUAL',
-  },
-  {
     code: 'Pole_ARCHITECTURE_HERITAGE',
     name: "Pôle architecture et patrimoine",
     description: "Gestion de l'architecture et du patrimoine",

@@ -15,7 +15,7 @@ export type RouteGuardMe = {
   };
   organisationName: string;
   firstLogin: boolean;
-  permissionMode: "FULL_ACCESS" | "ROLE_PERMISSIONS" | "FALLBACK_READ_ALL";
+  permissionMode: "FULL_ACCESS" | "ROLE_PERMISSIONS" | "NO_PERMISSIONS";
   permissions: string[];
   hasSalesCatalog: boolean;
 };
@@ -26,8 +26,44 @@ export type RouteGuardRule =
 
 /** Routes protégées par permission ou restriction maison mère. */
 export const ROUTE_GUARDS: Record<string, RouteGuardRule> = {
-  "/dashboard/fournisseurs": { mainOnly: true },
-  "/dashboard/organisations": { mainOnly: true },
+  "/dashboard/hq/fournisseurs": { mainOnly: true },
+  "/dashboard/hq/organisations": { mainOnly: true },
+  "/dashboard/hq/organisations/poles": {
+    permission: { action: "read", subject: "Pole" },
+  },
+  "/dashboard/hq/organisations/poles/add": {
+    permission: { action: "create", subject: "Pole" },
+  },
+  "/dashboard/hq/categories": {
+    permission: { action: "read", subject: "Category" },
+  },
+  "/dashboard/produits": {
+    permission: { action: "read", subject: "Product" },
+  },
+  "/dashboard/stocks": {
+    permission: { action: "read", subject: "Stock" },
+  },
+  "/dashboard/commandes-inter-filiales": {
+    permission: { action: "read", subject: "StockOrder" },
+  },
+  "/dashboard/budgets": {
+    permission: { action: "read", subject: "Budget" },
+  },
+  "/dashboard/utilisateurs": {
+    permission: { action: "read", subject: "User" },
+  },
+  "/dashboard/rh": {
+    permission: { action: "read", subject: "Employee" },
+  },
+  "/dashboard/audit": {
+    permission: { action: "read", subject: "AuditLog" },
+  },
+  "/dashboard/messages": {
+    permission: { action: "read", subject: "Message" },
+  },
+  "/dashboard/mes-actions": {
+    permission: { action: "read", subject: "Task" },
+  },
   "/dashboard/patrimoine": {
     permission: { action: "read", subject: "HeritageAsset" },
   },
@@ -40,14 +76,20 @@ export const ROUTE_GUARDS: Record<string, RouteGuardRule> = {
   "/dashboard/marketing": {
     permission: { action: "read", subject: "MarketingCampaign" },
   },
-  "/dashboard/spirituel": {
+  "/dashboard/evenements": {
     permission: { action: "read", subject: "SpiritualEvent" },
+  },
+  "/dashboard/production": {
+    permission: { action: "read", subject: "ProductionOrder" },
   },
   "/dashboard/comptabilite-generale": {
     permission: { action: "read", subject: "JournalEntry" },
   },
-  "/dashboard/commandes-inter-filiales": {
+  "/dashboard/comptabilite": {
     permission: { action: "read", subject: "StockOrder" },
+  },
+  "/dashboard/tresorerie": {
+    permission: { action: "read", subject: "AccountingPeriod" },
   },
 };
 
@@ -69,6 +111,9 @@ export function hasRouteGuardPermission(
 ): boolean {
   if (me.permissionMode === "FULL_ACCESS") {
     return true;
+  }
+  if (me.permissionMode === "NO_PERMISSIONS") {
+    return false;
   }
   const normalizedAction = action.trim().toLowerCase();
   const normalizedSubject = subject.trim();
@@ -114,6 +159,11 @@ function findRouteGuard(pathname: string): RouteGuardRule | null {
     }
   }
   return null;
+}
+
+/** True si le middleware doit appeler `/auth/me` (garde de route). */
+export function routeRequiresProfileCheck(pathname: string): boolean {
+  return findRouteGuard(pathname) != null;
 }
 
 export function isRouteAuthorized(

@@ -107,7 +107,7 @@ export function SubsidiaryCard({ subsidiary, className }: SubsidiaryCardProps) {
       ) : null}
 
       <Link
-        href={`/dashboard/organisations/${subsidiary.slug}`}
+        href={`/dashboard/hq/organisations/${subsidiary.slug}`}
         className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
       >
         Voir détails

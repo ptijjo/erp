@@ -4,8 +4,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { isMainOrganization, useMe } from "~/hooks/use-me";
-import { api } from "~/lib/api";
-import type { OrganizationDto } from "~/lib/api-types";
+import { fetchOrganizations } from "~/lib/api-list";
 
 /** Organisations visibles pour les formulaires multi-tenant (maison mère + filiales). */
 export function useScopedOrganizations(enabled = true) {
@@ -14,10 +13,7 @@ export function useScopedOrganizations(enabled = true) {
 
   const { data: organizations = [], isLoading } = useQuery({
     queryKey: ["organisation"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<OrganizationDto[]>("/organisation");
-      return data;
-    },
+    queryFn: fetchOrganizations,
     enabled: Boolean(enabled && main),
   });
 

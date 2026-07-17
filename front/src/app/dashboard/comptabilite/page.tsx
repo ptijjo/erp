@@ -45,6 +45,7 @@ import { PageHeader } from "~/components/layout/page-header";
 import { PageShell } from "~/components/layout/page-shell";
 import { hasMePermission, isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
+import { fetchOrganizations } from "~/lib/api-list";
 import type { OrganizationDto, StockOrderDto } from "~/lib/api-types";
 import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
@@ -163,10 +164,7 @@ export default function ComptabilitePage() {
 
   const { data: organisations = [] } = useQuery({
     queryKey: ["organisation"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<OrganizationDto[]>("/organisation");
-      return data;
-    },
+    queryFn: fetchOrganizations,
     enabled: canReadOrders && isHq,
   });
 

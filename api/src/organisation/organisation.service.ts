@@ -17,6 +17,13 @@ import {
 } from './dto/organization';
 import { SetOrganizationCatalogDto } from './dto/set-organization-catalog.dto';
 import { slugify } from '../lib/Slugify';
+import type { PaginationQueryDto } from '../lib/pagination-query.dto';
+import {
+  buildPaginationMeta,
+  paginationSkip,
+  resolvePagination,
+  type PaginatedResult,
+} from '../lib/pagination';
 
 @Injectable()
 export class OrganisationService {
@@ -24,13 +31,22 @@ export class OrganisationService {
 
   public getAllOrganisations = async (
     viewer: AuthenticatedUser,
-  ): Promise<Organization[]> => {
-    if (isMainOrganizationUser(viewer)) {
-      return await this.prisma.organization.findMany();
-    }
-    return await this.prisma.organization.findMany({
-      where: { id: viewer.organisationId },
-    });
+    query: PaginationQueryDto = {},
+  ): Promise<PaginatedResult<Organization>> => {
+    const where = isMainOrganizationUser(viewer)
+      ? {}
+      : { id: viewer.organisationId };
+    const { page, limit } = resolvePagination(query);
+    const [items, total] = await Promise.all([
+      this.prisma.organization.findMany({
+        where,
+        orderBy: [{ organizationType: 'asc' }, { name: 'asc' }],
+        skip: paginationSkip(page, limit),
+        take: limit,
+      }),
+      this.prisma.organization.count({ where }),
+    ]);
+    return { items, meta: buildPaginationMeta(total, page, limit) };
   };
 
   public getOrganisationById = async (
@@ -61,6 +77,18 @@ export class OrganisationService {
         'Une organisation avec ce slug existe déjà.',
       );
     }
+    const main = await this.prisma.organization.findFirst({
+      where: {
+        organizationType: OrganizationType.MAIN,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!main) {
+      throw new BadRequestException(
+        'Maison mère introuvable : impossible de rattacher une filiale.',
+      );
+    }
     const description =
       data.description !== undefined && String(data.description).trim() !== ''
         ? String(data.description).trim()
@@ -70,6 +98,7 @@ export class OrganisationService {
         name: data.name,
         slug,
         organizationType: OrganizationType.SUBSIDIARY,
+        parentId: main.id,
         ...(description !== undefined ? { description } : {}),
       },
     });
@@ -105,6 +134,11 @@ export class OrganisationService {
     });
     if (!existingOrganization) {
       throw new NotFoundException('Organization not found');
+    }
+    if (existingOrganization.organizationType === OrganizationType.MAIN) {
+      throw new BadRequestException(
+        'La maison mère ne peut pas être supprimée.',
+      );
     }
     return await this.prisma.organization.delete({
       where: { id },

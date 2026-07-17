@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import {
   isRouteAuthorized,
+  routeRequiresProfileCheck,
   type RouteGuardMe,
 } from "~/lib/route-guards";
 
@@ -56,16 +57,18 @@ async function fetchMe(request: NextRequest): Promise<{
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (
-    pathname === FIRST_LOGIN_PATH ||
-    pathname === UNAUTHORIZED_PATH
-  ) {
+  if (pathname === FIRST_LOGIN_PATH || pathname === UNAUTHORIZED_PATH) {
     return NextResponse.next();
   }
 
   const token = request.cookies.get(accessCookieName())?.value;
   if (!token) {
     return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // Évite un round-trip `/auth/me` sur chaque navigation : seulement si une garde existe.
+  if (!routeRequiresProfileCheck(pathname)) {
+    return NextResponse.next();
   }
 
   const { me, status } = await fetchMe(request);

@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.strategy/jwt-auth.guard';
@@ -20,6 +21,7 @@ import {
   UpdateOrganizationDto,
 } from './dto/organization';
 import { SetOrganizationCatalogDto } from './dto/set-organization-catalog.dto';
+import { PaginationQueryDto } from '../lib/pagination-query.dto';
 
 @Controller('organisation')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
@@ -28,8 +30,11 @@ export class OrganisationController {
 
   @Get()
   @CheckPolicies({ action: 'read', subject: 'Organization' })
-  findAll(@CurrentUser() viewer: AuthenticatedUser) {
-    return this.organisationService.getAllOrganisations(viewer);
+  findAll(
+    @CurrentUser() viewer: AuthenticatedUser,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.organisationService.getAllOrganisations(viewer, query);
   }
 
   @Get(':id/catalog')

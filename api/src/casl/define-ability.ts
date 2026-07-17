@@ -91,9 +91,6 @@ export function parsePermissionName(
   return { action, subject };
 }
 
-/**
- * Fallback si aucune permission n’est liée au rôle en base (comportement historique).
- */
 /** Lecture large sans le journal d’audit (réservé à `read:AuditLog` explicite). */
 function grantReadAllSubjectsExceptAuditLog(
   can: AbilityBuilder<AppAbility>['can'],
@@ -105,13 +102,15 @@ function grantReadAllSubjectsExceptAuditLog(
   }
 }
 
+/**
+ * Ability minimale : FULL_ACCESS → manage all ; sinon deny-by-default (aucune règle).
+ * Ne plus accorder de lecture large en fallback.
+ */
 export function defineAbilityFor(user: AuthenticatedUser): AppAbility {
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
 
   if (isFullAccessRoleName(user.role.name)) {
     can('manage', 'all');
-  } else {
-    grantReadAllSubjectsExceptAuditLog(can);
   }
 
   return build();
@@ -123,10 +122,11 @@ function applyParsedRule(
   subject: string,
 ): void {
   if (subject === 'all') {
+    if (action === 'read') {
+      grantReadAllSubjectsExceptAuditLog(can);
+      return;
+    }
     for (const s of KNOWN_POLICY_SUBJECTS) {
-      if (action === 'read' && s === 'AuditLog') {
-        continue;
-      }
       can(action as 'read' | 'create' | 'update' | 'delete' | 'manage', s);
     }
     return;
@@ -137,7 +137,7 @@ function applyParsedRule(
 /**
  * Ability à partir des liaisons `PermissionRole` du rôle JWT.
  * - Rôles FULL_ACCESS_* : identique à `defineAbilityFor` (ignore la base).
- * - Rôle sans aucune permission liée : fallback `defineAbilityFor`.
+ * - Rôle sans aucune permission liée : deny-by-default (`defineAbilityFor`).
  * - Sinon : une règle CASL par permission au format `action:Subject`.
  */
 export async function buildAbilityFromDatabase(
@@ -179,10 +179,6 @@ export function buildAbilityFromPermissionNames(
   }
 
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
-
-  if (user.organizationType === 'MAIN') {
-    grantReadAllSubjectsExceptAuditLog(can);
-  }
 
   for (const name of permissionNames) {
     const parsed = parsePermissionName(name);

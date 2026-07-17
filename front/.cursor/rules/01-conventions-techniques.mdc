@@ -61,7 +61,7 @@ dashboard/<domaine>/
   - détail : `["product", productId]`, `["user", userId]`, …
   - session : `meQueryKey` = `["auth", "me"]` dans `use-me.ts`
 - **Mutations** : `invalidateQueries` sur la clé liste (et détail si besoin) après succès.
-- **Pages listes** : aujourd’hui tri/filtre **en mémoire** dans `page.tsx` (ex. `produits/page.tsx`). Pour nouvelles tables denses : viser **TanStack Table** + colonnes Shadcn — à valider avant ajout de dépendance.
+- **Tables densifiées** : **TanStack Table** (`~/components/data-table/data-table.tsx`) — adopté (ex. audit) ; étendre aux listes denses.
 
 ## Permissions (UI)
 

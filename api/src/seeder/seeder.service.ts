@@ -11,6 +11,10 @@ import {
   describeCaslPermission,
 } from './casl-permission-names';
 import { SUBSIDIARY_MANAGER_PERMISSION_NAMES } from './subsidiary-manager-permissions';
+import {
+  clearRlsBypass,
+  enableRlsBypass,
+} from '../prisma/rls-bypass';
 
 @Injectable()
 export class SeederService implements OnModuleInit {
@@ -20,6 +24,15 @@ export class SeederService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    await enableRlsBypass(this.prisma);
+    try {
+      await this.seed();
+    } finally {
+      await clearRlsBypass(this.prisma);
+    }
+  }
+
+  private async seed() {
     try {
       const orgName = this.config.getOrThrow<string>('SEED_ORGANIZATION_NAME');
       const adminEmail =
@@ -146,6 +159,8 @@ export class SeederService implements OnModuleInit {
         Logger.log(`Rôle direction maison mère assuré : ${def.name}`);
       }
 
+      await this.removeRetiredTraditionalSpiritual(organization.id, adminRole.id);
+
       const provisionScopeId =
         seedAdminRoleName === 'ADMIN' ? null : organization.id;
       const provisionRole = await this.prisma.role.findFirst({
@@ -228,6 +243,59 @@ export class SeederService implements OnModuleInit {
         Logger.log(
           'Permission read:AuditLog liée à ADMIN, DIRECTOR_GENERAL et DIRECTOR_OPERATIONS',
         );
+      }
+
+      // CRUD écriture pôles : uniquement FULL_ACCESS (ADMIN / DG / OPS).
+      // Les autres rôles direction n’ont que la lecture via read:all ;
+      // update/delete/create Pole exigent une permission explicite en base.
+      const poleWriteNames = [
+        'create:Pole',
+        'update:Pole',
+        'delete:Pole',
+      ] as const;
+      {
+        const fullAccessRoles = await this.prisma.role.findMany({
+          where: {
+            OR: [
+              { name: 'ADMIN', organizationScopeId: null },
+              {
+                name: {
+                  in: ['DIRECTOR_GENERAL', 'DIRECTOR_OPERATIONS'],
+                },
+                organizationScopeId: organization.id,
+              },
+            ],
+          },
+          select: { id: true },
+        });
+        let poleWriteLinks = 0;
+        for (const permName of poleWriteNames) {
+          const perm = await this.prisma.permission.findUnique({
+            where: { name: permName },
+          });
+          if (!perm) continue;
+          for (const { id: roleId } of fullAccessRoles) {
+            await this.prisma.permissionRole.upsert({
+              where: {
+                permissionId_roleId: {
+                  permissionId: perm.id,
+                  roleId,
+                },
+              },
+              create: {
+                permissionId: perm.id,
+                roleId,
+              },
+              update: {},
+            });
+            poleWriteLinks += 1;
+          }
+        }
+        if (fullAccessRoles.length > 0) {
+          Logger.log(
+            `Permissions écriture Pole (create/update/delete) liées à ADMIN, DIRECTOR_GENERAL et DIRECTOR_OPERATIONS (${poleWriteLinks} liaisons)`,
+          );
+        }
       }
 
       const stockReadPerm = await this.prisma.permission.findUnique({
@@ -645,6 +713,30 @@ export class SeederService implements OnModuleInit {
         );
       }
 
+      const readAllPerm = await this.prisma.permission.findUnique({
+        where: { name: 'read:all' },
+      });
+      if (readAllPerm) {
+        for (const { id: roleId } of supplierRoles) {
+          await this.prisma.permissionRole.upsert({
+            where: {
+              permissionId_roleId: {
+                permissionId: readAllPerm.id,
+                roleId,
+              },
+            },
+            create: {
+              permissionId: readAllPerm.id,
+              roleId,
+            },
+            update: {},
+          });
+        }
+        Logger.log(
+          'Permission read:all liée à ADMIN et aux rôles direction maison mère',
+        );
+      }
+
       const hrDirectorRole = await this.prisma.role.findUnique({
         where: {
           name_organizationScopeId: {
@@ -892,15 +984,6 @@ export class SeederService implements OnModuleInit {
           ],
         },
         {
-          roleName: 'DIRECTOR_TRADITIONAL_SPIRITUAL',
-          permissions: [
-            'read:SpiritualEvent',
-            'create:SpiritualEvent',
-            'update:SpiritualEvent',
-            'delete:SpiritualEvent',
-          ],
-        },
-        {
           roleName: 'DIRECTOR_FINANCE',
           permissions: [
             'read:ChartAccount',
@@ -946,6 +1029,49 @@ export class SeederService implements OnModuleInit {
     } catch (error) {
       Logger.error(error);
       throw error;
+    }
+  }
+
+  /**
+   * Retire le pôle / rôle traditions & spiritualité (plus dans le catalogue seed).
+   * Réassigne les utilisateurs concernés à ADMIN avant suppression du rôle.
+   */
+  private async removeRetiredTraditionalSpiritual(
+    organizationId: string,
+    adminRoleId: string,
+  ): Promise<void> {
+    const retiredRole = await this.prisma.role.findFirst({
+      where: {
+        name: 'DIRECTOR_TRADITIONAL_SPIRITUAL',
+        organizationScopeId: organizationId,
+      },
+      select: { id: true },
+    });
+    if (retiredRole) {
+      const reassigned = await this.prisma.user.updateMany({
+        where: { roleId: retiredRole.id },
+        data: { roleId: adminRoleId },
+      });
+      await this.prisma.permissionRole.deleteMany({
+        where: { roleId: retiredRole.id },
+      });
+      await this.prisma.role.delete({ where: { id: retiredRole.id } });
+      Logger.log(
+        `Rôle DIRECTOR_TRADITIONAL_SPIRITUAL retiré (${reassigned.count} utilisateur(s) réassigné(s) à ADMIN)`,
+      );
+    }
+
+    const retiredPole = await this.prisma.pole.findUnique({
+      where: { code: 'Pole_TRADITIONAL_SPIRITUAL' },
+      select: { id: true },
+    });
+    if (retiredPole) {
+      await this.prisma.role.updateMany({
+        where: { poleId: retiredPole.id },
+        data: { poleId: null },
+      });
+      await this.prisma.pole.delete({ where: { id: retiredPole.id } });
+      Logger.log('Pôle Pole_TRADITIONAL_SPIRITUAL retiré');
     }
   }
 }

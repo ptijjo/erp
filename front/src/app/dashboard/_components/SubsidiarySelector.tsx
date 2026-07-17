@@ -13,8 +13,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { isMainOrganization, useMe } from "~/hooks/use-me";
-import { api } from "~/lib/api";
-import type { OrganizationDto } from "~/lib/api-types";
+import { fetchOrganizations } from "~/lib/api-list";
 import { useSubsidiaryContext } from "~/providers/subsidiary-context";
 
 const ALL_VALUE = "__all__";
@@ -26,10 +25,7 @@ export function SubsidiarySelector() {
 
   const { data: organizations = [] } = useQuery({
     queryKey: ["organisation"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<OrganizationDto[]>("/organisation");
-      return data;
-    },
+    queryFn: fetchOrganizations,
     enabled: me != null && isMainOrganization(me),
   });
 

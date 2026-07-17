@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "~/components/ui/button";
 import { hasMePermission, isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
+import { fetchCategories } from "~/lib/api-list";
 import type { CategoryDto, ProductDto, SupplierDto } from "~/lib/api-types";
 import { parseDecimal } from "~/lib/parse-decimal";
 
@@ -61,10 +62,7 @@ export default function EditProductForm({ productId }: Props) {
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ["category"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<CategoryDto[]>("/category");
-      return data;
-    },
+    queryFn: fetchCategories,
   });
 
   const { data: suppliers = [], isLoading: suppliersLoading } = useQuery({

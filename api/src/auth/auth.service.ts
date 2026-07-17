@@ -316,7 +316,7 @@ export class AuthService {
   }
 
   private async resolvePermissionSnapshot(jwtUser: AuthenticatedUser): Promise<{
-    permissionMode: 'FULL_ACCESS' | 'ROLE_PERMISSIONS' | 'FALLBACK_READ_ALL';
+    permissionMode: 'FULL_ACCESS' | 'ROLE_PERMISSIONS' | 'NO_PERMISSIONS';
     permissions: string[];
   }> {
     if (isFullAccessRoleName(jwtUser.role.name)) {
@@ -341,14 +341,10 @@ export class AuthService {
       }
     }
 
-    if (jwtUser.organizationType === 'MAIN') {
-      permissionNames.add('read:all');
-    }
-
     if (permissionNames.size === 0) {
       return {
-        permissionMode: 'FALLBACK_READ_ALL',
-        permissions: ['read:all'],
+        permissionMode: 'NO_PERMISSIONS',
+        permissions: [],
       };
     }
 

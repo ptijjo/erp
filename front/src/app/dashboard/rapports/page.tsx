@@ -17,6 +17,7 @@ import {
 } from "~/components/ui/select";
 import { isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
+import { fetchOrganizations } from "~/lib/api-list";
 import type { OrganizationDto } from "~/lib/api-types";
 
 const ALL_SUBSIDIARIES = "all";
@@ -31,10 +32,7 @@ export default function RapportsPage() {
 
   const { data: organizations = [] } = useQuery({
     queryKey: ["organisation"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<OrganizationDto[]>("/organisation");
-      return data;
-    },
+    queryFn: fetchOrganizations,
     enabled: Boolean(main && canAccess),
   });
 

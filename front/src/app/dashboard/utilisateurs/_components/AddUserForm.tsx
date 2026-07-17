@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "~/lib/api";
+import { fetchOrganizations } from "~/lib/api-list";
 import type { OrganizationDto, PoleDto, RoleDto } from "~/lib/api-types";
 import { hasMePermission, isMainOrganization, useMe } from "~/hooks/use-me";
 
@@ -61,10 +62,7 @@ export default function AddUserForm() {
 
   const { data: organisations = [], isLoading: orgsLoading } = useQuery({
     queryKey: ["organisation"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<OrganizationDto[]>("/organisation");
-      return data;
-    },
+    queryFn: fetchOrganizations,
   });
 
   const { data: roles = [], isLoading: rolesLoading } = useQuery({

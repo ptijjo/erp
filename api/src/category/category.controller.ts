@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -16,6 +17,7 @@ import { CheckPolicies } from '../casl/check-policies.decorator';
 import { PoliciesGuard } from '../casl/policies.guard';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
+import { PaginationQueryDto } from '../lib/pagination-query.dto';
 
 @Controller('category')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
@@ -24,8 +26,11 @@ export class CategoryController {
 
   @Get()
   @CheckPolicies({ action: 'read', subject: 'Category' })
-  findAll(@CurrentUser() viewer: AuthenticatedUser) {
-    return this.categoryService.findAll(viewer);
+  findAll(
+    @CurrentUser() viewer: AuthenticatedUser,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.categoryService.findAll(viewer, query);
   }
 
   @Get(':id')

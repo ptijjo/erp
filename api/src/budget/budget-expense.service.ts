@@ -13,10 +13,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   BudgetStatus,
   NotificationType,
+  Prisma,
 } from '../generated/prisma/client';
 import { AccountingPeriodService } from '../treasury/accounting-period.service';
 import { NotificationService } from '../notification/notification.service';
 import type { CreateBudgetExpenseDto } from './dto/budget-expense.dto';
+import {
+  decimalUtilizationRatio,
+  toDecimal,
+} from '../lib/decimal.util';
 
 const expenseInclude = {
   budgetLine: {
@@ -171,16 +176,18 @@ export class BudgetExpenseService {
 
   private async maybeNotifyBudgetUtilization(
     lineId: string,
-    amountPlanned: { toString(): string },
+    amountPlanned: Prisma.Decimal | { toString(): string },
     viewer: AuthenticatedUser,
   ): Promise<void> {
     const agg = await this.prisma.budgetExpense.aggregate({
       where: { budgetLineId: lineId },
       _sum: { amount: true },
     });
-    const spent = Number(agg._sum.amount ?? 0);
-    const planned = Number(amountPlanned.toString());
-    if (planned <= 0 || spent / planned < 0.9) {
+    const ratio = decimalUtilizationRatio(
+      agg._sum.amount,
+      amountPlanned.toString(),
+    );
+    if (ratio.lt('0.9')) {
       return;
     }
 
@@ -198,7 +205,7 @@ export class BudgetExpenseService {
     });
     if (!line) return;
 
-    const pct = Math.round((spent / planned) * 100);
+    const pct = ratio.mul(100).toDecimalPlaces(0).toNumber();
     await this.notificationService.notifyUsersWithPermission(
       line.budget.subsidiaryOrganizationId,
       'read:Budget',
@@ -261,21 +268,21 @@ export class BudgetExpenseService {
 
   private async assertLineHasRemainingCapacity(
     lineId: string,
-    amountPlanned: { toString(): string },
+    amountPlanned: Prisma.Decimal | { toString(): string },
     newAmount: number,
   ): Promise<void> {
     const agg = await this.prisma.budgetExpense.aggregate({
       where: { budgetLineId: lineId },
       _sum: { amount: true },
     });
-    const spent = Number(agg._sum.amount ?? 0);
-    const planned = Number(amountPlanned.toString());
-    const total = spent + newAmount;
+    const spent = toDecimal(agg._sum.amount);
+    const planned = toDecimal(amountPlanned.toString());
+    const total = spent.plus(toDecimal(newAmount));
 
-    if (total > planned) {
-      const remaining = Math.max(0, planned - spent);
+    if (total.gt(planned)) {
+      const remaining = Prisma.Decimal.max(0, planned.minus(spent));
       throw new BadRequestException(
-        `Montant dépassant le prévu sur cette ligne (${Math.round(remaining)} FCFA restant(s)). Vous pouvez demander une rallonge à la maison mère.`,
+        `Montant dépassant le prévu sur cette ligne (${remaining.toDecimalPlaces(0).toString()} FCFA restant(s)). Vous pouvez demander une rallonge à la maison mère.`,
       );
     }
   }

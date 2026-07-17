@@ -5,13 +5,8 @@ import {
 import type { AuthenticatedUser } from '../auth/auth.types';
 import {
   assertOrganizationResourceAccess,
-  isMainOrganizationUser,
   organizationListWhere,
 } from '../auth/organization-scope';
-import {
-  assertMainOrgPoleDomain,
-  POLE_DOMAIN,
-} from '../auth/pole-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Prisma, SpiritualEventStatus } from '../generated/prisma/client';
 import type { CreateSpiritualEventDto, UpdateSpiritualEventDto } from './dto/spiritual.dto';
@@ -35,16 +30,13 @@ export class SpiritualService {
   async findOne(id: string, viewer: AuthenticatedUser) {
     const row = await this.prisma.spiritualEvent.findUnique({ where: { id } });
     if (!row) {
-      throw new NotFoundException('Événement spirituel introuvable.');
+      throw new NotFoundException('Événement introuvable.');
     }
     assertOrganizationResourceAccess(viewer, row.organizationId);
     return row;
   }
 
   async create(dto: CreateSpiritualEventDto, viewer: AuthenticatedUser) {
-    if (isMainOrganizationUser(viewer)) {
-      assertMainOrgPoleDomain(viewer, POLE_DOMAIN.TRADITIONAL);
-    }
     assertOrganizationResourceAccess(viewer, dto.organizationId);
     return this.prisma.spiritualEvent.create({
       data: {
@@ -60,9 +52,6 @@ export class SpiritualService {
 
   async update(id: string, dto: UpdateSpiritualEventDto, viewer: AuthenticatedUser) {
     await this.findOne(id, viewer);
-    if (isMainOrganizationUser(viewer)) {
-      assertMainOrgPoleDomain(viewer, POLE_DOMAIN.TRADITIONAL);
-    }
     return this.prisma.spiritualEvent.update({
       where: { id },
       data: {
@@ -83,9 +72,6 @@ export class SpiritualService {
 
   async remove(id: string, viewer: AuthenticatedUser) {
     await this.findOne(id, viewer);
-    if (isMainOrganizationUser(viewer)) {
-      assertMainOrgPoleDomain(viewer, POLE_DOMAIN.TRADITIONAL);
-    }
     return this.prisma.spiritualEvent.delete({ where: { id } });
   }
 }

@@ -30,6 +30,7 @@ import {
   useMe,
 } from "~/hooks/use-me";
 import { api } from "~/lib/api";
+import { fetchOrganizations } from "~/lib/api-list";
 import type {
   AccountingPeriodClosureDto,
   OrganizationDto,
@@ -67,10 +68,7 @@ export default function TresoreriePage() {
 
   const { data: organizations = [] } = useQuery({
     queryKey: ["organisation"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<OrganizationDto[]>("/organisation");
-      return data;
-    },
+    queryFn: fetchOrganizations,
     enabled: main && canManage,
   });
 

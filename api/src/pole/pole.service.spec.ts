@@ -2,7 +2,12 @@ jest.mock('../prisma/prisma.service', () => ({
   PrismaService: class PrismaService {},
 }));
 
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PoleService } from './pole.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -33,7 +38,10 @@ const subsidiaryViewer: AuthenticatedUser = {
 describe('PoleService', () => {
   let service: PoleService;
   let findMany: jest.Mock;
+  let findUnique: jest.Mock;
   let create: jest.Mock;
+  let update: jest.Mock;
+  let remove: jest.Mock;
 
   const poles = [
     {
@@ -46,8 +54,18 @@ describe('PoleService', () => {
     },
   ];
 
+  const customPole = {
+    id: 'p-custom',
+    code: 'Pole_CUSTOM',
+    name: 'Pôle custom',
+    description: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
   beforeEach(async () => {
     findMany = jest.fn().mockResolvedValue(poles);
+    findUnique = jest.fn().mockResolvedValue(poles[0]);
     create = jest.fn().mockImplementation((args: { data: { code: string } }) =>
       Promise.resolve({
         id: 'new-id',
@@ -57,13 +75,19 @@ describe('PoleService', () => {
         updatedAt: new Date(),
       }),
     );
+    update = jest.fn().mockImplementation(
+      (args: { where: { id: string }; data: Record<string, unknown> }) =>
+        Promise.resolve({ ...poles[0], ...args.data, id: args.where.id }),
+    );
+    remove = jest.fn().mockResolvedValue(customPole);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PoleService,
         {
           provide: PrismaService,
           useValue: {
-            pole: { findMany, create },
+            pole: { findMany, findUnique, create, update, delete: remove },
           },
         },
       ],
@@ -84,6 +108,27 @@ describe('PoleService', () => {
       const result = await service.findAll(mainViewer);
       expect(result).toEqual(poles);
       expect(findMany).toHaveBeenCalledWith({ orderBy: { code: 'asc' } });
+    });
+  });
+
+  describe('findOne', () => {
+    it('refuse hors maison mère', async () => {
+      await expect(
+        service.findOne('p1', subsidiaryViewer),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('lève NotFound si absent', async () => {
+      findUnique.mockResolvedValueOnce(null);
+      await expect(service.findOne('x', mainViewer)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('retourne le pôle', async () => {
+      await expect(service.findOne('p1', mainViewer)).resolves.toEqual(
+        poles[0],
+      );
     });
   });
 
@@ -117,11 +162,69 @@ describe('PoleService', () => {
     it('lève ConflictException si le code existe déjà', async () => {
       create.mockRejectedValueOnce({ code: 'P2002' });
       await expect(
-        service.create(
-          { code: 'Pole_DUP', name: 'Doublon' },
-          mainViewer,
-        ),
+        service.create({ code: 'Pole_DUP', name: 'Doublon' }, mainViewer),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe('update', () => {
+    it('refuse hors maison mère', async () => {
+      await expect(
+        service.update('p1', { name: 'X' }, subsidiaryViewer),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('refuse de changer le code d’un pôle système', async () => {
+      findUnique.mockResolvedValueOnce(poles[0]);
+      await expect(
+        service.update('p1', { code: 'Pole_OTHER' }, mainViewer),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('autorise name/description sur un pôle système', async () => {
+      findUnique.mockResolvedValueOnce(poles[0]);
+      await service.update(
+        'p1',
+        { name: 'Ops renommé', description: 'nouvelle desc' },
+        mainViewer,
+      );
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'p1' },
+        data: { name: 'Ops renommé', description: 'nouvelle desc' },
+      });
+    });
+
+    it('autorise le changement de code d’un pôle custom', async () => {
+      findUnique.mockResolvedValueOnce(customPole);
+      await service.update('p-custom', { code: 'Pole_RENAMED' }, mainViewer);
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'p-custom' },
+        data: { code: 'Pole_RENAMED' },
+      });
+    });
+  });
+
+  describe('remove', () => {
+    it('refuse hors maison mère', async () => {
+      await expect(
+        service.remove('p-custom', subsidiaryViewer),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('supprime un pôle (rôles détachés via SetNull Prisma)', async () => {
+      findUnique.mockResolvedValueOnce(poles[0]);
+      remove.mockResolvedValueOnce(poles[0]);
+      await expect(service.remove('p1', mainViewer)).resolves.toEqual(poles[0]);
+      expect(remove).toHaveBeenCalledWith({ where: { id: 'p1' } });
+    });
+
+    it('supprime un pôle custom', async () => {
+      findUnique.mockResolvedValueOnce(customPole);
+      await expect(service.remove('p-custom', mainViewer)).resolves.toEqual(
+        customPole,
+      );
+      expect(remove).toHaveBeenCalledWith({ where: { id: 'p-custom' } });
     });
   });
 });

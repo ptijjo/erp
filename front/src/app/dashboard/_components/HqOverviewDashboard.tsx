@@ -43,6 +43,7 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { hasAnalyticsAccess } from "~/lib/dashboard-navigation";
 import { useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
+import { fetchOrganizations } from "~/lib/api-list";
 import type { GroupAnalyticsOverviewDto, OrganizationDto } from "~/lib/api-types";
 import { formatFcfa } from "~/lib/format-fcfa";
 
@@ -162,10 +163,7 @@ export function HqOverviewDashboard() {
 
   const organisationsQuery = useQuery({
     queryKey: ["organisation"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<OrganizationDto[]>("/organisation");
-      return data;
-    },
+    queryFn: fetchOrganizations,
     enabled: canAccess,
   });
 
@@ -397,7 +395,7 @@ export function HqOverviewDashboard() {
               </p>
             </div>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/organisations">
+              <Link href="/dashboard/hq/organisations">
                 Voir tout
                 <ArrowRight className="size-4" />
               </Link>

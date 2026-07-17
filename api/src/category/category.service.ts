@@ -10,26 +10,47 @@ import { isMainOrganizationUser } from '../auth/organization-scope';
 import { subsidiaryVisibleCategoryIdsForOrganization } from '../product/product-subsidiary-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Category, Prisma } from '../generated/prisma/client';
+import type { PaginationQueryDto } from '../lib/pagination-query.dto';
+import {
+  buildPaginationMeta,
+  paginationSkip,
+  resolvePagination,
+  type PaginatedResult,
+} from '../lib/pagination';
 
 @Injectable()
 export class CategoryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(viewer: AuthenticatedUser): Promise<Category[]> {
-    if (isMainOrganizationUser(viewer)) {
-      return this.prisma.category.findMany({ orderBy: { name: 'asc' } });
+  async findAll(
+    viewer: AuthenticatedUser,
+    query: PaginationQueryDto = {},
+  ): Promise<PaginatedResult<Category>> {
+    const { page, limit } = resolvePagination(query);
+    let where: Prisma.CategoryWhereInput = {};
+    if (!isMainOrganizationUser(viewer)) {
+      const ids = await subsidiaryVisibleCategoryIdsForOrganization(
+        this.prisma,
+        viewer.organisationId,
+      );
+      if (ids.size === 0) {
+        return {
+          items: [],
+          meta: buildPaginationMeta(0, page, limit),
+        };
+      }
+      where = { id: { in: [...ids] } };
     }
-    const ids = await subsidiaryVisibleCategoryIdsForOrganization(
-      this.prisma,
-      viewer.organisationId,
-    );
-    if (ids.size === 0) {
-      return [];
-    }
-    return this.prisma.category.findMany({
-      where: { id: { in: [...ids] } },
-      orderBy: { name: 'asc' },
-    });
+    const [items, total] = await Promise.all([
+      this.prisma.category.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        skip: paginationSkip(page, limit),
+        take: limit,
+      }),
+      this.prisma.category.count({ where }),
+    ]);
+    return { items, meta: buildPaginationMeta(total, page, limit) };
   }
 
   async findOne(id: string, viewer: AuthenticatedUser): Promise<Category> {

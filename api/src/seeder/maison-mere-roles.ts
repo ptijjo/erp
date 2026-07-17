@@ -12,10 +12,6 @@ export const MAISON_MERE_DIRECTOR_ROLES = [
     description: 'Directeur des affaires juridiques',
   },
   {
-    name: 'DIRECTOR_TRADITIONAL_SPIRITUAL',
-    description: 'Directeur des cultes traditionnels et spirituels',
-  },
-  {
     name: 'DIRECTOR_ARCHITECTURE_HERITAGE',
     description: "Directrice de l'architecture et du patrimoine",
   },

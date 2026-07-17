@@ -13,12 +13,14 @@
     "lint:fix": "eslint . --fix",
     "preview": "next build && next start",
     "start": "next start -p 3011",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:guards": "npx --yes tsx --test src/lib/route-guards.node-test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
     "@t3-oss/env-nextjs": "^0.13.11",
     "@tanstack/react-query": "^5.101.2",
+    "@tanstack/react-table": "^8.21.3",
     "axios": "^1.18.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

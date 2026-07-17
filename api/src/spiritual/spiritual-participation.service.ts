@@ -7,12 +7,7 @@ import {
 import type { AuthenticatedUser } from '../auth/auth.types';
 import {
   assertOrganizationResourceAccess,
-  isMainOrganizationUser,
 } from '../auth/organization-scope';
-import {
-  assertMainOrgPoleDomain,
-  POLE_DOMAIN,
-} from '../auth/pole-scope';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -143,12 +138,9 @@ export class SpiritualParticipationService {
       where: { id: eventId },
     });
     if (!event) {
-      throw new NotFoundException('Événement spirituel introuvable.');
+      throw new NotFoundException('Événement introuvable.');
     }
     assertOrganizationResourceAccess(viewer, event.organizationId);
-    if (isMainOrganizationUser(viewer)) {
-      assertMainOrgPoleDomain(viewer, POLE_DOMAIN.TRADITIONAL);
-    }
     if (!event.publishedAt) {
       throw new BadRequestException(
         'Publiez d’abord l’événement avant de synchroniser les invitations.',
@@ -188,7 +180,7 @@ export class SpiritualParticipationService {
       where: { id: eventId },
     });
     if (!event) {
-      throw new NotFoundException('Événement spirituel introuvable.');
+      throw new NotFoundException('Événement introuvable.');
     }
     assertOrganizationResourceAccess(viewer, event.organizationId);
     if (!event.publishedAt) {
@@ -287,12 +279,9 @@ export class SpiritualParticipationService {
       where: { id: eventId },
     });
     if (!event) {
-      throw new NotFoundException('Événement spirituel introuvable.');
+      throw new NotFoundException('Événement introuvable.');
     }
     assertOrganizationResourceAccess(viewer, event.organizationId);
-    if (isMainOrganizationUser(viewer)) {
-      assertMainOrgPoleDomain(viewer, POLE_DOMAIN.TRADITIONAL);
-    }
     if (event.status === SpiritualEventStatus.CANCELLED) {
       throw new BadRequestException(
         'Un événement annulé ne peut pas être publié.',
@@ -395,7 +384,7 @@ export class SpiritualParticipationService {
           this.notificationService.create({
             userId: user.id,
             type: NotificationType.SPIRITUAL_EVENT_INVITATION,
-            title: 'Invitation — événement spirituel',
+            title: 'Invitation — événement',
             body: `${event.title} — ${dateLabel} — ${locationLabel}. Événement groupe (maison mère et filiales). Répondez dans « Événements ».`,
             organizationId: user.organizationId,
             metadata: {

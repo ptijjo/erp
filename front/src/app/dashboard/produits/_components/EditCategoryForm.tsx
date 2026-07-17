@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "~/components/ui/button";
 import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
+import { fetchCategories } from "~/lib/api-list";
 import type { CategoryDto } from "~/lib/api-types";
 
 import { apiErrorMessage } from "~/lib/api-error-message";
@@ -54,10 +55,7 @@ export default function EditCategoryForm({ categoryId }: Props) {
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ["category"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<CategoryDto[]>("/category");
-      return data;
-    },
+    queryFn: fetchCategories,
   });
 
   const parentCandidates = categories.filter((c) => c.id !== categoryId);
@@ -89,7 +87,7 @@ export default function EditCategoryForm({ categoryId }: Props) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["category"] });
-      router.push("/dashboard/categories");
+      router.push("/dashboard/hq/categories");
     },
     onError: (err) => {
       setError("root", {
@@ -104,7 +102,7 @@ export default function EditCategoryForm({ categoryId }: Props) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["category"] });
-      router.push("/dashboard/categories");
+      router.push("/dashboard/hq/categories");
     },
     onError: (err) => {
       setError("root", {

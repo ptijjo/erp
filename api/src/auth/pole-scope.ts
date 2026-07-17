@@ -14,23 +14,19 @@ export const POLE_DOMAIN = {
   HERITAGE: 'Pole_ARCHITECTURE_HERITAGE',
   STRATEGY: 'Pole_STRATEGY_DEVELOPMENT',
   MARKETING: 'Pole_MARKETING_COMMUNICATION',
-  TRADITIONAL: 'Pole_TRADITIONAL_SPIRITUAL',
 } as const;
 
 export type PoleDomainCode = (typeof POLE_DOMAIN)[keyof typeof POLE_DOMAIN];
 
-/** ADMIN, DG, opérations et tous les DIRECTOR_* : pas de restriction pôle. */
+/**
+ * Seuls ADMIN, DIRECTOR_GENERAL et DIRECTOR_OPERATIONS contournent le périmètre pôle.
+ * Les autres directeurs / staff restent limités à leur pôle (`02-objectif`).
+ */
 export function bypassesMainOrgPoleScope(user: AuthenticatedUser): boolean {
   if (!isMainOrganizationUser(user)) {
     return true;
   }
-  if (isFullAccessRoleName(user.role.name)) {
-    return true;
-  }
-  if (user.role.name.startsWith('DIRECTOR_')) {
-    return true;
-  }
-  return false;
+  return isFullAccessRoleName(user.role.name);
 }
 
 /** Lecture / écriture maison mère limitée au pôle du rôle (hors bypass). */

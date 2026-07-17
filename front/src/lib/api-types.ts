@@ -25,7 +25,7 @@ export type OrganizationDto = {
   updatedAt?: string;
 };
 
-/** GET `/poles`, POST `/poles` */
+/** GET `/poles`, POST `/poles`, PATCH/DELETE `/poles/:id` */
 export type PoleDto = {
   id: string;
   code: string;

@@ -11,8 +11,11 @@ Document de **référence architecturale**. En cas d’écart avec le schéma Pr
 
 **Option retenue** : row-level multi-tenancy (une base, isolation par colonnes `organizationId`, périmètre pôle sur les rôles).
 
-**Cible sécurité** : politiques **RLS PostgreSQL** (filet si un `where` Nest est oublié).  
-**État actuel** : isolation applicative (Nest + `organization-scope.ts` + CASL) ; RLS à planifier — **ne pas supposer qu’elle est active**.
+## Étape 1 — Multi-tenant
+
+**Option retenue** : row-level multi-tenancy (une base, isolation par colonnes `organizationId`, périmètre pôle sur les rôles).
+
+**RLS PostgreSQL** : **activé** (migration `20260717220000_enable_rls_tenant_isolation`) + `RlsContextInterceptor` (`app.organization_id`, `app.is_main`, `app.user_id`, `app.rls_bypass`). Table `User` hors RLS (login). Préférer une connexion Postgres directe (pas PgBouncer transaction).
 
 | Concept doc historique | Code actuel |
 |------------------------|-------------|
@@ -71,7 +74,9 @@ Utiliser comme **ordre de priorité**, pas comme calendrier figé :
 
 ## Patterns nécessitant votre accord
 
-Avant d’introduire : **RLS PostgreSQL**, **EventEmitter2** global, **RabbitMQ**, **WebSockets** stock/commandes, **monorepo TurboRepo** — demander validation explicite si non déjà présent dans le repo.
+Avant d’introduire : **EventEmitter2** global, **RabbitMQ**, **WebSockets** stock/commandes, **monorepo TurboRepo** — demander validation explicite si non déjà présent dans le repo.
+
+**RLS PostgreSQL** : déjà actif — toute évolution de policies nécessite validation sécurité.
 
 ## Schéma cible historique (référence uniquement)
 

@@ -134,7 +134,7 @@ const baseNavItems: NavItem[] = [
   },
   {
     label: "Organisations",
-    href: "/dashboard/organisations",
+    href: "/dashboard/hq/organisations",
     icon: Building2,
     requiredPermission: { action: "read", subject: "Organization" },
   },
@@ -146,14 +146,14 @@ const baseNavItems: NavItem[] = [
   },
   {
     label: "Fournisseurs",
-    href: "/dashboard/fournisseurs",
+    href: "/dashboard/hq/fournisseurs",
     icon: Truck,
     requiredPermission: { action: "read", subject: "Supplier" },
     mainOnly: true,
   },
   {
     label: "Catégories",
-    href: "/dashboard/categories",
+    href: "/dashboard/hq/categories",
     icon: FolderTree,
     requiredPermission: { action: "read", subject: "Category" },
   },
@@ -183,12 +183,12 @@ const baseNavItems: NavItem[] = [
   },
   {
     label: "Caisse",
-    href: "/dashboard/caisse",
+    href: "/dashboard/subsidiary/caisse",
     icon: ScanLine,
   },
   {
     label: "Mes sessions caisse",
-    href: "/dashboard/compte",
+    href: "/dashboard/subsidiary/compte",
     icon: History,
   },
   {
@@ -228,8 +228,8 @@ const baseNavItems: NavItem[] = [
     requiredPermission: { action: "read", subject: "MarketingCampaign" },
   },
   {
-    label: "Spirituel",
-    href: "/dashboard/spirituel",
+    label: "Événements",
+    href: "/dashboard/evenements",
     icon: Sparkles,
     requiredPermission: { action: "read", subject: "SpiritualEvent" },
   },
@@ -280,7 +280,7 @@ const baseNavItems: NavItem[] = [
 const HQ_PRIMARY_NAV: NavItem[] = [
   {
     label: "Tableau de bord",
-    href: "/dashboard",
+    href: "/dashboard/hq",
     icon: LayoutDashboard,
     exact: true,
   },
@@ -297,7 +297,7 @@ const HQ_PRIMARY_NAV: NavItem[] = [
   },
   {
     label: "Filiales",
-    href: "/dashboard/organisations",
+    href: "/dashboard/hq/organisations",
     icon: Building2,
     requiredPermission: { action: "read", subject: "Organization" },
   },
@@ -359,13 +359,13 @@ const HQ_ADMIN_NAV: NavItem[] = [
   },
   {
     label: "Catégories",
-    href: "/dashboard/categories",
+    href: "/dashboard/hq/categories",
     icon: FolderTree,
     requiredPermission: { action: "read", subject: "Category" },
   },
   {
     label: "Fournisseurs",
-    href: "/dashboard/fournisseurs",
+    href: "/dashboard/hq/fournisseurs",
     icon: Truck,
     requiredPermission: { action: "read", subject: "Supplier" },
     mainOnly: true,
@@ -401,8 +401,8 @@ const HQ_ADMIN_NAV: NavItem[] = [
     requiredPermission: { action: "read", subject: "MarketingCampaign" },
   },
   {
-    label: "Spirituel",
-    href: "/dashboard/spirituel",
+    label: "Événements",
+    href: "/dashboard/evenements",
     icon: Sparkles,
     requiredPermission: { action: "read", subject: "SpiritualEvent" },
   },
@@ -438,23 +438,23 @@ const SECTION_BY_HREF: Record<string, string> = {
   "/dashboard/utilisateurs": "organisation",
   "/dashboard/annuaire": "organisation",
   "/dashboard/rh": "rh",
-  "/dashboard/organisations": "organisation",
+  "/dashboard/hq/organisations": "organisation",
   "/dashboard/produits": "catalogue",
-  "/dashboard/fournisseurs": "catalogue",
-  "/dashboard/categories": "catalogue",
+  "/dashboard/hq/fournisseurs": "catalogue",
+  "/dashboard/hq/categories": "catalogue",
   "/dashboard/stocks": "operations",
   "/dashboard/stocks/transferts": "operations",
   "/dashboard/stocks/mouvements": "operations",
   "/dashboard/production": "operations",
   "/dashboard/patrimoine": "gouvernance",
   "/dashboard/juridique": "gouvernance",
-  "/dashboard/caisse": "operations",
-  "/dashboard/compte": "operations",
+  "/dashboard/subsidiary/caisse": "operations",
+  "/dashboard/subsidiary/compte": "operations",
   "/dashboard/comptabilite": "operations",
   "/dashboard/commandes-inter-filiales": "operations",
   "/dashboard/strategie": "gouvernance",
   "/dashboard/marketing": "gouvernance",
-  "/dashboard/spirituel": "gouvernance",
+  "/dashboard/evenements": "gouvernance",
   "/dashboard/comptabilite-generale": "finance",
   "/dashboard/budgets": "finance",
   "/dashboard/tresorerie": "finance",
@@ -477,16 +477,16 @@ function itemIsAllowed(me: Me, item: NavItem): boolean {
   if (item.href === "/dashboard/rapports" && !hasAnalyticsAccess(me)) {
     return false;
   }
-  if (item.href === "/dashboard/caisse" && !canSeeCaisseNav(me)) {
+  if (item.href === "/dashboard/subsidiary/caisse" && !canSeeCaisseNav(me)) {
     return false;
   }
-  if (item.href === "/dashboard/compte" && !canReadSessionCaisseHistory(me)) {
+  if (item.href === "/dashboard/subsidiary/compte" && !canReadSessionCaisseHistory(me)) {
     return false;
   }
   if (item.mainOnly && !isMainOrganization(me)) return false;
   if (
     !isMainOrganization(me) &&
-    item.href === "/dashboard/organisations"
+    item.href === "/dashboard/hq/organisations"
   ) {
     return false;
   }
@@ -597,7 +597,7 @@ export const HQ_MODULE_TILES: ModuleTile[] = [
   {
     title: "Organisations",
     description: "Maison mère, filiales et pôles",
-    href: "/dashboard/organisations",
+    href: "/dashboard/hq/organisations",
     icon: Building2,
     subject: "Organization",
   },
@@ -685,9 +685,9 @@ export const HQ_MODULE_TILES: ModuleTile[] = [
     subject: "MarketingCampaign",
   },
   {
-    title: "Spirituel",
-    description: "Événements cultuels et spirituels",
-    href: "/dashboard/spirituel",
+    title: "Événements",
+    description: "Créer et publier des événements groupe",
+    href: "/dashboard/evenements",
     icon: Sparkles,
     subject: "SpiritualEvent",
   },
@@ -722,13 +722,40 @@ export const HQ_MODULE_TILES: ModuleTile[] = [
 ];
 
 export function filterModuleTiles(me: Me): ModuleTile[] {
-  return HQ_MODULE_TILES.filter((tile) => {
+  const tiles = HQ_MODULE_TILES.filter((tile) => {
     if (tile.href === "/dashboard/rapports") {
       return hasAnalyticsAccess(me);
     }
     if (!tile.subject) return true;
     return hasMePermission(me, "read", tile.subject);
   });
+
+  // Directeur de pôle (hors FULL_ACCESS) : modules du pôle en tête.
+  const poleCode = me.role.poleCode;
+  if (
+    me.permissionMode !== "FULL_ACCESS" &&
+    poleCode &&
+    me.role.name.startsWith("DIRECTOR_")
+  ) {
+    const poleHrefPriority: Record<string, string[]> = {
+      Pole_FINANCE: ["/dashboard/budgets", "/dashboard/comptabilite", "/dashboard/comptabilite-generale", "/dashboard/tresorerie"],
+      Pole_HR: ["/dashboard/rh", "/dashboard/utilisateurs"],
+      Pole_OPERATIONS: ["/dashboard/stocks", "/dashboard/produits", "/dashboard/commandes-inter-filiales"],
+      Pole_PRODUCTION: ["/dashboard/production", "/dashboard/stocks"],
+      Pole_LEGAL: ["/dashboard/juridique"],
+      Pole_ARCHITECTURE_HERITAGE: ["/dashboard/patrimoine"],
+      Pole_STRATEGY_DEVELOPMENT: ["/dashboard/strategie"],
+      Pole_MARKETING_COMMUNICATION: ["/dashboard/marketing"],
+    };
+    const priority = new Set(poleHrefPriority[poleCode] ?? []);
+    return [...tiles].sort((a, b) => {
+      const ap = priority.has(a.href) ? 0 : 1;
+      const bp = priority.has(b.href) ? 0 : 1;
+      return ap - bp;
+    });
+  }
+
+  return tiles;
 }
 
 /** Tuiles d’accueil pour les utilisateurs filiale. */
@@ -750,7 +777,7 @@ export const SUBSIDIARY_MODULE_TILES: ModuleTile[] = [
   {
     title: "Caisse",
     description: "Sessions, scan QR et encaissement",
-    href: "/dashboard/caisse",
+    href: "/dashboard/subsidiary/caisse",
     icon: ScanLine,
   },
   {
@@ -798,7 +825,7 @@ export const SUBSIDIARY_MODULE_TILES: ModuleTile[] = [
 
 export function filterSubsidiaryModuleTiles(me: Me): ModuleTile[] {
   return SUBSIDIARY_MODULE_TILES.filter((tile) => {
-    if (tile.href === "/dashboard/caisse") {
+    if (tile.href === "/dashboard/subsidiary/caisse") {
       return canSeeCaisseNav(me);
     }
     if (tile.href === "/dashboard/rapports") {

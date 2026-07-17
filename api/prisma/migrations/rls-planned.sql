@@ -1,8 +1,9 @@
--- RLS PostgreSQL (cible sécurité) — NON APPLIQUÉ automatiquement.
--- Nécessite un rôle DB par session (`SET app.current_organization_id`) côté Prisma.
--- À activer après validation explicite et tests d'intégration dédiés.
+-- RLS PostgreSQL — ACTIVÉ via migration 20260717220000_enable_rls_tenant_isolation.
 --
--- Exemple filiale sur Stock :
--- ALTER TABLE "Stock" ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY stock_subsidiary_isolation ON "Stock"
---   USING ("organizationId" = current_setting('app.organization_id', true));
+-- Variables de session (RlsContextInterceptor) :
+--   app.organization_id, app.user_id, app.is_main, app.rls_bypass
+--
+-- Important : utiliser une connexion Postgres directe (pas PgBouncer en mode
+-- transaction). Le seeder et les crons posent app.rls_bypass=on.
+--
+-- Table User : volontairement hors RLS (login / résolution JWT avant contexte).

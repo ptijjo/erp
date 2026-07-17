@@ -346,6 +346,10 @@ model Organization {
   slug             String           @unique
   organizationType OrganizationType
   description      String?
+  /// Filiale → maison mère (MAIN n’a pas de parent).
+  parentId         String?
+  parent           Organization?    @relation("OrgHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children         Organization[]   @relation("OrgHierarchy")
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   deletedAt        DateTime?
@@ -393,6 +397,7 @@ model Organization {
   journalEntries           JournalEntry[]
 
   @@index([organizationType])
+  @@index([parentId])
 }
 
 /// Catégorie (et sous-arbre) incluse dans le catalogue d’une filiale.
@@ -1413,7 +1418,7 @@ model MarketingCampaign {
   @@index([startDate])
 }
 
-/// Événement cultuel / spirituel (pôle cultes traditionnels).
+/// Événement cultuel / spirituel (module SpiritualEvent).
 model SpiritualEvent {
   id          String               @id @default(uuid())
   title       String

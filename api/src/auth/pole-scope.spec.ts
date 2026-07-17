@@ -23,10 +23,34 @@ function mainViewer(
 }
 
 describe('pole-scope', () => {
-  it('bypassesMainOrgPoleScope pour ADMIN et directeurs', () => {
+  it('bypassesMainOrgPoleScope pour ADMIN / DG / OPS seulement', () => {
     expect(
       bypassesMainOrgPoleScope(
         mainViewer({ role: { id: 'r', name: 'ADMIN', description: null, poleCode: null } }),
+      ),
+    ).toBe(true);
+    expect(
+      bypassesMainOrgPoleScope(
+        mainViewer({
+          role: {
+            id: 'r',
+            name: 'DIRECTOR_GENERAL',
+            description: null,
+            poleCode: null,
+          },
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      bypassesMainOrgPoleScope(
+        mainViewer({
+          role: {
+            id: 'r',
+            name: 'DIRECTOR_OPERATIONS',
+            description: null,
+            poleCode: 'Pole_OPERATIONS',
+          },
+        }),
       ),
     ).toBe(true);
     expect(
@@ -40,7 +64,7 @@ describe('pole-scope', () => {
           },
         }),
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('bypassesMainOrgPoleScope pour les filiales (périmètre org)', () => {

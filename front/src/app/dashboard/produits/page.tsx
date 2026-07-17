@@ -20,7 +20,7 @@ import { TableScroll } from "~/components/layout/table-scroll";
 import { hasMePermission, isMainOrganization, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { CategoryDto, PaginatedResponse, ProductDto } from "~/lib/api-types";
-import { extractApiList, FULL_LIST_QUERY } from "~/lib/api-list";
+import { extractApiList, FULL_LIST_QUERY, fetchCategories } from "~/lib/api-list";
 import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
 
@@ -90,10 +90,7 @@ export default function ProduitsPage() {
 
   const { data: categories = [] } = useQuery({
     queryKey: ["category"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<CategoryDto[]>("/category");
-      return data;
-    },
+    queryFn: fetchCategories,
     enabled: !mePending && canReadCategory,
   });
   const normalizedCategories = useMemo(

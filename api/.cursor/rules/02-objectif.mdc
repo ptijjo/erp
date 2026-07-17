@@ -15,7 +15,6 @@ Il y'aura les poles suivants :
  - Pole_STRATEGY_DEVELOPMENT : Gesttion stratégie et développement.
  - Pole_FINANCE : Gestion des finances.
  - Pole_LEGAL : Gestion des affaires juridiques.
- - Pole_TRADITIONAL_SPIRITUAL : Gestion des cultes traditionnels et spirituels.
  - Pole_ARCHITECTURE_HERITAGE : Gestion de l'architecture et du patrimoine.
  - Pole_MARKETING_COMMUNICATION : Gestion du marketing, du développement et de la communication.
  - Pole_PRODUCTION : Gestion production.
@@ -27,7 +26,6 @@ Dans y'aura un role directeur dans chaque pole qui pilotera entièrement son pol
  - DIRECTOR_STRATEGY_DEVELOPMENT : Directeur stratégie et développement.
  - DIRECTOR_FINANCE : Directeur des finances.
  - DIRECTOR_LEGAL : Directeur des affaires juridiques.
- - DIRECTOR_TRADITIONAL_SPIRITUAL : Directeur des cultes traditionnels et spirituels.
  - DIRECTOR_ARCHITECTURE_HERITAGE : Directrice de l'architecture et du patrimoine.
  - DIRECTOR_MARKETING_COMMUNICATION : Directrice du marketing, du développement et de la communication.
  - DIRECTOR_PRODUCTION : Directeur production.

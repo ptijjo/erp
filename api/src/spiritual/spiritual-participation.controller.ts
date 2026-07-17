@@ -22,6 +22,7 @@ export class SpiritualParticipationController {
     private readonly participationService: SpiritualParticipationService,
   ) {}
 
+  /** Self-service invitation : accès contrôlé dans le service (pas CASL update). */
   @Get('my-invitations')
   listMyInvitations(@CurrentUser() viewer: AuthenticatedUser) {
     return this.participationService.listMyInvitations(viewer);

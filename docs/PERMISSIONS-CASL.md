@@ -185,6 +185,17 @@ Pour chaque ligne, le nom exact à stocker est **`action:Subject`**. Les routes 
 | `update:Role`  | MAJ rôle |
 | `delete:Role`  | Suppression rôle |
 
+### Pole
+
+| Permission     | Usage typique |
+|----------------|----------------|
+| `read:Pole`    | Liste / détail pôles (aussi couvert par `read:all` pour la direction) |
+| `create:Pole`  | Création pôle |
+| `update:Pole`  | Modification pôle (libellé / description ; code système verrouillé) |
+| `delete:Pole`  | Suppression pôle |
+
+**Règle d’accès (comme d’habitude)** : `ADMIN`, `DIRECTOR_GENERAL` et `DIRECTOR_OPERATIONS` ont tout via FULL_ACCESS (`manage:all`). Les autres rôles ne peuvent **créer / modifier / supprimer** un pôle que s’ils ont explicitement `create:Pole`, `update:Pole` ou `delete:Pole` (liaison Permission ↔ Role).
+
 ### Permission (méta-permissions)
 
 | Permission         | Usage typique |
@@ -342,6 +353,10 @@ read:Role
 create:Role
 update:Role
 delete:Role
+read:Pole
+create:Pole
+update:Pole
+delete:Pole
 read:Permission
 create:Permission
 update:Permission
@@ -414,7 +429,7 @@ manage:all
 
 - `GET /auth/me` renvoie `permissionMode` et `permissions` (noms bruts identiques à `Permission.name`).
 - Le fichier `front/src/lib/me-ability.ts` définit les sujets utilisés pour le **menu** ; garde les mêmes chaînes `Subject` que dans ce document.
-- Rôles dont le **nom** contient `caissier` (sans tenir compte de la casse) ajoutent **en plus** `read:Product`, `read:Category`, `read` / `create` / `update` sur `SessionCaisse` (voir `back/src/casl/checkout-role.ts`) — ce ne sont pas des lignes en base ; utile lorsque le rôle a déjà des permissions explicites (sinon le fallback `read:all` suffit). `delete:SessionCaisse` n’est pas inclus (gestion / admin via permissions liées au rôle).
+- Rôles dont le **nom** contient `caissier` (sans tenir compte de la casse) ajoutent **en plus** `read:Product`, `read:Category`, `read` / `create` / `update` sur `SessionCaisse` (voir permissions seedées) — ce ne sont pas des lignes en base ; utile lorsque le rôle a déjà des permissions explicites. `delete:SessionCaisse` n’est pas inclus (gestion / admin via permissions liées au rôle). Un rôle **sans** permissions en base n’a **aucun** droit (deny-by-default).
 
 ---
 

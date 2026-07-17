@@ -25,7 +25,7 @@ import type {
   StockOrderDto,
   SupplierDto,
 } from "~/lib/api-types";
-import { extractApiList, FULL_LIST_QUERY } from "~/lib/api-list";
+import { extractApiList, FULL_LIST_QUERY, fetchOrganizations } from "~/lib/api-list";
 import type { Me } from "~/hooks/use-me";
 import { formatFcfa } from "~/lib/format-fcfa";
 import { parseDecimal } from "~/lib/parse-decimal";
@@ -170,10 +170,7 @@ export default function StocksPage() {
 
   const { data: organizations = [] } = useQuery({
     queryKey: ["organisation"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<OrganizationDto[]>("/organisation");
-      return data;
-    },
+    queryFn: fetchOrganizations,
     enabled: Boolean(me && isMain && canReadOrders),
   });
 

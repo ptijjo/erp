@@ -17,6 +17,7 @@ import {
   useMe,
 } from "~/hooks/use-me";
 import { api } from "~/lib/api";
+import { fetchOrganizations } from "~/lib/api-list";
 import type { DepartmentDto, OrganizationDto } from "~/lib/api-types";
 import { apiErrorMessage } from "~/lib/api-error-message";
 
@@ -45,10 +46,7 @@ export default function DepartementsPage() {
 
   const { data: organisations = [] } = useQuery({
     queryKey: ["organisation"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<OrganizationDto[]>("/organisation");
-      return data;
-    },
+    queryFn: fetchOrganizations,
     enabled: isMain && canCreate,
   });
 

@@ -25,7 +25,7 @@ export type AuthenticatedUser = {
 /** Réponse de GET /auth/me (profil rechargé depuis la base). */
 export type MeResponse = AuthenticatedUser & {
   organisationName: string;
-  permissionMode: 'FULL_ACCESS' | 'ROLE_PERMISSIONS' | 'FALLBACK_READ_ALL';
+  permissionMode: 'FULL_ACCESS' | 'ROLE_PERMISSIONS' | 'NO_PERMISSIONS';
   permissions: string[];
   /** Fille : au moins une catégorie ou un produit dans le catalogue vente. */
   hasSalesCatalog: boolean;

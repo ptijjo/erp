@@ -23,12 +23,12 @@ export type Me = {
   organisationId: string;
   /** Maison mère ou filiale (aligné sur Prisma `OrganizationType`). */
   organizationType: "MAIN" | "SUBSIDIARY";
-  /** Slug pour `/dashboard/organisations/[slug]`. */
+  /** Slug pour `/dashboard/hq/organisations/[slug]`. */
   organizationSlug: string;
   role: MeRole;
   organisationName: string;
   firstLogin: boolean;
-  permissionMode: "FULL_ACCESS" | "ROLE_PERMISSIONS" | "FALLBACK_READ_ALL";
+  permissionMode: "FULL_ACCESS" | "ROLE_PERMISSIONS" | "NO_PERMISSIONS";
   permissions: string[];
   /** Fille : catalogue vente (catégories ou produits) assigné par la maison mère. */
   hasSalesCatalog: boolean;
@@ -52,6 +52,9 @@ export function hasMePermission(
 ): boolean {
   if (me.permissionMode === "FULL_ACCESS") {
     return true;
+  }
+  if (me.permissionMode === "NO_PERMISSIONS") {
+    return false;
   }
   const normalizedAction = action.trim().toLowerCase();
   const normalizedSubject = subject.trim();
@@ -112,15 +115,17 @@ export function isAdminUser(me: Me | null | undefined): boolean {
   return me?.role.name === "ADMIN";
 }
 
+import { erpHomeForOrganizationType, ERP_PATHS } from "~/lib/erp-paths";
+
 /** Page d’accueil dashboard après connexion (hors parcours premier login). */
-export function dashboardHomePath(_me: Me): string {
-  return "/dashboard";
+export function dashboardHomePath(me: Me): string {
+  return erpHomeForOrganizationType(me.organizationType);
 }
 
 /** Fiche détail de la filiale connectée (menu « Mon organisation »). */
 export function subsidiaryOrganizationPath(me: Me): string | null {
   if (me.organizationType === "SUBSIDIARY" && me.organizationSlug) {
-    return `/dashboard/organisations/${me.organizationSlug}`;
+    return `${ERP_PATHS.organisations}/${me.organizationSlug}`;
   }
   return null;
 }

@@ -36,7 +36,9 @@ Une seule app Next.js, **plusieurs visages** selon `GET /auth/me` (rôle, `organ
 ### Implémentation actuelle
 
 - Filtrage menu : `NavBar` + `hasMePermission` + `mainOnly` + `isMainOrganization`.
-- Pas encore de layouts séparés `hq/` vs `subsidiary/` — tout passe par `dashboard/*`.
+- Accueils dédiés : `/dashboard/hq` (maison mère) et `/dashboard/subsidiary` (filiale) ; `/dashboard` redirige selon le profil.
+- Modules HQ : `dashboard/hq/{organisations,fournisseurs,categories}` ; filiale : `dashboard/subsidiary/{caisse,compte}`.
+- Anciennes URLs redirigées via `next.config.js`.
 
 ---
 
@@ -156,6 +158,4 @@ Inspiré Stripe / Linear / Vercel — pas d’animations lourdes ni dégradés �
 
 ## Patterns nécessitant votre accord
 
-Middleware multi-rôles, Zustand/Redux, Tremor, i18n, PWA, WebSockets stock/commandes, adoption globale TanStack Table, refonte route groups — validation explicite avant mise en œuvre.
-
-Côté API (voir `api/03`) : RLS, EventEmitter2, RabbitMQ, TurboRepo.
+TanStack Table (adoption progressive), Zustand/Redux, Tremor, i18n, PWA, WebSockets stock/commandes — validation explicite avant nouvelle lib hors stack actuelle.

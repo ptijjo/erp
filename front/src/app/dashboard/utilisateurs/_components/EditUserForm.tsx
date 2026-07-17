@@ -15,6 +15,7 @@ import {
   meQueryKey,
 } from "~/hooks/use-me";
 import { api } from "~/lib/api";
+import { fetchOrganizations } from "~/lib/api-list";
 import type { OrganizationDto, PoleDto, RoleDto, UserDetailDto } from "~/lib/api-types";
 
 import { apiErrorMessage } from "~/lib/api-error-message";
@@ -91,10 +92,7 @@ export default function EditUserForm({ userId }: Props) {
 
   const { data: organisations = [], isLoading: orgsLoading } = useQuery({
     queryKey: ["organisation"] as const,
-    queryFn: async () => {
-      const { data } = await api.get<OrganizationDto[]>("/organisation");
-      return data;
-    },
+    queryFn: fetchOrganizations,
   });
 
   const { data: roles = [], isLoading: rolesLoading } = useQuery({

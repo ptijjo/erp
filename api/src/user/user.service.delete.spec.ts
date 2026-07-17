@@ -24,13 +24,14 @@ const viewer: AuthenticatedUser = {
 
 describe('UserService delete', () => {
   let service: UserService;
-  let userFindUnique: jest.Mock;
-  let userDelete: jest.Mock;
+  let userFindFirst: jest.Mock;
+  let userUpdate: jest.Mock;
+  let sessionFindMany: jest.Mock;
   let deleteByPublicUrl: jest.Mock;
   let deleteAllThreadsForUser: jest.Mock;
 
   beforeEach(async () => {
-    userFindUnique = jest.fn().mockResolvedValue({
+    userFindFirst = jest.fn().mockResolvedValue({
       id: 'u-target',
       email: 'target@vifaa.local',
       organizationId: 'org-main',
@@ -38,9 +39,11 @@ describe('UserService delete', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       roleId: 'role-1',
+      deletedAt: null,
       role: { pole: { code: 'Pole_FINANCE' } },
     });
-    userDelete = jest.fn().mockResolvedValue(undefined);
+    userUpdate = jest.fn().mockResolvedValue(undefined);
+    sessionFindMany = jest.fn().mockResolvedValue([]);
     deleteByPublicUrl = jest.fn().mockResolvedValue(undefined);
     deleteAllThreadsForUser = jest.fn().mockResolvedValue(2);
 
@@ -51,8 +54,16 @@ describe('UserService delete', () => {
           provide: PrismaService,
           useValue: {
             user: {
-              findUnique: userFindUnique,
-              delete: userDelete,
+              findFirst: userFindFirst,
+              update: userUpdate,
+            },
+            sessionCaisse: {
+              findMany: sessionFindMany,
+              update: jest.fn(),
+            },
+            vente: {
+              count: jest.fn().mockResolvedValue(0),
+              updateMany: jest.fn(),
             },
           },
         },
@@ -89,14 +100,23 @@ describe('UserService delete', () => {
     service = module.get(UserService);
   });
 
-  it('supprime la photo de profil R2 et les conversations avant l’utilisateur', async () => {
+  it('soft-delete : photo R2, conversations, puis deletedAt (conserve l’historique caisse)', async () => {
     await service.delete('u-target', viewer);
 
     expect(deleteByPublicUrl).toHaveBeenCalledWith(
       'https://cdn.example/profile-photos/u-target/x.webp',
     );
     expect(deleteAllThreadsForUser).toHaveBeenCalledWith('u-target');
-    expect(userDelete).toHaveBeenCalledWith({ where: { id: 'u-target' } });
+    expect(userUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'u-target' },
+        data: expect.objectContaining({
+          deletedAt: expect.any(Date),
+          email: expect.stringContaining('target@vifaa.local.deleted.'),
+          profilePhotoUrl: null,
+        }),
+      }),
+    );
   });
 
   it('refuse la suppression hors périmètre', async () => {
@@ -108,7 +128,7 @@ describe('UserService delete', () => {
       role: { id: 'r1', name: 'MANAGER', poleCode: null },
     };
 
-    userFindUnique.mockResolvedValue({
+    userFindFirst.mockResolvedValue({
       id: 'u-target',
       email: 'target@vifaa.local',
       organizationId: 'org-other',
@@ -116,6 +136,7 @@ describe('UserService delete', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       roleId: 'role-1',
+      deletedAt: null,
       role: { pole: { code: 'Pole_FINANCE' } },
     });
 
@@ -125,7 +146,7 @@ describe('UserService delete', () => {
   });
 
   it('renvoie NotFound si utilisateur absent', async () => {
-    userFindUnique.mockResolvedValue(null);
+    userFindFirst.mockResolvedValue(null);
 
     await expect(service.delete('missing', viewer)).rejects.toThrow(
       NotFoundException,

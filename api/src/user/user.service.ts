@@ -27,7 +27,7 @@ import type {
   UserWithRole,
   UserWithRoleAndOrg,
 } from './user.types';
-import { OrganizationType } from '../generated/prisma/client';
+import { OrganizationType, SessionCaisseStatut, VenteStatut } from '../generated/prisma/client';
 import { ImageProcessorService } from '../storage/image-processor.service';
 import { R2ObjectStorageService } from '../storage/r2-object-storage.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
@@ -42,6 +42,7 @@ import {
   resolvePagination,
   type PaginatedResult,
 } from '../lib/pagination';
+import { computePaymentTotals } from '../session-caisse/session-caisse.types';
 
 export type {
   SafeUserDetail,
@@ -86,10 +87,11 @@ export class UserService {
    * et si le JWT porte un `poleCode`, uniquement les utilisateurs dont le rôle est rattaché à ce pôle.
    */
   private buildUserListWhere(viewer: AuthenticatedUser): Prisma.UserWhereInput {
+    const active: Prisma.UserWhereInput = { deletedAt: null };
     if (!isMainOrganizationUser(viewer)) {
-      return { organizationId: viewer.organisationId };
+      return { ...active, organizationId: viewer.organisationId };
     }
-    return mainOrgUserListPoleFilter(viewer);
+    return { ...active, ...mainOrgUserListPoleFilter(viewer) };
   }
 
   /** Lecture / écriture sur une fiche utilisateur : même périmètre que `buildUserListWhere`. */
@@ -187,9 +189,10 @@ export class UserService {
   }
 
   async findUser(email: string): Promise<UserWithRoleAndOrg | null> {
-    return this.prisma.user.findUnique({
+    return this.prisma.user.findFirst({
       where: {
         email,
+        deletedAt: null,
       },
       include: UserService.sessionInclude,
     });
@@ -199,8 +202,8 @@ export class UserService {
   async findUserByIdWithRoleAndOrg(
     id: string,
   ): Promise<UserWithRoleAndOrg | null> {
-    return this.prisma.user.findUnique({
-      where: { id },
+    return this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
       include: UserService.sessionInclude,
     });
   }
@@ -238,9 +241,10 @@ export class UserService {
     id: string,
     viewer: AuthenticatedUser,
   ): Promise<SafeUserDetail> => {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findFirst({
       where: {
         id,
+        deletedAt: null,
       },
       include: {
         role: {
@@ -358,8 +362,8 @@ export class UserService {
     user: UpdateUserDto,
     viewer: AuthenticatedUser,
   ): Promise<SafeUserWithRole> => {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { id },
+    const existingUser = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
       include: {
         role: { include: { pole: { select: { code: true } } } },
       },
@@ -440,14 +444,19 @@ export class UserService {
       'id' | 'email' | 'createdAt' | 'updatedAt' | 'organizationId' | 'roleId'
     >
   > => {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { id },
+    const existingUser = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
       include: {
         role: { include: { pole: { select: { code: true } } } },
       },
     });
     if (!existingUser) {
       throw new NotFoundException('Utilisateur non trouvé');
+    }
+    if (viewer.sub === id) {
+      throw new BadRequestException(
+        'Vous ne pouvez pas supprimer votre propre compte.',
+      );
     }
     if (
       !this.userTargetInViewerScope(viewer, {
@@ -460,13 +469,26 @@ export class UserService {
       );
     }
 
+    await this.forceCloseOpenSessionsForUser(id, viewer.sub);
+
     if (existingUser.profilePhotoUrl) {
       await this.objectStorage.deleteByPublicUrl(existingUser.profilePhotoUrl);
     }
 
     await this.messagingAttachmentService.deleteAllThreadsForUser(id);
 
-    await this.prisma.user.delete({ where: { id } });
+    const deletedAt = new Date();
+    /** Libère l’email unique pour permettre de recréer un compte avec la même adresse. */
+    const freedEmail = `${existingUser.email}.deleted.${deletedAt.getTime()}`;
+
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        deletedAt,
+        email: freedEmail,
+        profilePhotoUrl: null,
+      },
+    });
     await this.invalidateUserSessionCache(id);
     return {
       id: existingUser.id,
@@ -477,6 +499,74 @@ export class UserService {
       roleId: existingUser.roleId,
     };
   };
+
+  /**
+   * Clôture les sessions de caisse encore ouvertes avant soft-delete.
+   * Refuse si des ventes brouillon non vides bloquent la clôture.
+   */
+  private async forceCloseOpenSessionsForUser(
+    userId: string,
+    closedByUserId: string,
+  ): Promise<void> {
+    const openSessions = await this.prisma.sessionCaisse.findMany({
+      where: {
+        userId,
+        statut: SessionCaisseStatut.OUVERTE,
+      },
+      include: {
+        ventes: {
+          where: { status: VenteStatut.CONFIRMED },
+          include: { paiements: true },
+        },
+      },
+    });
+
+    for (const session of openSessions) {
+      const draftsWithLines = await this.prisma.vente.count({
+        where: {
+          sessionCaisseId: session.id,
+          status: VenteStatut.DRAFT,
+          lines: { some: {} },
+        },
+      });
+      if (draftsWithLines > 0) {
+        throw new BadRequestException(
+          `Impossible de supprimer : session de caisse ouverte avec ${draftsWithLines} vente(s) en brouillon. Clôturez la caisse d’abord.`,
+        );
+      }
+
+      await this.prisma.vente.updateMany({
+        where: {
+          sessionCaisseId: session.id,
+          status: VenteStatut.DRAFT,
+          lines: { none: {} },
+        },
+        data: { status: VenteStatut.CANCELLED },
+      });
+
+      const totals = computePaymentTotals(session.ventes);
+      const fondOuverture = Number(session.fondOuverture);
+      const fondCloture = fondOuverture + totals.totalEspecesFcfa;
+
+      await this.prisma.sessionCaisse.update({
+        where: { id: session.id },
+        data: {
+          statut: SessionCaisseStatut.CLOTUREE,
+          closedAt: new Date(),
+          fondCloture,
+          ecartCloture: 0,
+          commentaireCloture:
+            'Clôturée automatiquement — compte utilisateur désactivé.',
+          closedByUserId,
+          totalVentesFcfa: totals.totalVentesFcfa,
+          totalEspecesFcfa: totals.totalEspecesFcfa,
+          totalCarteFcfa: totals.totalCarteFcfa,
+          totalMobileMoneyFcfa: totals.totalMobileMoneyFcfa,
+          nombreVentes: totals.nombreVentes,
+        },
+      });
+    }
+  }
 
   /**
    * Photo de profil : soi-même, ou modération par un utilisateur avec update:User

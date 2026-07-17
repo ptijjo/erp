@@ -259,10 +259,7 @@ export class AuthService {
     userId: string,
     password: string,
   ): Promise<SessionTokens> {
-    const row = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: UserService.sessionInclude,
-    });
+    const row = await this.userService.findUserByIdWithRoleAndOrg(userId);
     if (!row) {
       throw new NotFoundException('Utilisateur introuvable');
     }

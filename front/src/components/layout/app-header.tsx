@@ -32,6 +32,7 @@ import {
   readSoundEnabled,
   writeSoundEnabled,
 } from "~/lib/sound-preferences";
+import { unlockNotificationAudio } from "~/lib/erp-sounds";
 
 type AppHeaderProps = {
   showMenu?: boolean;
@@ -70,7 +71,11 @@ export function AppHeader({ showMenu = true }: AppHeaderProps) {
   }, []);
 
   function toggleSounds() {
-    writeSoundEnabled(!soundEnabled);
+    const next = !soundEnabled;
+    writeSoundEnabled(next);
+    if (next) {
+      unlockNotificationAudio();
+    }
   }
 
   if (!me) return null;

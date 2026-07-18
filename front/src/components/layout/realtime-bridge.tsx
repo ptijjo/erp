@@ -1,16 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 
 import { useRealtimeSse } from "~/hooks/use-realtime-sse";
 import { hasMePermission, useMe } from "~/hooks/use-me";
-import {
-  onSoundPreferenceChanged,
-  readSoundEnabled,
-} from "~/lib/sound-preferences";
+import { playErpSound, unlockNotificationAudio } from "~/lib/erp-sounds";
 import type {
   RealtimeMessagePayload,
   RealtimeNotificationPayload,
@@ -20,55 +17,35 @@ function messagesThreadHref(threadId: string) {
   return `/dashboard/messages?thread=${threadId}`;
 }
 
-const MESSAGE_SOUND_URL = "/sons/messages/message.mp3";
-const NOTIFICATION_SOUND_URL = "/sons/notifications/notification.mp3";
-const SOUND_COOLDOWN_MS = 600;
-
-/** Connexion SSE unique : toasts + invalidation React Query. */
+/** Connexion SSE unique : toasts + sons + invalidation React Query. */
 export function RealtimeBridge() {
   const { data: me } = useMe();
   const pathname = usePathname();
   const router = useRouter();
-  const messageAudioRef = useRef<HTMLAudioElement | null>(null);
-  const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
-  const lastPlayRef = useRef<{ message: number; notification: number }>({
-    message: 0,
-    notification: 0,
-  });
-  const [soundEnabled, setSoundEnabled] = useState(() => readSoundEnabled());
 
   const canNotify =
     me != null && hasMePermission(me, "read", "Notification");
   const canMessage = me != null && hasMePermission(me, "read", "Message");
 
+  /** Débloque l’autoplay après la première interaction utilisateur. */
   useEffect(() => {
-    return onSoundPreferenceChanged(setSoundEnabled);
+    const unlock = () => {
+      unlockNotificationAudio();
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
   }, []);
-
-  function playSound(kind: "message" | "notification") {
-    if (!soundEnabled) return;
-    const now = Date.now();
-    if (now - lastPlayRef.current[kind] < SOUND_COOLDOWN_MS) return;
-    lastPlayRef.current[kind] = now;
-
-    const targetRef = kind === "message" ? messageAudioRef : notificationAudioRef;
-    const src = kind === "message" ? MESSAGE_SOUND_URL : NOTIFICATION_SOUND_URL;
-
-    if (!targetRef.current) {
-      targetRef.current = new Audio(src);
-      targetRef.current.preload = "auto";
-    }
-
-    targetRef.current.currentTime = 0;
-    void targetRef.current.play().catch(() => {
-      // Navigateur peut bloquer l'autoplay sans interaction utilisateur.
-    });
-  }
 
   useRealtimeSse(canNotify || canMessage, {
     onNotification: canNotify
       ? (payload: RealtimeNotificationPayload) => {
-          playSound("notification");
+          playErpSound("notification");
           toast.info(
             <div className="flex flex-col gap-1">
               <span className="font-semibold">{payload.title}</span>
@@ -85,7 +62,7 @@ export function RealtimeBridge() {
       : undefined,
     onMessage: canMessage
       ? (payload: RealtimeMessagePayload) => {
-          playSound("message");
+          playErpSound("message");
           const onMessagesPage = pathname.startsWith("/dashboard/messages");
           const href = messagesThreadHref(payload.threadId);
 

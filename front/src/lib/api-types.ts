@@ -499,6 +499,36 @@ export type AccountingPeriodClosureDto = {
   };
 };
 
+export type TreasuryOverviewDto = {
+  year: number;
+  month: number;
+  organizationId: string | null;
+  summary: {
+    nombreSessions: number;
+    sessionsOuvertes: number;
+    nombreVentes: number;
+    totalVentesFcfa: number;
+    totalEspecesFcfa: number;
+    totalCarteFcfa: number;
+    totalMobileMoneyFcfa: number;
+    totalEcartClotureFcfa: number;
+  };
+  sessions: Array<{
+    id: string;
+    organizationId: string;
+    organization: { id: string; name: string; slug: string };
+    closedAt: string | null;
+    fondOuverture: number;
+    fondCloture: number | null;
+    ecartCloture: number | null;
+    totalVentesFcfa: number;
+    totalEspecesFcfa: number;
+    totalCarteFcfa: number;
+    totalMobileMoneyFcfa: number;
+    nombreVentes: number;
+  }>;
+};
+
 export type NotificationDto = {
   id: string;
   createdAt: string;
@@ -1145,6 +1175,50 @@ export type JournalEntryDto = {
   lines: JournalEntryLineDto[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type TrialBalanceRowDto = {
+  chartAccountId: string;
+  code: string;
+  name: string;
+  accountType: ChartAccountTypeDto;
+  debit: number;
+  credit: number;
+  balance: number;
+};
+
+export type TrialBalanceDto = {
+  year: number;
+  month: number;
+  organizationId: string;
+  rows: TrialBalanceRowDto[];
+  totals: { debit: number; credit: number };
+};
+
+export type GeneralLedgerDto = {
+  account: {
+    id: string;
+    code: string;
+    name: string;
+    accountType: ChartAccountTypeDto;
+    organizationId: string;
+  };
+  from: string;
+  to: string;
+  movements: Array<{
+    id: string;
+    label: string | null;
+    debit: number;
+    credit: number;
+    balance: number;
+    entry: {
+      id: string;
+      entryDate: string;
+      reference: string | null;
+      description: string | null;
+    };
+  }>;
+  closingBalance: number;
 };
 
 export type StockTransferStatusDto =

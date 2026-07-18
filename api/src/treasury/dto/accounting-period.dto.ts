@@ -19,3 +19,21 @@ export class CloseAccountingPeriodDto {
   @IsUUID()
   organizationId?: string;
 }
+
+export class ReopenAccountingPeriodDto {
+  @IsInt()
+  @Min(2000)
+  @Max(2100)
+  @Type(() => Number)
+  year!: number;
+
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  @Type(() => Number)
+  month!: number;
+
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string;
+}

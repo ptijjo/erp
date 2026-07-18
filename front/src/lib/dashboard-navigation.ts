@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   Megaphone,
   Package,
+  Banknote,
   Receipt,
   Scale,
   ScanLine,
@@ -199,9 +200,15 @@ const baseNavItems: NavItem[] = [
   },
   {
     label: "Clôtures comptables",
-    href: "/dashboard/tresorerie",
+    href: "/dashboard/clotures",
     icon: Lock,
     requiredPermission: { action: "read", subject: "AccountingPeriod" },
+  },
+  {
+    label: "Trésorerie",
+    href: "/dashboard/tresorerie",
+    icon: Banknote,
+    requiredPermission: { action: "read", subject: "SessionCaisse" },
   },
   {
     label: "Synthèse commandes",
@@ -372,9 +379,15 @@ const HQ_ADMIN_NAV: NavItem[] = [
   },
   {
     label: "Clôtures comptables",
-    href: "/dashboard/tresorerie",
+    href: "/dashboard/clotures",
     icon: Lock,
     requiredPermission: { action: "read", subject: "AccountingPeriod" },
+  },
+  {
+    label: "Trésorerie",
+    href: "/dashboard/tresorerie",
+    icon: Banknote,
+    requiredPermission: { action: "read", subject: "SessionCaisse" },
   },
   {
     label: "Patrimoine",
@@ -458,6 +471,7 @@ const SECTION_BY_HREF: Record<string, string> = {
   "/dashboard/comptabilite-generale": "finance",
   "/dashboard/budgets": "finance",
   "/dashboard/tresorerie": "finance",
+  "/dashboard/clotures": "finance",
   "/dashboard/audit": "gouvernance",
   "/dashboard/mes-actions": "operations",
   "/dashboard/messages": "gouvernance",
@@ -643,6 +657,20 @@ export const HQ_MODULE_TILES: ModuleTile[] = [
     subject: "Budget",
   },
   {
+    title: "Trésorerie",
+    description: "Encaissements caisse et écarts",
+    href: "/dashboard/tresorerie",
+    icon: Banknote,
+    subject: "SessionCaisse",
+  },
+  {
+    title: "Clôtures comptables",
+    description: "Verrouiller ou rouvrir une période",
+    href: "/dashboard/clotures",
+    icon: Lock,
+    subject: "AccountingPeriod",
+  },
+  {
     title: "Synthèse commandes",
     description: "Volumes fournisseurs en FCFA",
     href: "/dashboard/comptabilite",
@@ -693,7 +721,7 @@ export const HQ_MODULE_TILES: ModuleTile[] = [
   },
   {
     title: "Comptabilité générale",
-    description: "Plan comptable et écritures",
+    description: "Plan comptable, journal, balance et grand livre",
     href: "/dashboard/comptabilite-generale",
     icon: BookOpen,
     subject: "JournalEntry",
@@ -738,7 +766,13 @@ export function filterModuleTiles(me: Me): ModuleTile[] {
     me.role.name.startsWith("DIRECTOR_")
   ) {
     const poleHrefPriority: Record<string, string[]> = {
-      Pole_FINANCE: ["/dashboard/budgets", "/dashboard/comptabilite", "/dashboard/comptabilite-generale", "/dashboard/tresorerie"],
+      Pole_FINANCE: [
+        "/dashboard/budgets",
+        "/dashboard/tresorerie",
+        "/dashboard/clotures",
+        "/dashboard/comptabilite-generale",
+        "/dashboard/comptabilite",
+      ],
       Pole_HR: ["/dashboard/rh", "/dashboard/utilisateurs"],
       Pole_OPERATIONS: ["/dashboard/stocks", "/dashboard/produits", "/dashboard/commandes-inter-filiales"],
       Pole_PRODUCTION: ["/dashboard/production", "/dashboard/stocks"],

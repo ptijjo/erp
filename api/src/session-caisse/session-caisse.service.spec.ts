@@ -6,6 +6,7 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SessionCaisseService } from './session-caisse.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AccountingService } from '../accounting/accounting.service';
 import { SessionCaisseStatut } from '../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
@@ -52,6 +53,12 @@ describe('SessionCaisseService', () => {
             vente: { count: jest.fn() },
             organizationCatalogCategory: { count: catalogCategoryCount },
             organizationCatalogProduct: { count: catalogProductCount },
+          },
+        },
+        {
+          provide: AccountingService,
+          useValue: {
+            autoPostFromSessionClose: jest.fn(),
           },
         },
       ],

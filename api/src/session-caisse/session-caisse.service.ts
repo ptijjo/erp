@@ -26,10 +26,14 @@ import {
   type SessionCaisseWithDetails,
 } from './session-caisse.types';
 import { assertSubsidiaryHasSalesCatalog } from '../product/product-subsidiary-scope.util';
+import { AccountingService } from '../accounting/accounting.service';
 
 @Injectable()
 export class SessionCaisseService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly accountingService: AccountingService,
+  ) {}
 
   async open(
     dto: OpenSessionCaisseDto,
@@ -187,7 +191,7 @@ export class SessionCaisseService {
     const theoriqueEspeces = fondOuverture + totals.totalEspecesFcfa;
     const ecartCloture = dto.fondCloture - theoriqueEspeces;
 
-    return this.prisma.sessionCaisse.update({
+    const closed = await this.prisma.sessionCaisse.update({
       where: { id },
       data: {
         statut: SessionCaisseStatut.CLOTUREE,
@@ -204,6 +208,10 @@ export class SessionCaisseService {
       },
       include: sessionCaisseInclude,
     });
+
+    void this.accountingService.autoPostFromSessionClose(closed.id);
+
+    return closed;
   }
 
   /** Session ouverte obligatoire pour encaisser (filiale). */

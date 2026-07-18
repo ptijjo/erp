@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -67,6 +68,36 @@ export class AccountingController {
     @CurrentUser() viewer: AuthenticatedUser,
   ) {
     return this.accountingService.removeChartAccount(id, viewer);
+  }
+
+  @Get('reports/trial-balance')
+  @CheckPolicies({ action: 'read', subject: 'JournalEntry' })
+  trialBalance(
+    @Query('year') year: string,
+    @Query('month') month: string,
+    @Query('organizationId') organizationId: string | undefined,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.accountingService.trialBalance(viewer, {
+      year: Number(year),
+      month: Number(month),
+      organizationId,
+    });
+  }
+
+  @Get('reports/general-ledger')
+  @CheckPolicies({ action: 'read', subject: 'JournalEntry' })
+  generalLedger(
+    @Query('chartAccountId') chartAccountId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.accountingService.generalLedger(viewer, {
+      chartAccountId,
+      from,
+      to,
+    });
   }
 
   @Get('journal-entries')

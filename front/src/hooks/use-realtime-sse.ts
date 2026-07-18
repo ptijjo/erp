@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { getApiBaseUrl } from "~/lib/api";
+import { api, getApiBaseUrl } from "~/lib/api";
 import {
   parseRealtimeMessage,
   parseRealtimeNotification,
@@ -17,7 +17,21 @@ type RealtimeHandlers = {
 };
 
 const MAX_BACKOFF_MS = 30_000;
+const INITIAL_BACKOFF_MS = 1_000;
 
+async function refreshSessionQuietly(): Promise<boolean> {
+  try {
+    await api.post("/auth/refresh", null, { skipAuthRefresh: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Connexion SSE temps réel.
+ * Sur erreur (JWT expiré, redémarrage API) : refresh cookie puis reconnexion.
+ */
 export function useRealtimeSse(
   enabled: boolean,
   handlers: RealtimeHandlers,
@@ -34,8 +48,9 @@ export function useRealtimeSse(
 
     let es: EventSource | null = null;
     let disposed = false;
-    let retryMs = 1_000;
+    let retryMs = INITIAL_BACKOFF_MS;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let connecting = false;
 
     const invalidateNotificationQueries = () => {
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
@@ -63,35 +78,66 @@ export function useRealtimeSse(
       handlersRef.current.onMessage?.(payload);
     };
 
-    const connect = () => {
+    const scheduleReconnect = () => {
       if (disposed) return;
-      es?.close();
-
-      const url = `${getApiBaseUrl()}/realtime/events`;
-      es = new EventSource(url, { withCredentials: true });
-
-      es.addEventListener("notification", onNotificationEvent);
-      es.addEventListener("message", onMessageEvent);
-
-      es.onopen = () => {
-        retryMs = 1_000;
-      };
-
-      es.onerror = () => {
-        es?.close();
-        es = null;
-        if (disposed) return;
-        retryTimer = setTimeout(() => {
-          retryMs = Math.min(retryMs * 2, MAX_BACKOFF_MS);
-          connect();
-        }, retryMs);
-      };
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        void connect();
+      }, retryMs);
+      retryMs = Math.min(retryMs * 2, MAX_BACKOFF_MS);
     };
 
-    connect();
+    const connect = async () => {
+      if (disposed || connecting) return;
+      connecting = true;
+
+      try {
+        es?.close();
+        es = null;
+
+        // EventSource ne peut pas rafraîchir le JWT : on le fait avant chaque tentative.
+        await refreshSessionQuietly();
+        if (disposed) return;
+
+        const url = `${getApiBaseUrl()}/realtime/events`;
+        es = new EventSource(url, { withCredentials: true });
+
+        es.addEventListener("notification", onNotificationEvent);
+        es.addEventListener("message", onMessageEvent);
+        // `ping` ignoré volontairement (garde la connexion ouverte).
+
+        es.onopen = () => {
+          retryMs = INITIAL_BACKOFF_MS;
+        };
+
+        es.onerror = () => {
+          es?.removeEventListener("notification", onNotificationEvent);
+          es?.removeEventListener("message", onMessageEvent);
+          es?.close();
+          es = null;
+          if (disposed) return;
+          scheduleReconnect();
+        };
+      } finally {
+        connecting = false;
+      }
+    };
+
+    void connect();
+
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible" || disposed) return;
+      // Onglet de retour : forcer une reconnexion fraîche.
+      retryMs = INITIAL_BACKOFF_MS;
+      es?.close();
+      es = null;
+      void connect();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       disposed = true;
+      document.removeEventListener("visibilitychange", onVisibility);
       if (retryTimer) clearTimeout(retryTimer);
       es?.removeEventListener("notification", onNotificationEvent);
       es?.removeEventListener("message", onMessageEvent);

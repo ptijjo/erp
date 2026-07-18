@@ -267,7 +267,7 @@ export class MessagingService {
       preview: this.buildMessagePreview(dto.body, dto.attachmentIds),
     };
     this.realtimeHub.emitToMany(
-      participants.map((p) => p.userId),
+      participants.map((p) => p.userId).filter((id) => id !== viewer.sub),
       'message',
       payload,
     );

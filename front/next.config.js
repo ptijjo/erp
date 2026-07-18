@@ -68,6 +68,11 @@ const config = {
         destination: "/dashboard/evenements/:path*",
         permanent: false,
       },
+      {
+        source: "/dashboard/synthese-commandes",
+        destination: "/dashboard/comptabilite",
+        permanent: false,
+      },
     ];
   },
 };

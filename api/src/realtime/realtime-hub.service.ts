@@ -1,7 +1,9 @@
 import { Injectable, MessageEvent } from '@nestjs/common';
-import { Subject } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 
-export type RealtimeEventType = 'notification' | 'message';
+export type RealtimeEventType = 'notification' | 'message' | 'ping';
+
+const HEARTBEAT_MS = 20_000;
 
 @Injectable()
 export class RealtimeHubService {
@@ -16,7 +18,40 @@ export class RealtimeHubService {
     return subject;
   }
 
+  /**
+   * Observable SSE par utilisateur : heartbeat pour garder la connexion ouverte
+   * (proxies / navigateurs coupent sinon les flux idle).
+   */
+  observeFor(userId: string): Observable<MessageEvent> {
+    return new Observable<MessageEvent>((subscriber) => {
+      const subject = this.streamFor(userId);
+      const sub = subject.subscribe({
+        next: (event) => subscriber.next(event),
+        error: (err) => subscriber.error(err),
+        complete: () => subscriber.complete(),
+      });
+
+      subscriber.next({
+        type: 'ping',
+        data: JSON.stringify({ ts: Date.now() }),
+      });
+
+      const heartbeat = setInterval(() => {
+        subscriber.next({
+          type: 'ping',
+          data: JSON.stringify({ ts: Date.now() }),
+        });
+      }, HEARTBEAT_MS);
+
+      return () => {
+        clearInterval(heartbeat);
+        sub.unsubscribe();
+      };
+    });
+  }
+
   emit(userId: string, type: RealtimeEventType, payload: unknown): void {
+    if (type === 'ping') return;
     const subject = this.streamFor(userId);
     subject.next({
       type,
@@ -24,7 +59,11 @@ export class RealtimeHubService {
     });
   }
 
-  emitToMany(userIds: string[], type: RealtimeEventType, payload: unknown): void {
+  emitToMany(
+    userIds: string[],
+    type: RealtimeEventType,
+    payload: unknown,
+  ): void {
     for (const id of new Set(userIds)) {
       this.emit(id, type, payload);
     }

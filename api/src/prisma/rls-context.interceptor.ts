@@ -28,6 +28,13 @@ export class RlsContextInterceptor implements NestInterceptor {
     const req = context.switchToHttp().getRequest<
       Request & { user?: AuthenticatedUser }
     >();
+
+    /** SSE long-lived : pas de set_config pool (fuite + inutile). */
+    const path = req.originalUrl ?? req.url ?? '';
+    if (path.includes('/realtime/events')) {
+      return next.handle();
+    }
+
     const user = req.user;
 
     const store = {

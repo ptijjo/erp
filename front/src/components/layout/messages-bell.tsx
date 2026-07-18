@@ -40,7 +40,8 @@ export function MessagesBell() {
       return data;
     },
     enabled: canRead,
-    refetchInterval: 60_000,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   });
 
   const markRead = useMutation({

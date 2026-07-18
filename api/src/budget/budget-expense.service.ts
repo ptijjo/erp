@@ -16,6 +16,7 @@ import {
   Prisma,
 } from '../generated/prisma/client';
 import { AccountingPeriodService } from '../treasury/accounting-period.service';
+import { AccountingService } from '../accounting/accounting.service';
 import { NotificationService } from '../notification/notification.service';
 import type { CreateBudgetExpenseDto } from './dto/budget-expense.dto';
 import {
@@ -53,6 +54,7 @@ export class BudgetExpenseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly accountingPeriodService: AccountingPeriodService,
+    private readonly accountingService: AccountingService,
     private readonly notificationService: NotificationService,
   ) {}
 
@@ -169,6 +171,7 @@ export class BudgetExpenseService {
       include: expenseInclude,
     });
 
+    void this.accountingService.autoPostFromBudgetExpense(expense.id);
     void this.maybeNotifyBudgetUtilization(lineId, line.amountPlanned, viewer);
 
     return expense;

@@ -47,7 +47,8 @@ export function NotificationsBell() {
       return data;
     },
     enabled: canRead,
-    refetchInterval: 120_000,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   });
 
   const markRead = useMutation({

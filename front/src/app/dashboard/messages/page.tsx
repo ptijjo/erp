@@ -44,6 +44,7 @@ import type {
   MessageDto,
   MessageThreadSummaryDto,
   MessagingContactDto,
+  UserDetailDto,
 } from "~/lib/api-types";
 import { apiErrorMessage } from "~/lib/api-error-message";
 import { cn } from "~/lib/utils";
@@ -67,6 +68,7 @@ export default function MessagesPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const threadFromUrl = searchParams.get("thread");
+  const userIdFromUrl = searchParams.get("userId");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const replyFileInputRef = useRef<HTMLInputElement>(null);
   const composeFileInputRef = useRef<HTMLInputElement>(null);
@@ -163,6 +165,53 @@ export default function MessagesPage() {
   }, [threads, threadSearch]);
 
   const unreadCount = threads.filter((t) => t.unread).length;
+
+  /** Ouverture depuis un profil : `/messages?userId=…` → composer prérempli. */
+  useEffect(() => {
+    if (!userIdFromUrl || !canSend || !me) return;
+    if (userIdFromUrl === me.sub) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data: user } = await api.get<UserDetailDto>(
+          `/user/${userIdFromUrl}`,
+        );
+        if (cancelled) return;
+        const contact: MessagingContactDto = {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName ?? null,
+          lastName: user.lastName ?? null,
+          profilePhotoUrl: user.profilePhotoUrl ?? null,
+          organizationId: user.organizationId,
+          organization: {
+            name: user.organization?.name ?? "—",
+            organizationType: user.organization?.organizationType ?? "MAIN",
+          },
+          role: {
+            name: user.role.name,
+            pole: user.role.pole
+              ? { code: user.role.pole.code, name: user.role.pole.name }
+              : null,
+          },
+          employeeId: null,
+          position: null,
+          department: null,
+        };
+        setComposeTo(contact);
+        setLocalThreadId(null);
+        setMainView("compose");
+        router.replace(pathname, { scroll: false });
+      } catch {
+        /* profil inaccessible */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userIdFromUrl, canSend, me, router, pathname]);
 
   useEffect(() => {
     if (!selectedThreadId) return;

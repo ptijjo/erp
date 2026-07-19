@@ -217,12 +217,6 @@ const baseNavItems: NavItem[] = [
     requiredPermission: { action: "read", subject: "StockOrder" },
   },
   {
-    label: "Commandes inter-filiales",
-    href: "/dashboard/commandes-inter-filiales",
-    icon: ArrowLeftRight,
-    requiredPermission: { action: "read", subject: "StockOrder" },
-  },
-  {
     label: "Stratégie",
     href: "/dashboard/strategie",
     icon: Target,
@@ -324,12 +318,6 @@ const HQ_PRIMARY_NAV: NavItem[] = [
     label: "Commandes",
     href: "/dashboard/comptabilite",
     icon: Receipt,
-    requiredPermission: { action: "read", subject: "StockOrder" },
-  },
-  {
-    label: "Commandes inter-filiales",
-    href: "/dashboard/commandes-inter-filiales",
-    icon: ArrowLeftRight,
     requiredPermission: { action: "read", subject: "StockOrder" },
   },
   {
@@ -464,7 +452,6 @@ const SECTION_BY_HREF: Record<string, string> = {
   "/dashboard/subsidiary/caisse": "operations",
   "/dashboard/subsidiary/compte": "operations",
   "/dashboard/comptabilite": "operations",
-  "/dashboard/commandes-inter-filiales": "operations",
   "/dashboard/strategie": "gouvernance",
   "/dashboard/marketing": "gouvernance",
   "/dashboard/evenements": "gouvernance",
@@ -774,7 +761,7 @@ export function filterModuleTiles(me: Me): ModuleTile[] {
         "/dashboard/comptabilite",
       ],
       Pole_HR: ["/dashboard/rh", "/dashboard/utilisateurs"],
-      Pole_OPERATIONS: ["/dashboard/stocks", "/dashboard/produits", "/dashboard/commandes-inter-filiales"],
+      Pole_OPERATIONS: ["/dashboard/stocks", "/dashboard/produits"],
       Pole_PRODUCTION: ["/dashboard/production", "/dashboard/stocks"],
       Pole_LEGAL: ["/dashboard/juridique"],
       Pole_ARCHITECTURE_HERITAGE: ["/dashboard/patrimoine"],

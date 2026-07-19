@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -9,9 +10,7 @@ import {
   isMainOrganizationUser,
   organizationListWhere,
 } from '../auth/organization-scope';
-import {
-  bypassesMainOrgPoleScope,
-} from '../auth/pole-scope';
+import { bypassesMainOrgPoleScope } from '../auth/pole-scope';
 import { AlertsService } from '../alerts/alerts.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -23,11 +22,19 @@ import {
   TaskStatus,
   type Prisma,
 } from '../generated/prisma/client';
-import type { CreateTaskDto, UpdateTaskDto } from './dto/actions.dto';
+import type {
+  CreateTaskDto,
+  CreateTaskSubtaskDto,
+  UpdateTaskDto,
+  UpdateTaskSubtaskDto,
+} from './dto/actions.dto';
 import {
   ActionItemDto,
   SYSTEM_ACTION_ID_PREFIX,
+  computeSubtaskProgress,
+  deriveParentStatusFromSubtasks,
   isSystemActionId,
+  type TaskSubtaskDto,
 } from './actions.types';
 import type { DashboardAlertSeverity } from '../alerts/alerts.service';
 
@@ -51,6 +58,9 @@ const taskInclude = {
       profilePhotoUrl: true,
     },
   },
+  subtasks: {
+    orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }],
+  },
 } satisfies Prisma.TaskInclude;
 
 type TaskRow = Prisma.TaskGetPayload<{ include: typeof taskInclude }>;
@@ -68,10 +78,22 @@ export class ActionsService {
   ): Promise<ActionItemDto[]> {
     const manual = await this.listManualTasks(viewer, statusFilter);
     const system =
-      statusFilter === TaskStatus.DONE ? [] : await this.buildSystemActions(viewer);
+      statusFilter === TaskStatus.DONE
+        ? []
+        : await this.buildSystemActions(viewer);
 
     const merged = [...manual, ...system];
     return merged.sort((a, b) => compareActionItems(a, b));
+  }
+
+  async getTask(id: string, viewer: AuthenticatedUser): Promise<ActionItemDto> {
+    if (isSystemActionId(id)) {
+      throw new ForbiddenException(
+        'Les actions système n’ont pas de fiche détail.',
+      );
+    }
+    const row = await this.findVisibleTask(id, viewer);
+    return this.toManualActionItem(row);
   }
 
   async createTask(dto: CreateTaskDto, viewer: AuthenticatedUser) {
@@ -79,7 +101,9 @@ export class ActionsService {
     this.validateScopePayload(dto.scope ?? TaskScope.USER, dto, viewer);
 
     const status = dto.status ?? TaskStatus.TODO;
+    const startDate = dto.startDate ? new Date(dto.startDate) : null;
     const dueDate = dto.dueDate ? new Date(dto.dueDate) : null;
+    assertStartBeforeDue(startDate, dueDate);
 
     return this.prisma.task.create({
       data: {
@@ -88,6 +112,7 @@ export class ActionsService {
         status,
         priority: dto.priority ?? TaskPriority.NORMAL,
         scope: dto.scope ?? TaskScope.USER,
+        startDate,
         dueDate,
         completedAt: status === TaskStatus.DONE ? new Date() : null,
         organizationId: dto.organizationId,
@@ -113,7 +138,6 @@ export class ActionsService {
     const existing = await this.findVisibleTask(id, viewer);
     this.assertCanMutateTask(existing, viewer);
 
-    const nextStatus = dto.status ?? existing.status;
     let completedAt = existing.completedAt;
     if (dto.status != null) {
       if (dto.status === TaskStatus.DONE) {
@@ -123,7 +147,21 @@ export class ActionsService {
       }
     }
 
-    return this.prisma.task.update({
+    const nextStart =
+      dto.startDate === undefined
+        ? existing.startDate
+        : dto.startDate
+          ? new Date(dto.startDate)
+          : null;
+    const nextDue =
+      dto.dueDate === undefined
+        ? existing.dueDate
+        : dto.dueDate
+          ? new Date(dto.dueDate)
+          : null;
+    assertStartBeforeDue(nextStart, nextDue);
+
+    await this.prisma.task.update({
       where: { id },
       data: {
         title: dto.title?.trim(),
@@ -134,6 +172,12 @@ export class ActionsService {
         status: dto.status,
         priority: dto.priority,
         scope: dto.scope,
+        startDate:
+          dto.startDate === undefined
+            ? undefined
+            : dto.startDate
+              ? new Date(dto.startDate)
+              : null,
         dueDate:
           dto.dueDate === undefined
             ? undefined
@@ -142,12 +186,12 @@ export class ActionsService {
               : null,
         assigneeUserId:
           dto.assigneeUserId === undefined ? undefined : dto.assigneeUserId,
-        poleCode:
-          dto.poleCode === undefined ? undefined : dto.poleCode,
+        poleCode: dto.poleCode === undefined ? undefined : dto.poleCode,
         completedAt,
       },
-      include: taskInclude,
     });
+
+    return this.getTask(id, viewer);
   }
 
   async removeTask(id: string, viewer: AuthenticatedUser) {
@@ -162,6 +206,164 @@ export class ActionsService {
 
     await this.prisma.task.delete({ where: { id } });
     return { ok: true };
+  }
+
+  async createSubtask(
+    taskId: string,
+    dto: CreateTaskSubtaskDto,
+    viewer: AuthenticatedUser,
+  ): Promise<ActionItemDto> {
+    if (isSystemActionId(taskId)) {
+      throw new ForbiddenException(
+        'Les actions système ne peuvent pas avoir de sous-tâches.',
+      );
+    }
+
+    const parent = await this.findVisibleTask(taskId, viewer);
+    this.assertCanMutateTask(parent, viewer);
+
+    const agg = await this.prisma.taskSubtask.aggregate({
+      where: { taskId },
+      _max: { sortOrder: true },
+    });
+    const sortOrder = (agg._max.sortOrder ?? -1) + 1;
+    const status = dto.status ?? TaskStatus.TODO;
+    const startDate = dto.startDate ? new Date(dto.startDate) : null;
+    const dueDate = dto.dueDate ? new Date(dto.dueDate) : null;
+    assertStartBeforeDue(startDate, dueDate);
+
+    await this.prisma.taskSubtask.create({
+      data: {
+        title: dto.title.trim(),
+        status,
+        priority: dto.priority ?? TaskPriority.NORMAL,
+        startDate,
+        dueDate,
+        sortOrder,
+        completedAt: status === TaskStatus.DONE ? new Date() : null,
+        taskId,
+        organizationId: parent.organizationId,
+      },
+    });
+
+    await this.syncParentFromSubtasks(taskId);
+    return this.getTask(taskId, viewer);
+  }
+
+  async updateSubtask(
+    taskId: string,
+    subtaskId: string,
+    dto: UpdateTaskSubtaskDto,
+    viewer: AuthenticatedUser,
+  ): Promise<ActionItemDto> {
+    if (isSystemActionId(taskId)) {
+      throw new ForbiddenException(
+        'Les actions système ne peuvent pas avoir de sous-tâches.',
+      );
+    }
+
+    const parent = await this.findVisibleTask(taskId, viewer);
+    this.assertCanMutateTask(parent, viewer);
+
+    const existing = await this.prisma.taskSubtask.findFirst({
+      where: { id: subtaskId, taskId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Sous-tâche introuvable.');
+    }
+
+    let completedAt = existing.completedAt;
+    if (dto.status != null) {
+      completedAt = dto.status === TaskStatus.DONE ? new Date() : null;
+    }
+
+    const nextStart =
+      dto.startDate === undefined
+        ? existing.startDate
+        : dto.startDate
+          ? new Date(dto.startDate)
+          : null;
+    const nextDue =
+      dto.dueDate === undefined
+        ? existing.dueDate
+        : dto.dueDate
+          ? new Date(dto.dueDate)
+          : null;
+    assertStartBeforeDue(nextStart, nextDue);
+
+    await this.prisma.taskSubtask.update({
+      where: { id: subtaskId },
+      data: {
+        title: dto.title?.trim(),
+        startDate:
+          dto.startDate === undefined
+            ? undefined
+            : dto.startDate
+              ? new Date(dto.startDate)
+              : null,
+        dueDate:
+          dto.dueDate === undefined
+            ? undefined
+            : dto.dueDate
+              ? new Date(dto.dueDate)
+              : null,
+        status: dto.status,
+        priority: dto.priority,
+        completedAt,
+      },
+    });
+
+    await this.syncParentFromSubtasks(taskId);
+    return this.getTask(taskId, viewer);
+  }
+
+  async removeSubtask(
+    taskId: string,
+    subtaskId: string,
+    viewer: AuthenticatedUser,
+  ): Promise<ActionItemDto> {
+    if (isSystemActionId(taskId)) {
+      throw new ForbiddenException(
+        'Les actions système ne peuvent pas avoir de sous-tâches.',
+      );
+    }
+
+    const parent = await this.findVisibleTask(taskId, viewer);
+    this.assertCanMutateTask(parent, viewer);
+
+    const existing = await this.prisma.taskSubtask.findFirst({
+      where: { id: subtaskId, taskId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Sous-tâche introuvable.');
+    }
+
+    await this.prisma.taskSubtask.delete({ where: { id: subtaskId } });
+    await this.syncParentFromSubtasks(taskId);
+    return this.getTask(taskId, viewer);
+  }
+
+  private async syncParentFromSubtasks(taskId: string): Promise<void> {
+    const parent = await this.prisma.task.findFirst({
+      where: { id: taskId },
+      include: { subtasks: { select: { status: true } } },
+    });
+    if (!parent) {
+      return;
+    }
+
+    const derived = deriveParentStatusFromSubtasks(parent.subtasks);
+    if (derived == null) {
+      return;
+    }
+
+    await this.prisma.task.update({
+      where: { id: taskId },
+      data: {
+        status: derived,
+        completedAt: derived === TaskStatus.DONE ? new Date() : null,
+      },
+    });
   }
 
   private async listManualTasks(
@@ -196,6 +398,7 @@ export class ActionsService {
         description: alert.message,
         status: TaskStatus.TODO,
         priority: severityToPriority(alert.severity),
+        startDate: null,
         dueDate: null,
         href: alert.href,
         createdAt: nowIso,
@@ -232,7 +435,9 @@ export class ActionsService {
         [leave.employee.firstName, leave.employee.lastName]
           .filter(Boolean)
           .join(' ')
-          .trim() || leave.employee.email || 'Employé';
+          .trim() ||
+        leave.employee.email ||
+        'Employé';
       items.push({
         id: `${SYSTEM_ACTION_ID_PREFIX}LEAVE_PENDING:${leave.id}`,
         kind: 'SYSTEM',
@@ -240,6 +445,7 @@ export class ActionsService {
         description: `Demande en attente depuis le ${leave.startDate.toLocaleDateString('fr-FR')}.`,
         status: TaskStatus.TODO,
         priority: TaskPriority.NORMAL,
+        startDate: null,
         dueDate: leave.startDate.toISOString(),
         href: '/dashboard/rh/conges',
         organizationId: leave.organizationId,
@@ -270,6 +476,7 @@ export class ActionsService {
         description: `Budget ${budget.month}/${budget.year} en attente de validation.`,
         status: TaskStatus.TODO,
         priority: TaskPriority.HIGH,
+        startDate: null,
         dueDate: budget.submittedAt?.toISOString() ?? null,
         href: '/dashboard/budgets',
         organizationId: budget.subsidiaryOrganizationId,
@@ -336,7 +543,9 @@ export class ActionsService {
         row.assigneeUserId === viewer.sub ||
         row.createdByUserId === viewer.sub;
       if (!allowed) {
-        throw new ForbiddenException('Modification réservée au créateur ou au responsable.');
+        throw new ForbiddenException(
+          'Modification réservée au créateur ou au responsable.',
+        );
       }
       return;
     }
@@ -416,11 +625,29 @@ export class ActionsService {
     };
   }
 
+  private toSubtaskDto(
+    row: TaskRow['subtasks'][number],
+  ): TaskSubtaskDto {
+    return {
+      id: row.id,
+      title: row.title,
+      status: row.status,
+      priority: row.priority,
+      startDate: row.startDate?.toISOString() ?? null,
+      dueDate: row.dueDate?.toISOString() ?? null,
+      sortOrder: row.sortOrder,
+      completedAt: row.completedAt?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
   private toManualActionItem(row: TaskRow): ActionItemDto {
     const createdBy = this.toUserSummary(row.createdBy);
     const assignee = row.assignee
       ? this.toUserSummary(row.assignee)
       : null;
+    const subtasks = (row.subtasks ?? []).map((s) => this.toSubtaskDto(s));
+    const subtaskProgress = computeSubtaskProgress(subtasks);
 
     return {
       id: row.id,
@@ -430,6 +657,7 @@ export class ActionsService {
       status: row.status,
       priority: row.priority,
       scope: row.scope,
+      startDate: row.startDate?.toISOString() ?? null,
       dueDate: row.dueDate?.toISOString() ?? null,
       organizationId: row.organizationId,
       organizationName: row.organization.name,
@@ -440,6 +668,8 @@ export class ActionsService {
       createdAt: row.createdAt.toISOString(),
       completedAt: row.completedAt?.toISOString() ?? null,
       editable: true,
+      subtasks,
+      subtaskProgress,
     };
   }
 }
@@ -458,6 +688,17 @@ function severityToPriority(
       const _exhaustive: never = severity;
       return _exhaustive;
     }
+  }
+}
+
+function assertStartBeforeDue(
+  startDate: Date | null,
+  dueDate: Date | null,
+): void {
+  if (startDate && dueDate && startDate.getTime() > dueDate.getTime()) {
+    throw new BadRequestException(
+      'La date de début doit être antérieure ou égale à la date butoir.',
+    );
   }
 }
 

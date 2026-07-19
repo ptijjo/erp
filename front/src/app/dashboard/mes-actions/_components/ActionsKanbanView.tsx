@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowUpRight, GripVertical } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import {
   ActionOwnerCell,
@@ -14,28 +14,101 @@ import {
   progressForStatus,
 } from "~/app/dashboard/mes-actions/_lib/action-board";
 import { formatActionDueDate } from "~/app/dashboard/mes-actions/_lib/action-labels";
-import type { ActionItemDto, TaskStatusDto } from "~/lib/api-types";
+import type {
+  ActionItemDto,
+  TaskPriorityDto,
+  TaskStatusDto,
+  TaskSubtaskDto,
+} from "~/lib/api-types";
 import { cn } from "~/lib/utils";
 
 type ActionsKanbanViewProps = {
   actions: ActionItemDto[];
   canUpdate: boolean;
+  onOpenTask: (action: ActionItemDto) => void;
   onStatusChange: (id: string, status: TaskStatusDto) => void;
+  onSubtaskStatusChange: (
+    taskId: string,
+    subtaskId: string,
+    status: TaskStatusDto,
+  ) => void;
 };
 
-const DRAG_MIME = "application/x-vifaa-action-id";
+const DRAG_MIME = "application/x-vifaa-kanban-item";
+
+type KanbanDragPayload =
+  | { kind: "task"; taskId: string }
+  | { kind: "subtask"; taskId: string; subtaskId: string };
+
+type KanbanItem =
+  | {
+      key: string;
+      kind: "task";
+      status: TaskStatusDto;
+      action: ActionItemDto;
+      editable: boolean;
+      priority: TaskPriorityDto;
+      dueDate: string | null;
+    }
+  | {
+      key: string;
+      kind: "subtask";
+      status: TaskStatusDto;
+      action: ActionItemDto;
+      subtask: TaskSubtaskDto;
+      editable: boolean;
+      priority: TaskPriorityDto;
+      dueDate: string | null;
+    };
+
+function buildKanbanItems(actions: ActionItemDto[]): KanbanItem[] {
+  const items: KanbanItem[] = [];
+
+  for (const action of actions) {
+    const subtasks = action.subtasks ?? [];
+    if (subtasks.length > 0) {
+      for (const subtask of subtasks) {
+        items.push({
+          key: `sub:${subtask.id}`,
+          kind: "subtask",
+          status: subtask.status,
+          action,
+          subtask,
+          editable: action.editable,
+          priority: subtask.priority,
+          dueDate: subtask.dueDate ?? action.dueDate,
+        });
+      }
+      continue;
+    }
+
+    items.push({
+      key: `task:${action.id}`,
+      kind: "task",
+      status: action.status,
+      action,
+      editable: action.editable,
+      priority: action.priority,
+      dueDate: action.dueDate,
+    });
+  }
+
+  return items;
+}
 
 function KanbanCard({
-  action,
+  item,
   canDrag,
   isDragging,
   onDragBegin,
+  onOpen,
   onStatusChange,
 }: {
-  action: ActionItemDto;
+  item: KanbanItem;
   canDrag: boolean;
   isDragging: boolean;
   onDragBegin: () => void;
+  onOpen: () => void;
   onStatusChange: (status: TaskStatusDto) => void;
 }) {
   const handleDragStart = (e: React.DragEvent) => {
@@ -44,19 +117,33 @@ function KanbanCard({
       return;
     }
     onDragBegin();
-    e.dataTransfer.setData(DRAG_MIME, action.id);
+    const payload: KanbanDragPayload =
+      item.kind === "task"
+        ? { kind: "task", taskId: item.action.id }
+        : {
+            kind: "subtask",
+            taskId: item.action.id,
+            subtaskId: item.subtask.id,
+          };
+    e.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload));
     e.dataTransfer.effectAllowed = "move";
   };
+
+  const title = item.kind === "task" ? item.action.title : item.subtask.title;
+  const isDone = item.status === "DONE";
 
   return (
     <article
       draggable={canDrag}
       onDragStart={handleDragStart}
+      onClick={onOpen}
       className={cn(
         "rounded-lg border bg-card p-3 shadow-sm transition-all hover:shadow-md",
-        action.kind === "SYSTEM" && "border-violet-200/80",
+        item.action.kind === "SYSTEM" && "border-violet-200/80",
+        item.kind === "subtask" && "border-l-4 border-l-sky-400",
         canDrag && "cursor-grab active:cursor-grabbing",
         isDragging && "scale-[0.98] opacity-40",
+        "cursor-pointer",
       )}
     >
       <div className="mb-2 flex items-start gap-1.5">
@@ -64,44 +151,64 @@ function KanbanCard({
           <GripVertical className="text-muted-foreground mt-0.5 size-4 shrink-0 opacity-50" />
         )}
         <div className="min-w-0 flex-1">
+          {item.kind === "subtask" ? (
+            <p className="text-muted-foreground mb-0.5 truncate text-[10px] font-medium uppercase tracking-wide">
+              {item.action.title}
+            </p>
+          ) : null}
           <div className="flex items-start justify-between gap-2">
             <p
               className={cn(
                 "text-sm leading-snug font-medium",
-                action.status === "DONE" && "text-muted-foreground line-through",
+                isDone && "text-muted-foreground line-through",
               )}
             >
-              {action.title}
+              {title}
             </p>
-            {action.href && (
+            {item.kind === "task" && item.action.href ? (
               <Link
-                href={action.href}
+                href={item.action.href}
                 className="text-muted-foreground hover:text-primary shrink-0"
                 aria-label="Ouvrir"
                 onClick={(e) => e.stopPropagation()}
               >
                 <ArrowUpRight className="size-4" />
               </Link>
-            )}
+            ) : null}
           </div>
-          {action.description && (
+          {item.kind === "task" && item.action.description ? (
             <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">
-              {action.description}
+              {item.action.description}
             </p>
-          )}
+          ) : null}
         </div>
       </div>
-      <ActionProgressCell status={action.status} />
+      {item.kind === "task" ? (
+        <ActionProgressCell action={item.action} />
+      ) : (
+        <div className="flex items-center gap-2">
+          <div className="bg-muted h-2 flex-1 overflow-hidden rounded-full">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-all"
+              style={{ width: `${progressForStatus(item.status)}%` }}
+            />
+          </div>
+          <span className="text-muted-foreground text-[10px]">Sous-tâche</span>
+        </div>
+      )}
       <div className="mt-3 flex items-center justify-between gap-2">
-        <ActionOwnerCell action={action} />
-        <ActionPriorityPill priority={action.priority} />
+        <ActionOwnerCell action={item.action} />
+        <ActionPriorityPill priority={item.priority} />
       </div>
       <p className="text-muted-foreground mt-2 text-xs">
-        {formatActionDueDate(action.dueDate)}
+        {formatActionDueDate(item.dueDate)}
       </p>
-      {action.editable && canDrag && action.status !== "DONE" && (
-        <div className="mt-3 flex gap-1 border-t pt-2">
-          {action.status === "TODO" && (
+      {item.editable && canDrag && item.status !== "DONE" ? (
+        <div
+          className="mt-3 flex gap-1 border-t pt-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {item.status === "TODO" ? (
             <button
               type="button"
               className="text-primary text-xs hover:underline"
@@ -109,8 +216,8 @@ function KanbanCard({
             >
               Démarrer
             </button>
-          )}
-          {action.status === "IN_PROGRESS" && (
+          ) : null}
+          {item.status === "IN_PROGRESS" ? (
             <button
               type="button"
               className="text-emerald-700 text-xs hover:underline"
@@ -118,9 +225,9 @@ function KanbanCard({
             >
               Terminer
             </button>
-          )}
+          ) : null}
         </div>
-      )}
+      ) : null}
     </article>
   );
 }
@@ -128,10 +235,14 @@ function KanbanCard({
 export function ActionsKanbanView({
   actions,
   canUpdate,
+  onOpenTask,
   onStatusChange,
+  onSubtaskStatusChange,
 }: ActionsKanbanViewProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<TaskStatusDto | null>(null);
+
+  const items = useMemo(() => buildKanbanItems(actions), [actions]);
 
   const handleDragEnd = useCallback(() => {
     setDraggingId(null);
@@ -150,35 +261,52 @@ export function ActionsKanbanView({
 
   const handleColumnDrop = (e: React.DragEvent, status: TaskStatusDto) => {
     e.preventDefault();
-    const id = e.dataTransfer.getData(DRAG_MIME);
-    if (!id || !canUpdate) {
+    const raw = e.dataTransfer.getData(DRAG_MIME);
+    if (!raw || !canUpdate) {
       handleDragEnd();
       return;
     }
 
-    const action = actions.find((a) => a.id === id);
-    if (!action?.editable || action.status === status) {
+    let payload: KanbanDragPayload;
+    try {
+      payload = JSON.parse(raw) as KanbanDragPayload;
+    } catch {
       handleDragEnd();
       return;
     }
 
-    onStatusChange(id, status);
+    if (payload.kind === "task") {
+      const action = actions.find((a) => a.id === payload.taskId);
+      if (!action?.editable || action.status === status) {
+        handleDragEnd();
+        return;
+      }
+      onStatusChange(payload.taskId, status);
+    } else {
+      const action = actions.find((a) => a.id === payload.taskId);
+      const sub = action?.subtasks?.find((s) => s.id === payload.subtaskId);
+      if (!action?.editable || !sub || sub.status === status) {
+        handleDragEnd();
+        return;
+      }
+      onSubtaskStatusChange(payload.taskId, payload.subtaskId, status);
+    }
+
     handleDragEnd();
   };
 
   return (
-    <div
-      className="grid gap-4 md:grid-cols-3"
-      onDragEnd={handleDragEnd}
-    >
+    <div className="grid gap-4 md:grid-cols-3" onDragEnd={handleDragEnd}>
       {KANBAN_COLUMNS.map((col) => {
-        const items = actions.filter((a) => a.status === col.status);
+        const colItems = items.filter((i) => i.status === col.status);
         const avgProgress =
-          items.length === 0
+          colItems.length === 0
             ? 0
             : Math.round(
-                items.reduce((s, a) => s + progressForStatus(a.status), 0) /
-                  items.length,
+                colItems.reduce(
+                  (s, i) => s + progressForStatus(i.status),
+                  0,
+                ) / colItems.length,
               );
         const isDropActive = dropTarget === col.status && draggingId != null;
 
@@ -198,7 +326,7 @@ export function ActionsKanbanView({
               <div>
                 <h3 className="text-sm font-semibold">{col.label}</h3>
                 <p className="text-muted-foreground text-xs">
-                  {items.length} action{items.length !== 1 ? "s" : ""}
+                  {colItems.length} carte{colItems.length !== 1 ? "s" : ""}
                   {canUpdate && " · glisser-déposer"}
                 </p>
               </div>
@@ -212,28 +340,37 @@ export function ActionsKanbanView({
                 isDropActive && "bg-primary/5",
               )}
             >
-              {items.length === 0 ? (
+              {colItems.length === 0 ? (
                 <p
                   className={cn(
                     "text-muted-foreground rounded-lg border border-dashed py-8 text-center text-xs",
                     isDropActive && "border-primary bg-primary/5 text-primary",
                   )}
                 >
-                  {isDropActive ? "Relâcher ici" : "Aucune action"}
+                  {isDropActive ? "Relâcher ici" : "Aucune carte"}
                 </p>
               ) : (
-                items.map((action) => {
-                  const canDrag = canUpdate && action.editable;
+                colItems.map((item) => {
+                  const canDrag = canUpdate && item.editable;
                   return (
                     <KanbanCard
-                      key={action.id}
-                      action={action}
+                      key={item.key}
+                      item={item}
                       canDrag={canDrag}
-                      isDragging={draggingId === action.id}
-                      onDragBegin={() => setDraggingId(action.id)}
-                      onStatusChange={(status) =>
-                        onStatusChange(action.id, status)
-                      }
+                      isDragging={draggingId === item.key}
+                      onDragBegin={() => setDraggingId(item.key)}
+                      onOpen={() => onOpenTask(item.action)}
+                      onStatusChange={(status) => {
+                        if (item.kind === "task") {
+                          onStatusChange(item.action.id, status);
+                        } else {
+                          onSubtaskStatusChange(
+                            item.action.id,
+                            item.subtask.id,
+                            status,
+                          );
+                        }
+                      }}
                     />
                   );
                 })

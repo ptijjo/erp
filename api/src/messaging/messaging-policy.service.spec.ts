@@ -81,4 +81,27 @@ describe('MessagingPolicyService', () => {
     );
     expect(scope).toBe(MessageThreadScope.MAIN_INTRA_POLE);
   });
+
+  it('autorise un DIRECTOR_* vers un autre pôle (préfixe)', () => {
+    const scope = service.assertCanExchange(
+      viewer({
+        sub: 'u1',
+        role: { id: 'r', name: 'DIRECTOR_HR', poleCode: 'Pole_HR' },
+      }),
+      peer({
+        poleCode: 'Pole_FINANCE',
+        roleName: 'DIRECTOR_FINANCE',
+      }),
+    );
+    expect(scope).toBe(MessageThreadScope.MAIN_CROSS_POLE);
+  });
+
+  it('autorise un rôle directeur custom préfixé DIRECTOR_', () => {
+    expect(service.canSendCrossPole(
+      viewer({
+        sub: 'u1',
+        role: { id: 'r', name: 'DIRECTOR_CUSTOM_POLE', poleCode: 'Pole_X' },
+      }),
+    )).toBe(true);
+  });
 });

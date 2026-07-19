@@ -17,8 +17,10 @@ import { PoliciesGuard } from '../casl/policies.guard';
 import { ActionsService } from './actions.service';
 import {
   CreateTaskDto,
+  CreateTaskSubtaskDto,
   ListActionsQueryDto,
   UpdateTaskDto,
+  UpdateTaskSubtaskDto,
 } from './dto/actions.dto';
 
 @Controller('actions')
@@ -33,6 +35,15 @@ export class ActionsController {
     @CurrentUser() viewer: AuthenticatedUser,
   ) {
     return this.actionsService.listActions(viewer, query.status);
+  }
+
+  @Get(':id')
+  @CheckPolicies({ action: 'read', subject: 'Task' })
+  getOne(
+    @Param('id') id: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.actionsService.getTask(id, viewer);
   }
 
   @Post()
@@ -58,5 +69,41 @@ export class ActionsController {
   @CheckPolicies({ action: 'delete', subject: 'Task' })
   remove(@Param('id') id: string, @CurrentUser() viewer: AuthenticatedUser) {
     return this.actionsService.removeTask(id, viewer);
+  }
+
+  @Post(':id/subtasks')
+  @CheckPolicies({ action: 'update', subject: 'Task' })
+  createSubtask(
+    @Param('id') id: string,
+    @Body() dto: CreateTaskSubtaskDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.actionsService.createSubtask(id, dto, viewer);
+  }
+
+  @Patch(':taskId/subtasks/:subtaskId')
+  @CheckPolicies({ action: 'update', subject: 'Task' })
+  updateSubtask(
+    @Param('taskId') taskId: string,
+    @Param('subtaskId') subtaskId: string,
+    @Body() dto: UpdateTaskSubtaskDto,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.actionsService.updateSubtask(
+      taskId,
+      subtaskId,
+      dto,
+      viewer,
+    );
+  }
+
+  @Delete(':taskId/subtasks/:subtaskId')
+  @CheckPolicies({ action: 'update', subject: 'Task' })
+  removeSubtask(
+    @Param('taskId') taskId: string,
+    @Param('subtaskId') subtaskId: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.actionsService.removeSubtask(taskId, subtaskId, viewer);
   }
 }

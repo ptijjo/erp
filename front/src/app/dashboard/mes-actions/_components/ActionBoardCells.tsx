@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Bot, MoreHorizontal, Trash2 } from "lucide-react";
+import { ArrowUpRight, Bot, ListTree, MoreHorizontal, Trash2 } from "lucide-react";
 
 import {
   PRIORITY_PILL_CLASS,
   STATUS_PILL_CLASS,
   formatShortDueDate,
-  progressForStatus,
+  formatSubtaskProgress,
+  progressForAction,
 } from "~/app/dashboard/mes-actions/_lib/action-board";
 import {
   ACTION_KIND_LABEL,
@@ -29,22 +30,30 @@ import type { ActionItemDto, TaskStatusDto } from "~/lib/api-types";
 import { cn } from "~/lib/utils";
 
 type ActionProgressCellProps = {
-  status: TaskStatusDto;
+  action: ActionItemDto;
 };
 
-export function ActionProgressCell({ status }: ActionProgressCellProps) {
-  const value = progressForStatus(status);
+export function ActionProgressCell({ action }: ActionProgressCellProps) {
+  const value = progressForAction(action);
+  const ratio = formatSubtaskProgress(action);
   return (
-    <div className="flex min-w-[120px] items-center gap-2">
-      <div className="bg-muted h-2 flex-1 overflow-hidden rounded-full">
-        <div
-          className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-          style={{ width: `${value}%` }}
-        />
+    <div className="flex min-w-[120px] flex-col gap-0.5">
+      <div className="flex items-center gap-2">
+        <div className="bg-muted h-2 flex-1 overflow-hidden rounded-full">
+          <div
+            className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+            style={{ width: `${value}%` }}
+          />
+        </div>
+        <span className="text-muted-foreground w-9 text-right text-xs tabular-nums">
+          {value}%
+        </span>
       </div>
-      <span className="text-muted-foreground w-9 text-right text-xs tabular-nums">
-        {value}%
-      </span>
+      {ratio ? (
+        <span className="text-muted-foreground text-[10px] tabular-nums">
+          Sous-tâches {ratio}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -133,6 +142,7 @@ type ActionRowMenuProps = {
   canDelete: boolean;
   onStatusChange: (status: TaskStatusDto) => void;
   onDelete: () => void;
+  onOpenSubtasks?: () => void;
 };
 
 export function ActionRowMenu({
@@ -141,6 +151,7 @@ export function ActionRowMenu({
   canDelete,
   onStatusChange,
   onDelete,
+  onOpenSubtasks,
 }: ActionRowMenuProps) {
   return (
     <DropdownMenu>
@@ -149,13 +160,13 @@ export function ActionRowMenu({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
+          className="size-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 data-[state=open]:opacity-100"
           aria-label="Actions"
         >
           <MoreHorizontal className="size-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-52">
         {action.href && (
           <DropdownMenuItem asChild>
             <Link href={action.href}>
@@ -164,6 +175,12 @@ export function ActionRowMenu({
             </Link>
           </DropdownMenuItem>
         )}
+        {action.editable && onOpenSubtasks ? (
+          <DropdownMenuItem onClick={onOpenSubtasks}>
+            <ListTree className="size-3.5" />
+            Gérer les sous-tâches
+          </DropdownMenuItem>
+        ) : null}
         {action.editable && canUpdate && (
           <>
             {action.status !== "TODO" && (
@@ -206,12 +223,18 @@ export function ActionRowMenu({
 }
 
 export function ActionDueDateCell({
+  startDate,
   dueDate,
   status,
 }: {
+  startDate?: string | null;
   dueDate: string | null;
   status: TaskStatusDto;
 }) {
+  const label =
+    startDate != null && startDate !== ""
+      ? `${formatShortDueDate(startDate)} → ${formatShortDueDate(dueDate)}`
+      : formatShortDueDate(dueDate);
   return (
     <span
       className={cn(
@@ -219,7 +242,7 @@ export function ActionDueDateCell({
         dueDate && status !== "DONE" && "font-medium",
       )}
     >
-      {formatShortDueDate(dueDate)}
+      {label}
     </span>
   );
 }

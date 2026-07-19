@@ -73,6 +73,11 @@ const config = {
         destination: "/dashboard/comptabilite",
         permanent: false,
       },
+      {
+        source: "/dashboard/commandes-inter-filiales",
+        destination: "/dashboard/stocks",
+        permanent: false,
+      },
     ];
   },
 };

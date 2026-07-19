@@ -74,14 +74,19 @@ export class MessagingService {
     const eligible: MessagingContactDto[] = [];
 
     for (const entry of entries) {
-      if (!entry.userId || entry.userId === viewer.sub) {
+      const userId =
+        entry.userId ??
+        (entry.email
+          ? await this.resolveUserIdByEmail(entry.email)
+          : null);
+      if (!userId || userId === viewer.sub) {
         continue;
       }
       try {
-        const peer = await this.policy.loadPeer(entry.userId);
+        const peer = await this.policy.loadPeer(userId);
         this.policy.assertCanExchange(viewer, peer);
         eligible.push({
-          id: entry.userId,
+          id: userId,
           email: entry.email ?? peer.email,
           firstName: entry.firstName,
           lastName: entry.lastName,
@@ -106,6 +111,14 @@ export class MessagingService {
       }
     }
     return eligible;
+  }
+
+  private async resolveUserIdByEmail(email: string): Promise<string | null> {
+    const user = await this.prisma.user.findFirst({
+      where: { email, deletedAt: null },
+      select: { id: true },
+    });
+    return user?.id ?? null;
   }
 
   async listThreads(viewer: AuthenticatedUser) {

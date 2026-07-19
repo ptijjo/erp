@@ -1,10 +1,25 @@
-import type { ActionItemDto } from "~/lib/api-types";
+import type {
+  ActionItemDto,
+  TaskStatusDto,
+  TaskSubtaskDto,
+} from "~/lib/api-types";
+
+export type GanttRowKind = "parent" | "subtask";
 
 export type GanttItem = {
-  action: ActionItemDto;
+  id: string;
+  kind: GanttRowKind;
+  depth: number;
+  title: string;
+  status: TaskStatusDto;
+  startDate: string | null;
+  dueDate: string | null;
   start: Date;
   end: Date;
   hasDueDate: boolean;
+  /** Action parent (pour href / chips). */
+  action: ActionItemDto;
+  subtask?: TaskSubtaskDto;
 };
 
 export type GanttTimeline = {
@@ -34,25 +49,113 @@ function startOfWeekMonday(d: Date): Date {
   return addDays(day, diff);
 }
 
+function resolveStart(
+  plannedStart: string | null | undefined,
+  fallbackIso: string,
+): Date {
+  if (plannedStart) {
+    const d = startOfDay(new Date(plannedStart));
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return startOfDay(new Date(fallbackIso));
+}
+
+function parentBar(action: ActionItemDto): {
+  start: Date;
+  end: Date;
+  hasDueDate: boolean;
+} {
+  const start = resolveStart(action.startDate, action.createdAt);
+  let end: Date;
+  let hasDueDate = false;
+
+  if (action.dueDate) {
+    end = startOfDay(new Date(action.dueDate));
+    hasDueDate = true;
+  } else {
+    end = addDays(start, 1);
+  }
+
+  if (end.getTime() < start.getTime()) {
+    end = addDays(start, 1);
+  }
+
+  return { start, end, hasDueDate };
+}
+
+function subtaskBar(
+  parent: ActionItemDto,
+  sub: TaskSubtaskDto,
+): { start: Date; end: Date; hasDueDate: boolean } {
+  const start = resolveStart(sub.startDate, sub.createdAt);
+  let end: Date;
+  let hasDueDate = false;
+
+  if (sub.dueDate) {
+    end = startOfDay(new Date(sub.dueDate));
+    hasDueDate = true;
+  } else if (parent.dueDate) {
+    end = startOfDay(new Date(parent.dueDate));
+    hasDueDate = true;
+  } else {
+    end = addDays(start, 1);
+  }
+
+  if (end.getTime() < start.getTime()) {
+    end = addDays(start, 1);
+  }
+
+  return { start, end, hasDueDate };
+}
+
+/** Lignes Gantt hiérarchiques : parent puis sous-tâches indentées. */
 export function buildGanttItems(actions: ActionItemDto[]): GanttItem[] {
-  return actions.map((action) => {
-    const start = startOfDay(new Date(action.createdAt));
-    let end: Date;
-    let hasDueDate = false;
-
-    if (action.dueDate) {
-      end = startOfDay(new Date(action.dueDate));
-      hasDueDate = true;
-    } else {
-      end = addDays(start, 1);
-    }
-
-    if (end.getTime() < start.getTime()) {
-      end = addDays(start, 1);
-    }
-
-    return { action, start, end, hasDueDate };
+  const sortedParents = [...actions].sort((a, b) => {
+    const aStart = resolveStart(a.startDate, a.createdAt).getTime();
+    const bStart = resolveStart(b.startDate, b.createdAt).getTime();
+    if (aStart !== bStart) return aStart - bStart;
+    return a.title.localeCompare(b.title, "fr");
   });
+
+  const rows: GanttItem[] = [];
+
+  for (const action of sortedParents) {
+    const bar = parentBar(action);
+    rows.push({
+      id: action.id,
+      kind: "parent",
+      depth: 0,
+      title: action.title,
+      status: action.status,
+      startDate: action.startDate ?? null,
+      dueDate: action.dueDate,
+      start: bar.start,
+      end: bar.end,
+      hasDueDate: bar.hasDueDate,
+      action,
+    });
+
+    const subtasks = action.subtasks ?? [];
+    for (const sub of subtasks) {
+      const subBar = subtaskBar(action, sub);
+      rows.push({
+        id: `${action.id}:${sub.id}`,
+        kind: "subtask",
+        depth: 1,
+        title: sub.title,
+        status: sub.status,
+        startDate: sub.startDate,
+        dueDate: sub.dueDate,
+        start: subBar.start,
+        end: subBar.end,
+        hasDueDate: subBar.hasDueDate,
+        action,
+        subtask: sub,
+      });
+    }
+  }
+
+  return rows;
 }
 
 export function computeGanttTimeline(items: GanttItem[]): GanttTimeline {
@@ -118,19 +221,13 @@ export function ganttBarMetrics(
   };
 }
 
-export const GANTT_STATUS_BAR_CLASS: Record<
-  ActionItemDto["status"],
-  string
-> = {
+export const GANTT_STATUS_BAR_CLASS: Record<TaskStatusDto, string> = {
   TODO: "bg-orange-400/90",
   IN_PROGRESS: "bg-amber-400/90",
   DONE: "bg-emerald-500/90",
 };
 
+/** @deprecated Prefer buildGanttItems (already sorted). */
 export function sortGanttItems(items: GanttItem[]): GanttItem[] {
-  return [...items].sort((a, b) => {
-    const dueDiff = a.start.getTime() - b.start.getTime();
-    if (dueDiff !== 0) return dueDiff;
-    return a.action.title.localeCompare(b.action.title, "fr");
-  });
+  return items;
 }

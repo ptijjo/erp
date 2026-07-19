@@ -43,9 +43,6 @@ export const ROUTE_GUARDS: Record<string, RouteGuardRule> = {
   "/dashboard/stocks": {
     permission: { action: "read", subject: "Stock" },
   },
-  "/dashboard/commandes-inter-filiales": {
-    permission: { action: "read", subject: "StockOrder" },
-  },
   "/dashboard/budgets": {
     permission: { action: "read", subject: "Budget" },
   },

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 
+import { useRealtimeStatus } from "~/components/layout/realtime-status-context";
 import { useRealtimeSse } from "~/hooks/use-realtime-sse";
 import { hasMePermission, useMe } from "~/hooks/use-me";
 import { playErpSound, unlockNotificationAudio } from "~/lib/erp-sounds";
@@ -22,6 +23,7 @@ export function RealtimeBridge() {
   const { data: me } = useMe();
   const pathname = usePathname();
   const router = useRouter();
+  const { setSseConnected } = useRealtimeStatus();
 
   const canNotify =
     me != null && hasMePermission(me, "read", "Notification");
@@ -43,6 +45,7 @@ export function RealtimeBridge() {
   }, []);
 
   useRealtimeSse(canNotify || canMessage, {
+    onConnectionChange: setSseConnected,
     onNotification: canNotify
       ? (payload: RealtimeNotificationPayload) => {
           playErpSound("notification");

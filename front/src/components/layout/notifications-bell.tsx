@@ -13,9 +13,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { useRealtimeSseConnected } from "~/components/layout/realtime-status-context";
 import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { NotificationDto } from "~/lib/api-types";
+
+/** Polling de secours uniquement si le SSE est down. */
+const POLL_WHEN_SSE_DOWN_MS = 30_000;
 
 function formatRelativeTime(iso: string): string {
   const date = new Date(iso);
@@ -35,6 +39,7 @@ export function NotificationsBell() {
   const router = useRouter();
   const { data: me } = useMe();
   const queryClient = useQueryClient();
+  const sseConnected = useRealtimeSseConnected();
   const canRead = me != null && hasMePermission(me, "read", "Notification");
   const canUpdate = me != null && hasMePermission(me, "update", "Notification");
 
@@ -47,7 +52,7 @@ export function NotificationsBell() {
       return data;
     },
     enabled: canRead,
-    refetchInterval: 15_000,
+    refetchInterval: sseConnected ? false : POLL_WHEN_SSE_DOWN_MS,
     refetchIntervalInBackground: false,
   });
 

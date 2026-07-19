@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { Prisma } from '../generated/prisma/client';
 
 const SENSITIVE_KEYS = new Set([
   'password',
@@ -15,12 +16,20 @@ const SENSITIVE_KEYS = new Set([
   'accessToken',
 ]);
 
+function isPrismaDecimal(value: object): boolean {
+  return value instanceof Prisma.Decimal;
+}
+
 function stripSensitive(value: unknown): unknown {
   if (value == null || typeof value !== 'object') {
     return value;
   }
   if (value instanceof Date) {
     return value;
+  }
+  if (isPrismaDecimal(value)) {
+    // String JSON-safe : sinon Object.entries casse Decimal → front parse à 0
+    return value.toString();
   }
   if (Array.isArray(value)) {
     return value.map(stripSensitive);

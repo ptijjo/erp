@@ -12,6 +12,14 @@ const CROSS_POLE_MESSENGER_ROLES = new Set<string>([
   ...MAISON_MERE_POLES.map((p) => p.directorRoleName),
 ]);
 
+/** ADMIN, DG, et tout rôle `DIRECTOR_*` (seed ou créé ensuite). */
+export function isCrossPoleMessengerRole(roleName: string): boolean {
+  const name = roleName.trim();
+  if (!name) return false;
+  if (CROSS_POLE_MESSENGER_ROLES.has(name)) return true;
+  return name.startsWith('DIRECTOR_');
+}
+
 export type MessagingPeer = {
   id: string;
   email: string;
@@ -28,7 +36,7 @@ export class MessagingPolicyService {
   constructor(private readonly prisma: PrismaService) {}
 
   canSendCrossPole(viewer: AuthenticatedUser): boolean {
-    return CROSS_POLE_MESSENGER_ROLES.has(viewer.role.name);
+    return isCrossPoleMessengerRole(viewer.role.name);
   }
 
   async loadPeer(userId: string): Promise<MessagingPeer> {
@@ -90,10 +98,6 @@ export class MessagingPolicyService {
 
     if (vPole && tPole && vPole === tPole) {
       return MessageThreadScope.MAIN_INTRA_POLE;
-    }
-
-    if (!vPole && !tPole && this.canSendCrossPole(viewer)) {
-      return MessageThreadScope.MAIN_CROSS_POLE;
     }
 
     if (this.canSendCrossPole(viewer)) {

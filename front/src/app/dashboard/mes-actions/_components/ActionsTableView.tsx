@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, ListTree, Plus } from "lucide-react";
 import { useState } from "react";
 
 import type { ActionGroup } from "~/app/dashboard/mes-actions/_lib/action-board";
@@ -26,6 +26,7 @@ type ActionsTableViewProps = {
   onAddTask: (groupId: ActionGroup["id"]) => void;
   onStatusChange: (id: string, status: TaskStatusDto) => void;
   onDelete: (id: string) => void;
+  onOpenTask?: (action: ActionItemDto) => void;
 };
 
 function ActionTableRow({
@@ -34,12 +35,14 @@ function ActionTableRow({
   canDelete,
   onStatusChange,
   onDelete,
+  onOpenTask,
 }: {
   action: ActionItemDto;
   canUpdate: boolean;
   canDelete: boolean;
   onStatusChange: (status: TaskStatusDto) => void;
   onDelete: () => void;
+  onOpenTask?: () => void;
 }) {
   return (
     <tr
@@ -61,20 +64,52 @@ function ActionTableRow({
         />
       </td>
       <td className="min-w-[220px] px-3 py-2.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <span
-            className={cn(
-              "truncate text-sm font-medium",
-              action.status === "DONE" && "text-muted-foreground line-through",
-            )}
-          >
-            {action.title}
-          </span>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {action.kind === "MANUAL" && onOpenTask ? (
+            <button
+              type="button"
+              onClick={onOpenTask}
+              className={cn(
+                "truncate text-left text-sm font-medium text-primary hover:underline",
+                action.status === "DONE" &&
+                  "text-muted-foreground line-through",
+              )}
+            >
+              {action.title}
+            </button>
+          ) : (
+            <span
+              className={cn(
+                "truncate text-sm font-medium",
+                action.status === "DONE" &&
+                  "text-muted-foreground line-through",
+              )}
+            >
+              {action.title}
+            </span>
+          )}
           {action.kind === "SYSTEM" && (
             <span className="bg-violet-100 text-violet-700 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
               {ACTION_KIND_LABEL.SYSTEM}
             </span>
           )}
+          {action.subtaskProgress && action.subtaskProgress.total > 0 ? (
+            <span className="text-muted-foreground shrink-0 text-[10px] tabular-nums">
+              {action.subtaskProgress.done}/{action.subtaskProgress.total}
+            </span>
+          ) : null}
+          {action.kind === "MANUAL" && onOpenTask ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 gap-1 px-2 text-xs"
+              onClick={onOpenTask}
+            >
+              <ListTree className="size-3.5" />
+              Sous-tâches
+            </Button>
+          ) : null}
           {action.href && (
             <Link
               href={action.href}
@@ -94,7 +129,7 @@ function ActionTableRow({
         <ActionOwnerCell action={action} />
       </td>
       <td className="hidden px-3 py-2.5 lg:table-cell">
-        <ActionProgressCell status={action.status} />
+        <ActionProgressCell action={action} />
       </td>
       <td className="px-3 py-2.5">
         {action.editable && canUpdate ? (
@@ -121,7 +156,11 @@ function ActionTableRow({
         <ActionPriorityPill priority={action.priority} />
       </td>
       <td className="hidden px-3 py-2.5 sm:table-cell">
-        <ActionDueDateCell dueDate={action.dueDate} status={action.status} />
+        <ActionDueDateCell
+          startDate={action.startDate}
+          dueDate={action.dueDate}
+          status={action.status}
+        />
       </td>
       <td className="w-10 px-1 py-2">
         <ActionRowMenu
@@ -130,6 +169,7 @@ function ActionTableRow({
           canDelete={canDelete}
           onStatusChange={onStatusChange}
           onDelete={onDelete}
+          onOpenSubtasks={onOpenTask}
         />
       </td>
     </tr>
@@ -144,6 +184,7 @@ function ActionGroupSection({
   onAddTask,
   onStatusChange,
   onDelete,
+  onOpenTask,
 }: {
   group: ActionGroup;
   canCreate: boolean;
@@ -152,6 +193,7 @@ function ActionGroupSection({
   onAddTask: () => void;
   onStatusChange: (id: string, status: TaskStatusDto) => void;
   onDelete: (id: string) => void;
+  onOpenTask?: (action: ActionItemDto) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -198,6 +240,9 @@ function ActionGroupSection({
                   canDelete={canDelete}
                   onStatusChange={(status) => onStatusChange(action.id, status)}
                   onDelete={() => onDelete(action.id)}
+                  onOpenTask={
+                    onOpenTask ? () => onOpenTask(action) : undefined
+                  }
                 />
               ))}
               {canCreate && (
@@ -232,6 +277,7 @@ export function ActionsTableView({
   onAddTask,
   onStatusChange,
   onDelete,
+  onOpenTask,
 }: ActionsTableViewProps) {
   return (
     <div className="space-y-4">
@@ -245,6 +291,7 @@ export function ActionsTableView({
           onAddTask={() => onAddTask(group.id)}
           onStatusChange={onStatusChange}
           onDelete={onDelete}
+          onOpenTask={onOpenTask}
         />
       ))}
     </div>

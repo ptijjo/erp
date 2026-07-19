@@ -37,6 +37,10 @@ export class CreateTaskDto {
 
   @IsOptional()
   @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
   dueDate?: string;
 
   @IsUUID()
@@ -78,6 +82,10 @@ export class UpdateTaskDto {
 
   @IsOptional()
   @IsDateString()
+  startDate?: string | null;
+
+  @IsOptional()
+  @IsDateString()
   dueDate?: string | null;
 
   @IsOptional()
@@ -94,4 +102,51 @@ export class ListActionsQueryDto {
   @IsOptional()
   @IsEnum(TASK_STATUSES)
   status?: (typeof TASK_STATUSES)[number];
+}
+
+export class CreateTaskSubtaskDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  title!: string;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dueDate?: string;
+
+  @IsOptional()
+  @IsEnum(TASK_STATUSES)
+  status?: (typeof TASK_STATUSES)[number];
+
+  @IsOptional()
+  @IsEnum(TASK_PRIORITIES)
+  priority?: (typeof TASK_PRIORITIES)[number];
+}
+
+export class UpdateTaskSubtaskDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  title?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  dueDate?: string | null;
+
+  @IsOptional()
+  @IsEnum(TASK_STATUSES)
+  status?: (typeof TASK_STATUSES)[number];
+
+  @IsOptional()
+  @IsEnum(TASK_PRIORITIES)
+  priority?: (typeof TASK_PRIORITIES)[number];
 }

@@ -14,7 +14,6 @@ import {
   buildGanttItems,
   computeGanttTimeline,
   ganttBarMetrics,
-  sortGanttItems,
 } from "~/app/dashboard/mes-actions/_lib/gantt-layout";
 import { formatShortDueDate } from "~/app/dashboard/mes-actions/_lib/action-board";
 import type { ActionItemDto, TaskStatusDto } from "~/lib/api-types";
@@ -27,16 +26,17 @@ const STATUS_OPTIONS = Object.entries(TASK_STATUS_LABEL) as [
 
 type ActionsGanttViewProps = {
   actions: ActionItemDto[];
+  onOpenTask?: (action: ActionItemDto) => void;
 };
 
 const ROW_HEIGHT = 44;
-const LABEL_WIDTH = 240;
+const LABEL_WIDTH = 260;
 
-export function ActionsGanttView({ actions }: ActionsGanttViewProps) {
-  const ganttItems = useMemo(
-    () => sortGanttItems(buildGanttItems(actions)),
-    [actions],
-  );
+export function ActionsGanttView({
+  actions,
+  onOpenTask,
+}: ActionsGanttViewProps) {
+  const ganttItems = useMemo(() => buildGanttItems(actions), [actions]);
   const timeline = useMemo(
     () => computeGanttTimeline(ganttItems),
     [ganttItems],
@@ -58,6 +58,8 @@ export function ActionsGanttView({ actions }: ActionsGanttViewProps) {
       </p>
     );
   }
+
+  const parentChips = ganttItems.filter((i) => i.kind === "parent");
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
@@ -86,7 +88,6 @@ export function ActionsGanttView({ actions }: ActionsGanttViewProps) {
           className="relative min-w-[720px]"
           style={{ minHeight: ganttItems.length * ROW_HEIGHT + 48 }}
         >
-          {/* En-tête timeline */}
           <div className="sticky top-0 z-20 flex border-b bg-background">
             <div
               className="shrink-0 border-r"
@@ -108,7 +109,6 @@ export function ActionsGanttView({ actions }: ActionsGanttViewProps) {
             </div>
           </div>
 
-          {/* Corps + ligne aujourd'hui */}
           <div className="relative flex">
             <div className="shrink-0" style={{ width: LABEL_WIDTH }} />
             <div className="relative flex-1">
@@ -122,11 +122,11 @@ export function ActionsGanttView({ actions }: ActionsGanttViewProps) {
 
               {ganttItems.map((item, index) => {
                 const { leftPct, widthPct } = ganttBarMetrics(item, timeline);
-                const { action } = item;
+                const endLabel = formatShortDueDate(item.dueDate);
 
                 return (
                   <div
-                    key={action.id}
+                    key={item.id}
                     className={cn(
                       "relative border-b border-border/50",
                       index % 2 === 0 ? "bg-background" : "bg-muted/10",
@@ -135,7 +135,7 @@ export function ActionsGanttView({ actions }: ActionsGanttViewProps) {
                   >
                     {timeline.weekMarkers.map((marker) => (
                       <div
-                        key={`${action.id}-${marker.date.toISOString()}`}
+                        key={`${item.id}-${marker.date.toISOString()}`}
                         className="bg-border/40 absolute top-0 bottom-0 w-px"
                         style={{ left: `${marker.offsetPct}%` }}
                       />
@@ -148,18 +148,22 @@ export function ActionsGanttView({ actions }: ActionsGanttViewProps) {
                         width: `${widthPct}%`,
                         minWidth: item.hasDueDate ? 24 : 8,
                       }}
-                      title={`${action.title} — ${TASK_STATUS_LABEL[action.status]}`}
+                      title={`${item.title} — ${TASK_STATUS_LABEL[item.status]} — fin ${endLabel}`}
                     >
                       <div
                         className={cn(
                           "flex h-full w-full items-center overflow-hidden rounded-md px-2 shadow-sm",
-                          GANTT_STATUS_BAR_CLASS[action.status],
-                          action.kind === "SYSTEM" &&
+                          GANTT_STATUS_BAR_CLASS[item.status],
+                          item.kind === "subtask" && "h-5 opacity-90",
+                          item.action.kind === "SYSTEM" &&
+                            item.kind === "parent" &&
                             "ring-1 ring-violet-300 ring-inset",
                         )}
                       >
                         <span className="truncate text-[10px] font-medium text-white drop-shadow-sm">
-                          {action.title}
+                          {item.kind === "subtask"
+                            ? `${item.title} · ${endLabel}`
+                            : item.title}
                         </span>
                       </div>
                     </div>
@@ -169,61 +173,92 @@ export function ActionsGanttView({ actions }: ActionsGanttViewProps) {
             </div>
           </div>
 
-          {/* Labels tâches (colonne gauche sticky) */}
           <div
             className="pointer-events-none absolute top-10 left-0 z-10"
             style={{ width: LABEL_WIDTH }}
           >
-            {ganttItems.map((item, index) => {
-              const { action } = item;
-              return (
-                <div
-                  key={`label-${action.id}`}
-                  className={cn(
-                    "pointer-events-auto flex items-center gap-2 border-r border-b border-border/50 px-3",
-                    index % 2 === 0 ? "bg-background" : "bg-muted/10",
-                  )}
-                  style={{ height: ROW_HEIGHT }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{action.title}</p>
-                    <p className="text-muted-foreground truncate text-[10px]">
-                      {formatShortDueDate(action.dueDate)}
-                      {!item.hasDueDate && " · sans échéance"}
-                    </p>
-                  </div>
-                  {action.href && (
-                    <Link
-                      href={action.href}
-                      className="text-muted-foreground hover:text-primary shrink-0"
-                      aria-label="Ouvrir"
-                    >
-                      <ArrowUpRight className="size-3.5" />
-                    </Link>
-                  )}
+            {ganttItems.map((item, index) => (
+              <div
+                key={`label-${item.id}`}
+                className={cn(
+                  "pointer-events-auto flex items-center gap-2 border-r border-b border-border/50 px-3",
+                  index % 2 === 0 ? "bg-background" : "bg-muted/10",
+                )}
+                style={{
+                  height: ROW_HEIGHT,
+                  paddingLeft: 12 + item.depth * 16,
+                }}
+              >
+                <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    className={cn(
+                      "block w-full truncate text-left text-sm font-medium hover:underline",
+                      item.kind === "subtask" && "text-sm font-normal",
+                      item.action.kind === "MANUAL" &&
+                        item.kind === "parent" &&
+                        onOpenTask &&
+                        "cursor-pointer",
+                    )}
+                    disabled={
+                      !(
+                        item.action.kind === "MANUAL" &&
+                        item.kind === "parent" &&
+                        onOpenTask
+                      )
+                    }
+                    onClick={() => {
+                      if (item.kind === "parent" && onOpenTask) {
+                        onOpenTask(item.action);
+                      }
+                    }}
+                  >
+                    {item.kind === "subtask" ? `↳ ${item.title}` : item.title}
+                  </button>
+                  <p className="text-muted-foreground truncate text-[10px]">
+                    {TASK_STATUS_LABEL[item.status]}
+                    {" · "}
+                    {formatShortDueDate(item.startDate)}
+                    {" → "}
+                    {formatShortDueDate(item.dueDate)}
+                    {!item.hasDueDate && " · sans échéance"}
+                  </p>
                 </div>
-              );
-            })}
+                {item.kind === "parent" && item.action.href ? (
+                  <Link
+                    href={item.action.href}
+                    className="text-muted-foreground hover:text-primary shrink-0"
+                    aria-label="Ouvrir"
+                  >
+                    <ArrowUpRight className="size-3.5" />
+                  </Link>
+                ) : null}
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Détail compact sous le Gantt */}
       <div className="border-t bg-muted/10 px-4 py-3">
         <div className="flex flex-wrap gap-2">
-          {ganttItems.slice(0, 8).map(({ action }) => (
+          {parentChips.slice(0, 8).map((item) => (
             <div
-              key={`chip-${action.id}`}
+              key={`chip-${item.id}`}
               className="inline-flex items-center gap-2 rounded-md border bg-background px-2 py-1"
             >
-              <ActionStatusPill status={action.status} className="min-w-0 px-2 py-0.5 text-[10px]" />
-              <ActionPriorityPill priority={action.priority} />
-              <span className="max-w-[140px] truncate text-xs">{action.title}</span>
+              <ActionStatusPill
+                status={item.status}
+                className="min-w-0 px-2 py-0.5 text-[10px]"
+              />
+              <ActionPriorityPill priority={item.action.priority} />
+              <span className="max-w-[140px] truncate text-xs">
+                {item.title}
+              </span>
             </div>
           ))}
-          {ganttItems.length > 8 && (
+          {parentChips.length > 8 && (
             <span className="text-muted-foreground self-center text-xs">
-              +{ganttItems.length - 8} autres
+              +{parentChips.length - 8} autres
             </span>
           )}
         </div>

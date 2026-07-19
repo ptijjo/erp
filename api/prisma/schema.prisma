@@ -390,6 +390,7 @@ model Organization {
   notifications            Notification[]
   accountingPeriodClosures AccountingPeriodClosure[]
   tasks                    Task[]
+  taskSubtasks             TaskSubtask[]
   strategyProjects         StrategyProject[]
   marketingCampaigns       MarketingCampaign[]
   spiritualEvents          SpiritualEvent[]
@@ -1538,6 +1539,7 @@ model Task {
   status      TaskStatus   @default(TODO)
   priority    TaskPriority @default(NORMAL)
   scope       TaskScope    @default(USER)
+  startDate   DateTime?
   dueDate     DateTime?
   completedAt DateTime?
   createdAt   DateTime     @default(now())
@@ -1555,11 +1557,42 @@ model Task {
   /// Scope POLE : code pôle maison mère (ex. Pole_FINANCE).
   poleCode String?
 
+  subtasks TaskSubtask[]
+
   @@index([organizationId])
   @@index([assigneeUserId])
   @@index([createdByUserId])
   @@index([status])
+  @@index([startDate])
   @@index([dueDate])
   @@index([scope])
   @@index([poleCode])
+}
+
+/// Sous-tâche d’une Task manuelle — avancement parent = done / total.
+model TaskSubtask {
+  id          String       @id @default(uuid())
+  title       String
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(NORMAL)
+  startDate   DateTime?
+  dueDate     DateTime?
+  sortOrder   Int          @default(0)
+  completedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  /// Dénormalisé pour RLS tenant (même org que la tâche parent).
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([taskId])
+  @@index([organizationId])
+  @@index([startDate])
+  @@index([dueDate])
+  @@index([status])
+  @@index([priority])
 }

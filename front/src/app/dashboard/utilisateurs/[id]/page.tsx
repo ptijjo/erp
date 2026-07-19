@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, MessageSquare } from "lucide-react";
 
 import { DashboardTitleBar } from "~/components/layout/dashboard-title-bar";
 import { hasMePermission, useMe } from "~/hooks/use-me";
@@ -24,6 +24,7 @@ export default function UserDetailPage() {
   const { data: me } = useMe();
   const canUpdateUser = me != null && hasMePermission(me, "update", "User");
   const canDeleteUser = me != null && hasMePermission(me, "delete", "User");
+  const canMessage = me != null && hasMePermission(me, "create", "Message");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const params = useParams();
   const id =
@@ -72,6 +73,15 @@ export default function UserDetailPage() {
             </Link>
             {user && !isLoading && !isError ? (
               <>
+                {canMessage && !isSelf ? (
+                  <Link
+                    href={`/dashboard/messages?userId=${id}`}
+                    className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-900 transition-colors hover:bg-sky-100 sm:w-fit"
+                  >
+                    <MessageSquare className="size-4 shrink-0" />
+                    Écrire un message
+                  </Link>
+                ) : null}
                 {canUpdateUser ? (
                   <Link
                     href={`/dashboard/utilisateurs/${id}/edit`}

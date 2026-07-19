@@ -114,6 +114,23 @@ export function progressForStatus(status: TaskStatusDto): number {
   }
 }
 
+/** Avancement : sous-tâches si présentes, sinon statut parent. */
+export function progressForAction(action: ActionItemDto): number {
+  const progress = action.subtaskProgress;
+  if (progress != null && progress.total > 0) {
+    return progress.percent;
+  }
+  return progressForStatus(action.status);
+}
+
+export function formatSubtaskProgress(action: ActionItemDto): string | null {
+  const progress = action.subtaskProgress;
+  if (progress == null || progress.total === 0) {
+    return null;
+  }
+  return `${progress.done}/${progress.total}`;
+}
+
 export function formatShortDueDate(iso: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);

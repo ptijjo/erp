@@ -29,6 +29,7 @@ type CreateTaskPanelProps = {
   open: boolean;
   title: string;
   description: string;
+  startDate: string;
   dueDate: string;
   priority: TaskPriorityDto;
   scope: TaskScopeDto;
@@ -42,6 +43,7 @@ type CreateTaskPanelProps = {
   pending: boolean;
   onTitleChange: (v: string) => void;
   onDescriptionChange: (v: string) => void;
+  onStartDateChange: (v: string) => void;
   onDueDateChange: (v: string) => void;
   onPriorityChange: (v: TaskPriorityDto) => void;
   onScopeChange: (v: TaskScopeDto) => void;
@@ -62,6 +64,7 @@ export function CreateTaskPanel({
   open,
   title,
   description,
+  startDate,
   dueDate,
   priority,
   scope,
@@ -75,6 +78,7 @@ export function CreateTaskPanel({
   pending,
   onTitleChange,
   onDescriptionChange,
+  onStartDateChange,
   onDueDateChange,
   onPriorityChange,
   onScopeChange,
@@ -121,8 +125,8 @@ export function CreateTaskPanel({
           onSubmit();
         }}
       >
-        <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <div className="space-y-2">
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="space-y-2 lg:col-span-1">
             <Label htmlFor="task-title">Titre</Label>
             <Input
               id="task-title"
@@ -134,7 +138,16 @@ export function CreateTaskPanel({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="task-due">Échéance</Label>
+            <Label htmlFor="task-start">Date de début</Label>
+            <Input
+              id="task-start"
+              type="date"
+              value={startDate}
+              onChange={(e) => onStartDateChange(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="task-due">Date butoir</Label>
             <Input
               id="task-due"
               type="date"

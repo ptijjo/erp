@@ -4,7 +4,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { AppThrottlerGuard } from './common/app-throttler.guard';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
@@ -100,8 +101,9 @@ import { AccountingModule } from './accounting/accounting.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
+        // Défaut 600/min : un dashboard SPA dépasse facilement 120/min (polls + listes).
         const limit =
-          parseInt(config.get<string>('THROTTLE_LIMIT') ?? '120', 10) || 120;
+          parseInt(config.get<string>('THROTTLE_LIMIT') ?? '600', 10) || 600;
         const ttl =
           parseInt(config.get<string>('THROTTLE_TTL_MS') ?? '60000', 10) ||
           60_000;
@@ -117,7 +119,7 @@ import { AccountingModule } from './accounting/accounting.module';
     AppService,
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: AppThrottlerGuard,
     },
     {
       provide: APP_INTERCEPTOR,

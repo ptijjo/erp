@@ -14,6 +14,8 @@ import {
 type RealtimeHandlers = {
   onNotification?: (payload: RealtimeNotificationPayload) => void;
   onMessage?: (payload: RealtimeMessagePayload) => void;
+  /** Notifie l’UI (polling de secours si false). */
+  onConnectionChange?: (connected: boolean) => void;
 };
 
 const MAX_BACKOFF_MS = 30_000;
@@ -30,7 +32,7 @@ async function refreshSessionQuietly(): Promise<boolean> {
 
 /**
  * Connexion SSE temps réel.
- * Sur erreur (JWT expiré, redémarrage API) : refresh cookie puis reconnexion.
+ * Refresh JWT seulement après une erreur de flux (pas à chaque connect).
  */
 export function useRealtimeSse(
   enabled: boolean,
@@ -44,13 +46,21 @@ export function useRealtimeSse(
   });
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      handlersRef.current.onConnectionChange?.(false);
+      return;
+    }
 
     let es: EventSource | null = null;
     let disposed = false;
     let retryMs = INITIAL_BACKOFF_MS;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let connecting = false;
+    let refreshBeforeNextConnect = false;
+
+    const setConnected = (connected: boolean) => {
+      handlersRef.current.onConnectionChange?.(connected);
+    };
 
     const invalidateNotificationQueries = () => {
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
@@ -94,27 +104,32 @@ export function useRealtimeSse(
       try {
         es?.close();
         es = null;
+        setConnected(false);
 
-        // EventSource ne peut pas rafraîchir le JWT : on le fait avant chaque tentative.
-        await refreshSessionQuietly();
-        if (disposed) return;
+        if (refreshBeforeNextConnect) {
+          refreshBeforeNextConnect = false;
+          await refreshSessionQuietly();
+          if (disposed) return;
+        }
 
         const url = `${getApiBaseUrl()}/realtime/events`;
         es = new EventSource(url, { withCredentials: true });
 
         es.addEventListener("notification", onNotificationEvent);
         es.addEventListener("message", onMessageEvent);
-        // `ping` ignoré volontairement (garde la connexion ouverte).
 
         es.onopen = () => {
           retryMs = INITIAL_BACKOFF_MS;
+          setConnected(true);
         };
 
         es.onerror = () => {
+          setConnected(false);
           es?.removeEventListener("notification", onNotificationEvent);
           es?.removeEventListener("message", onMessageEvent);
           es?.close();
           es = null;
+          refreshBeforeNextConnect = true;
           if (disposed) return;
           scheduleReconnect();
         };
@@ -127,8 +142,10 @@ export function useRealtimeSse(
 
     const onVisibility = () => {
       if (document.visibilityState !== "visible" || disposed) return;
-      // Onglet de retour : forcer une reconnexion fraîche.
+      // Reconnect seulement si le flux est mort (évite spam refresh + 429).
+      if (es != null && es.readyState === EventSource.OPEN) return;
       retryMs = INITIAL_BACKOFF_MS;
+      refreshBeforeNextConnect = true;
       es?.close();
       es = null;
       void connect();
@@ -137,6 +154,7 @@ export function useRealtimeSse(
 
     return () => {
       disposed = true;
+      setConnected(false);
       document.removeEventListener("visibilitychange", onVisibility);
       if (retryTimer) clearTimeout(retryTimer);
       es?.removeEventListener("notification", onNotificationEvent);

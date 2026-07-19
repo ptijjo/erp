@@ -75,7 +75,7 @@ export class AuthController {
    * Sans garde JWT : l’accès peut être expiré.
    */
   @Post('refresh')
-  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
   @HttpCode(200)
   async refresh(
     @Request() req: RequestExpress,

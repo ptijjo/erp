@@ -67,6 +67,7 @@ export const KNOWN_POLICY_SUBJECTS = [
   'Notification',
   'Message',
   'Task',
+  'TaskSubtask',
 ] as const;
 
 const VALID_ACTIONS = new Set(['read', 'create', 'update', 'delete', 'manage']);

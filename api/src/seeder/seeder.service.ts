@@ -856,6 +856,10 @@ export class SeederService implements OnModuleInit {
         'create:Task',
         'update:Task',
         'delete:Task',
+        'read:TaskSubtask',
+        'create:TaskSubtask',
+        'update:TaskSubtask',
+        'delete:TaskSubtask',
       ] as const) {
         const perm = await this.prisma.permission.findUnique({
           where: { name: permName },
@@ -871,7 +875,9 @@ export class SeederService implements OnModuleInit {
           });
         }
       }
-      Logger.log('Permissions Task (Mes actions) liées à tous les rôles');
+      Logger.log(
+        'Permissions Task / TaskSubtask (Mes actions) liées à tous les rôles',
+      );
 
       const budgetReadForAccounting = await this.prisma.permission.findUnique({
         where: { name: 'read:Budget' },

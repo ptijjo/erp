@@ -1296,6 +1296,24 @@ export type ActionUserSummaryDto = {
   profilePhotoUrl: string | null;
 };
 
+export type TaskSubtaskDto = {
+  id: string;
+  title: string;
+  status: TaskStatusDto;
+  priority: TaskPriorityDto;
+  startDate: string | null;
+  dueDate: string | null;
+  sortOrder: number;
+  completedAt: string | null;
+  createdAt: string;
+};
+
+export type SubtaskProgressDto = {
+  done: number;
+  total: number;
+  percent: number;
+};
+
 export type ActionItemDto = {
   id: string;
   kind: ActionItemKindDto;
@@ -1304,6 +1322,7 @@ export type ActionItemDto = {
   status: TaskStatusDto;
   priority: TaskPriorityDto;
   scope?: TaskScopeDto;
+  startDate: string | null;
   dueDate: string | null;
   href?: string;
   organizationId?: string;
@@ -1316,6 +1335,8 @@ export type ActionItemDto = {
   createdAt: string;
   completedAt: string | null;
   editable: boolean;
+  subtasks?: TaskSubtaskDto[];
+  subtaskProgress?: SubtaskProgressDto;
 };
 
 export type TaskDto = {
@@ -1325,6 +1346,7 @@ export type TaskDto = {
   status: TaskStatusDto;
   priority: TaskPriorityDto;
   scope: TaskScopeDto;
+  startDate: string | null;
   dueDate: string | null;
   completedAt: string | null;
   organizationId: string;

@@ -13,9 +13,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { useRealtimeSseConnected } from "~/components/layout/realtime-status-context";
 import { hasMePermission, useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import type { MessageThreadSummaryDto } from "~/lib/api-types";
+
+/** Polling de secours uniquement si le SSE est down. */
+const POLL_WHEN_SSE_DOWN_MS = 30_000;
 
 function displayName(c: {
   firstName: string | null;
@@ -29,6 +33,7 @@ function displayName(c: {
 export function MessagesBell() {
   const { data: me } = useMe();
   const queryClient = useQueryClient();
+  const sseConnected = useRealtimeSseConnected();
   const canRead = me != null && hasMePermission(me, "read", "Message");
 
   const { data: threads = [] } = useQuery({
@@ -40,7 +45,7 @@ export function MessagesBell() {
       return data;
     },
     enabled: canRead,
-    refetchInterval: 15_000,
+    refetchInterval: sseConnected ? false : POLL_WHEN_SSE_DOWN_MS,
     refetchIntervalInBackground: false,
   });
 

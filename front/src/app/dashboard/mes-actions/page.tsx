@@ -8,6 +8,7 @@ import {
   CreateTaskPanel,
   defaultDueForGroup,
 } from "~/app/dashboard/mes-actions/_components/CreateTaskPanel";
+import { TaskDetailPanel } from "~/app/dashboard/mes-actions/_components/TaskDetailPanel";
 import { ActionsGanttView } from "~/app/dashboard/mes-actions/_components/ActionsGanttView";
 import { ActionsKanbanView } from "~/app/dashboard/mes-actions/_components/ActionsKanbanView";
 import { ActionsTableView } from "~/app/dashboard/mes-actions/_components/ActionsTableView";
@@ -53,13 +54,27 @@ export default function MesActionsPage() {
   const canCreate = me != null && hasMePermission(me, "create", "Task");
   const canUpdate = me != null && hasMePermission(me, "update", "Task");
   const canDelete = me != null && hasMePermission(me, "delete", "Task");
+  const canCreateSubtask =
+    me != null &&
+    (hasMePermission(me, "create", "TaskSubtask") ||
+      hasMePermission(me, "update", "Task"));
+  const canUpdateSubtask =
+    me != null &&
+    (hasMePermission(me, "update", "TaskSubtask") ||
+      hasMePermission(me, "update", "Task"));
+  const canDeleteSubtask =
+    me != null &&
+    (hasMePermission(me, "delete", "TaskSubtask") ||
+      hasMePermission(me, "update", "Task"));
 
   const [view, setView] = useState<BoardView>("table");
   const [showForm, setShowForm] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [presetGroup, setPresetGroup] = useState<ActionGroupId | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [startDate, setStartDate] = useState("");
   const [priority, setPriority] = useState<TaskPriorityDto>("NORMAL");
   const [scope, setScope] = useState<TaskScopeDto>("USER");
   const [organizationId, setOrganizationId] = useState("");
@@ -89,6 +104,15 @@ export default function MesActionsPage() {
 
   const groups = useMemo(() => groupActions(actions), [actions]);
 
+  const selectedTask = useMemo(() => {
+    if (!selectedTaskId) return null;
+    return (
+      actions.find(
+        (a) => a.id === selectedTaskId && a.kind === "MANUAL",
+      ) ?? null
+    );
+  }, [actions, selectedTaskId]);
+
   const stats = useMemo(() => {
     const todo = actions.filter((a) => a.status === "TODO").length;
     const inProgress = actions.filter((a) => a.status === "IN_PROGRESS").length;
@@ -99,6 +123,7 @@ export default function MesActionsPage() {
   const resetForm = () => {
     setTitle("");
     setDescription("");
+    setStartDate("");
     setDueDate("");
     setPriority("NORMAL");
     setScope("USER");
@@ -120,6 +145,7 @@ export default function MesActionsPage() {
       await api.post("/actions", {
         title: title.trim(),
         description: description.trim() || undefined,
+        startDate: startDate || undefined,
         dueDate: dueDate || undefined,
         priority,
         scope,
@@ -152,6 +178,26 @@ export default function MesActionsPage() {
     },
     onError: (e) => {
       alert(apiErrorMessage(e, "Mise à jour impossible"));
+    },
+  });
+
+  const updateSubtaskStatusMutation = useMutation({
+    mutationFn: async ({
+      taskId,
+      subtaskId,
+      status,
+    }: {
+      taskId: string;
+      subtaskId: string;
+      status: TaskStatusDto;
+    }) => {
+      await api.patch(`/actions/${taskId}/subtasks/${subtaskId}`, { status });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["actions"] });
+    },
+    onError: (e) => {
+      alert(apiErrorMessage(e, "Mise à jour de la sous-tâche impossible"));
     },
   });
 
@@ -238,6 +284,7 @@ export default function MesActionsPage() {
         open={showForm}
         title={title}
         description={description}
+        startDate={startDate}
         dueDate={dueDate}
         priority={priority}
         scope={scope}
@@ -252,6 +299,7 @@ export default function MesActionsPage() {
         presetGroup={presetGroup}
         onTitleChange={setTitle}
         onDescriptionChange={setDescription}
+        onStartDateChange={setStartDate}
         onDueDateChange={setDueDate}
         onPriorityChange={setPriority}
         onScopeChange={setScope}
@@ -259,6 +307,17 @@ export default function MesActionsPage() {
         onOrganizationChange={setOrganizationId}
         onSubmit={() => createMutation.mutate()}
         onCancel={resetForm}
+      />
+
+      <TaskDetailPanel
+        action={selectedTask}
+        canUpdate={canUpdateSubtask}
+        canCreateSubtask={canCreateSubtask}
+        canDeleteSubtask={canDeleteSubtask}
+        onClose={() => setSelectedTaskId(null)}
+        onActionUpdated={(updated) => {
+          setSelectedTaskId(updated.id);
+        }}
       />
 
       {isLoading ? (
@@ -284,6 +343,7 @@ export default function MesActionsPage() {
           canUpdate={canUpdate}
           canDelete={canDelete}
           onAddTask={(groupId) => openCreateForm(groupId)}
+          onOpenTask={(action) => setSelectedTaskId(action.id)}
           onStatusChange={(id, status) =>
             updateStatusMutation.mutate({ id, status })
           }
@@ -294,13 +354,20 @@ export default function MesActionsPage() {
           }}
         />
       ) : view === "gantt" ? (
-        <ActionsGanttView actions={actions} />
+        <ActionsGanttView
+          actions={actions}
+          onOpenTask={(action) => setSelectedTaskId(action.id)}
+        />
       ) : (
         <ActionsKanbanView
           actions={actions}
           canUpdate={canUpdate}
+          onOpenTask={(action) => setSelectedTaskId(action.id)}
           onStatusChange={(id, status) =>
             updateStatusMutation.mutate({ id, status })
+          }
+          onSubtaskStatusChange={(taskId, subtaskId, status) =>
+            updateSubtaskStatusMutation.mutate({ taskId, subtaskId, status })
           }
         />
       )}

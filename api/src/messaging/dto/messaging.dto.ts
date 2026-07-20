@@ -2,10 +2,13 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -47,6 +50,10 @@ export class SearchContactsQueryDto {
   @MaxLength(100)
   q!: string;
 
+  @IsOptional()
   @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
   limit?: number;
 }

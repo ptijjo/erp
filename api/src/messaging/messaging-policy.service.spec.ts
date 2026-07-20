@@ -82,6 +82,20 @@ describe('MessagingPolicyService', () => {
     expect(scope).toBe(MessageThreadScope.MAIN_INTRA_POLE);
   });
 
+  it('autorise un collaborateur vers un DIRECTOR_* d’un autre pôle', () => {
+    const scope = service.assertCanExchange(
+      viewer({
+        sub: 'u1',
+        role: { id: 'r', name: 'ASSISTANT_HR', poleCode: 'Pole_HR' },
+      }),
+      peer({
+        poleCode: 'Pole_FINANCE',
+        roleName: 'DIRECTOR_FINANCE',
+      }),
+    );
+    expect(scope).toBe(MessageThreadScope.MAIN_CROSS_POLE);
+  });
+
   it('autorise un DIRECTOR_* vers un autre pôle (préfixe)', () => {
     const scope = service.assertCanExchange(
       viewer({

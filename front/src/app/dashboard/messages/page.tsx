@@ -127,16 +127,22 @@ export default function MessagesPage() {
     enabled: Boolean(selectedThreadId && canRead),
   });
 
-  const { data: contacts = [] } = useQuery({
+  const {
+    data: contacts = [],
+    isError: contactsError,
+    isFetching: contactsFetching,
+    error: contactsQueryError,
+  } = useQuery({
     queryKey: ["messaging", "contacts", contactSearch] as const,
     queryFn: async () => {
       const { data } = await api.get<MessagingContactDto[]>(
         "/messaging/contacts",
-        { params: { q: contactSearch } },
+        { params: { q: contactSearch.trim(), limit: 20 } },
       );
       return data;
     },
     enabled: canRead && activeView === "compose" && contactSearch.trim().length >= 2,
+    staleTime: 0,
   });
 
   const selectedThread = useMemo(
@@ -415,7 +421,7 @@ export default function MessagesPage() {
         description="Filiales, maison mère et échanges intra-pôle. Inter-pôles : directeurs de pôle, DG et direction opérations."
       />
 
-      <div className="mt-6 flex h-[min(720px,calc(100vh-220px))] min-h-[480px] overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div className="mt-6 flex h-[min(720px,calc(100vh-220px))] min-h-120 overflow-hidden rounded-xl border bg-card shadow-sm">
         {/* Liste des conversations */}
         <aside className="flex w-full max-w-sm shrink-0 flex-col border-r bg-muted/20 lg:w-80">
           <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
@@ -562,6 +568,16 @@ export default function MessagesPage() {
               contactSearch={contactSearch}
               onContactSearchChange={setContactSearch}
               contacts={contacts}
+              contactsError={contactsError}
+              contactsFetching={contactsFetching}
+              contactsErrorMessage={
+                contactsQueryError
+                  ? apiErrorMessage(
+                      contactsQueryError,
+                      "Erreur lors de la recherche de contacts",
+                    )
+                  : null
+              }
               composeTo={composeTo}
               onSelectContact={setComposeTo}
               composeBody={composeBody}
@@ -693,7 +709,7 @@ export default function MessagesPage() {
                     </Label>
                     <textarea
                       id="reply"
-                      className="w-full min-h-[52px] resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="w-full min-h-13 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       placeholder="Écrire un message…"
@@ -775,6 +791,9 @@ function ComposePanel({
   contactSearch,
   onContactSearchChange,
   contacts,
+  contactsError,
+  contactsFetching,
+  contactsErrorMessage,
   composeTo,
   onSelectContact,
   composeBody,
@@ -789,6 +808,9 @@ function ComposePanel({
   contactSearch: string;
   onContactSearchChange: (v: string) => void;
   contacts: MessagingContactDto[];
+  contactsError: boolean;
+  contactsFetching: boolean;
+  contactsErrorMessage: string | null;
   composeTo: MessagingContactDto | null;
   onSelectContact: (c: MessagingContactDto | null) => void;
   composeBody: string;
@@ -882,9 +904,20 @@ function ComposePanel({
             </div>
           ) : contactSearch.trim().length >= 2 ? (
             <div className="overflow-hidden rounded-lg border">
-              {contacts.length === 0 ? (
+              {contactsError ? (
+                <p className="text-destructive px-3 py-4 text-sm">
+                  {contactsErrorMessage ??
+                    "Erreur lors de la recherche de contacts."}
+                </p>
+              ) : contactsFetching && contacts.length === 0 ? (
                 <p className="px-3 py-4 text-sm text-muted-foreground">
-                  Aucun contact trouvé ou non autorisé.
+                  Recherche…
+                </p>
+              ) : contacts.length === 0 ? (
+                <p className="px-3 py-4 text-sm text-muted-foreground">
+                  Aucun contact trouvé ou non autorisé. Essayez l’e-mail complet
+                  (ex. test2@vifaa.com) ou ouvrez le profil utilisateur →
+                  « Écrire un message ».
                 </p>
               ) : (
                 <ul className="divide-y">
@@ -922,7 +955,7 @@ function ComposePanel({
             <Label htmlFor="compose-body">Message</Label>
             <textarea
               id="compose-body"
-              className="w-full min-h-[120px] resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              className="w-full min-h-30 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               value={composeBody}
               onChange={(e) => onComposeBodyChange(e.target.value)}
               placeholder="Rédigez votre premier message…"

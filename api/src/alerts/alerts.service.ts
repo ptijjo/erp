@@ -9,7 +9,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   BudgetStatus,
   StockOrderStatus,
-  StockTransferStatus,
   VenteStatut,
   OrganizationType,
 } from '../generated/prisma/client';
@@ -40,7 +39,6 @@ export class AlertsService {
     const canReadStock = ability.can('read', 'Stock');
     const canReadBudget = ability.can('read', 'Budget');
     const canReadStockOrder = ability.can('read', 'StockOrder');
-    const canReadTransfer = ability.can('read', 'StockTransfer');
     const canReadSession = ability.can('read', 'SessionCaisse');
 
     const alerts: DashboardAlertDto[] = [];
@@ -89,38 +87,6 @@ export class AlertsService {
           message: `${pendingOrders} commande(s) fournisseur en attente.`,
           href: '/dashboard/stocks',
           count: pendingOrders,
-        });
-      }
-    }
-
-    if (canReadTransfer) {
-      const transferWhere = subsidiaryId
-        ? {
-            OR: [
-              { fromOrganizationId: subsidiaryId },
-              { toOrganizationId: subsidiaryId },
-            ],
-            status: {
-              in: [StockTransferStatus.PENDING, StockTransferStatus.SHIPPED],
-            },
-          }
-        : {
-            status: {
-              in: [StockTransferStatus.PENDING, StockTransferStatus.SHIPPED],
-            },
-          };
-
-      const pendingTransfers = await this.prisma.stockTransfer.count({
-        where: transferWhere,
-      });
-      if (pendingTransfers > 0) {
-        alerts.push({
-          code: 'STOCK_TRANSFER_PENDING',
-          severity: 'info',
-          title: 'Transferts inter-filiales',
-          message: `${pendingTransfers} transfert(s) en cours.`,
-          href: '/dashboard/commandes-inter-filiales',
-          count: pendingTransfers,
         });
       }
     }

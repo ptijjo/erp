@@ -16,8 +16,10 @@ const CROSS_POLE_MESSENGER_ROLES = new Set<string>([
 export function isCrossPoleMessengerRole(roleName: string): boolean {
   const name = roleName.trim();
   if (!name) return false;
+  const upper = name.toUpperCase();
+  if (CROSS_POLE_MESSENGER_ROLES.has(upper)) return true;
   if (CROSS_POLE_MESSENGER_ROLES.has(name)) return true;
-  return name.startsWith('DIRECTOR_');
+  return upper.startsWith('DIRECTOR_');
 }
 
 export type MessagingPeer = {
@@ -100,7 +102,12 @@ export class MessagingPolicyService {
       return MessageThreadScope.MAIN_INTRA_POLE;
     }
 
-    if (this.canSendCrossPole(viewer)) {
+    // Inter-pôles : OK si l’émetteur OU le destinataire est directeur / ADMIN / DG / OPS
+    // (sinon un collaborateur ne peut pas écrire au directeur finance d’un autre pôle).
+    if (
+      this.canSendCrossPole(viewer) ||
+      isCrossPoleMessengerRole(peer.roleName)
+    ) {
       return MessageThreadScope.MAIN_CROSS_POLE;
     }
 

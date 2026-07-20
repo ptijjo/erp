@@ -2,14 +2,18 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
-import { MessageThreadScope, type Prisma } from '../generated/prisma/client';
+import {
+  MessageThreadScope,
+  OrganizationType,
+  type Prisma,
+} from '../generated/prisma/client';
 import { RealtimeHubService } from '../realtime/realtime-hub.service';
 import { MessagingPolicyService } from './messaging-policy.service';
 import type { CreateThreadDto, SendMessageDto } from './dto/messaging.dto';
-import { DirectoryService } from '../directory/directory.service';
 import type { MessagingContactDto } from './messaging.types';
 import { MessagingAttachmentService } from './messaging-attachment.service';
 
@@ -61,7 +65,6 @@ export class MessagingService {
     private readonly prisma: PrismaService,
     private readonly policy: MessagingPolicyService,
     private readonly realtimeHub: RealtimeHubService,
-    private readonly directoryService: DirectoryService,
     private readonly attachmentService: MessagingAttachmentService,
   ) {}
 
@@ -70,55 +73,116 @@ export class MessagingService {
     query: string,
     limit = 20,
   ): Promise<MessagingContactDto[]> {
-    const entries = await this.directoryService.search(viewer, query, limit);
-    const eligible: MessagingContactDto[] = [];
+    const q = query.trim();
+    if (!q) {
+      return [];
+    }
 
-    for (const entry of entries) {
-      const userId =
-        entry.userId ??
-        (entry.email
-          ? await this.resolveUserIdByEmail(entry.email)
-          : null);
-      if (!userId || userId === viewer.sub) {
-        continue;
-      }
+    const max = Math.min(Math.max(limit, 1), 50);
+    const candidates = await this.findContactCandidateUsers(viewer, q, max * 3);
+    const eligible: MessagingContactDto[] = [];
+    const seen = new Set<string>();
+
+    for (const row of candidates) {
+      if (eligible.length >= max) break;
+      if (row.id === viewer.sub || seen.has(row.id)) continue;
       try {
-        const peer = await this.policy.loadPeer(userId);
+        const peer = await this.policy.loadPeer(row.id);
         this.policy.assertCanExchange(viewer, peer);
+        seen.add(row.id);
         eligible.push({
-          id: userId,
-          email: entry.email ?? peer.email,
-          firstName: entry.firstName,
-          lastName: entry.lastName,
-          profilePhotoUrl: entry.profilePhotoUrl,
-          organizationId: entry.organization.id,
+          id: row.id,
+          email: row.email,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          profilePhotoUrl: row.profilePhotoUrl,
+          organizationId: row.organizationId,
           organization: {
-            name: entry.organization.name,
-            organizationType: peer.organizationType,
+            name: row.organization.name,
+            organizationType: row.organization.organizationType,
           },
-          role: entry.role ?? {
-            name: peer.roleName,
-            pole: peer.poleCode
-              ? { code: peer.poleCode, name: peer.poleCode }
+          role: {
+            name: row.role.name,
+            pole: row.role.pole
+              ? { code: row.role.pole.code, name: row.role.pole.name }
               : null,
           },
-          employeeId: entry.employeeId,
-          position: entry.position,
-          department: entry.department,
+          employeeId: row.employee?.id ?? null,
+          position: row.employee?.position ?? null,
+          department: row.employee?.department ?? null,
         });
       } catch {
         /* non éligible */
       }
     }
+    Logger.log(
+      `searchContacts q="${q}" viewer=${viewer.email} candidates=${candidates.length} eligible=${eligible.length}`,
+    );
     return eligible;
   }
 
-  private async resolveUserIdByEmail(email: string): Promise<string | null> {
-    const user = await this.prisma.user.findFirst({
-      where: { email, deletedAt: null },
-      select: { id: true },
+  /**
+   * Recherche les comptes utilisateur messagerie (pas seulement l’annuaire RH).
+   * Maison mère : tous les orgs. Filiale : sa société + comptes maison mère (ex. directeurs).
+   */
+  private async findContactCandidateUsers(
+    viewer: AuthenticatedUser,
+    q: string,
+    take: number,
+  ) {
+    const textOr: Prisma.UserWhereInput[] = [
+      { email: { contains: q, mode: 'insensitive' } },
+      { firstName: { contains: q, mode: 'insensitive' } },
+      { lastName: { contains: q, mode: 'insensitive' } },
+      { role: { name: { contains: q, mode: 'insensitive' } } },
+      { role: { pole: { name: { contains: q, mode: 'insensitive' } } } },
+    ];
+
+    const where: Prisma.UserWhereInput = {
+      deletedAt: null,
+      OR: textOr,
+    };
+
+    if (viewer.organizationType !== 'MAIN') {
+      where.AND = [
+        {
+          OR: [
+            { organizationId: viewer.organisationId },
+            { organization: { organizationType: OrganizationType.MAIN } },
+          ],
+        },
+      ];
+    }
+
+    return this.prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        profilePhotoUrl: true,
+        organizationId: true,
+        organization: {
+          select: { id: true, name: true, organizationType: true },
+        },
+        role: {
+          select: {
+            name: true,
+            pole: { select: { code: true, name: true } },
+          },
+        },
+        employee: {
+          select: {
+            id: true,
+            position: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: [{ email: 'asc' }],
+      take: Math.min(take, 50),
     });
-    return user?.id ?? null;
   }
 
   async listThreads(viewer: AuthenticatedUser) {

@@ -8,7 +8,6 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { MessageThreadScope } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeHubService } from '../realtime/realtime-hub.service';
-import { DirectoryService } from '../directory/directory.service';
 import { MessagingPolicyService } from './messaging-policy.service';
 import { MessagingAttachmentService } from './messaging-attachment.service';
 import { MessagingService } from './messaging.service';
@@ -98,10 +97,6 @@ describe('MessagingService attachments', () => {
           useValue: {
             emitToMany: jest.fn(),
           },
-        },
-        {
-          provide: DirectoryService,
-          useValue: {},
         },
         {
           provide: MessagingAttachmentService,

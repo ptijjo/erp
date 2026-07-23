@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { api, getApiBaseUrl } from "~/lib/api";
+import { getApiBaseUrl, refreshSession } from "~/lib/api";
 import {
   parseRealtimeMessage,
   parseRealtimeNotification,
@@ -23,7 +23,7 @@ const INITIAL_BACKOFF_MS = 1_000;
 
 async function refreshSessionQuietly(): Promise<boolean> {
   try {
-    await api.post("/auth/refresh", null, { skipAuthRefresh: true });
+    await refreshSession();
     return true;
   } catch {
     return false;

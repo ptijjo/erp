@@ -8,6 +8,7 @@ import { ToastHost } from "~/components/layout/toast-host";
 import { AppSidebar } from "~/components/layout/app-sidebar";
 import { DashboardLoading } from "~/components/layout/dashboard-loading";
 import { RealtimeStatusProvider } from "~/components/layout/realtime-status-context";
+import { SessionKeepAlive } from "~/components/layout/session-keep-alive";
 import { SidebarProvider } from "~/components/layout/sidebar-context";
 import { SubsidiaryProvider } from "~/providers/subsidiary-context";
 import { dashboardHomePath, useMe } from "~/hooks/use-me";
@@ -53,6 +54,7 @@ export default function DashboardLayout({
     <SubsidiaryProvider>
       <SidebarProvider>
         <RealtimeStatusProvider>
+          <SessionKeepAlive />
           <ToastHost />
           <section className="flex h-screen w-full flex-col overflow-hidden bg-background">
             <AppHeader showMenu={!isFirstLoginRoute} />

@@ -29,6 +29,11 @@ function runRefreshSession(): Promise<void> {
   return refreshSessionPromise;
 }
 
+/** Refresh mutualisé (interceptor 401 + keep-alive). */
+export function refreshSession(): Promise<void> {
+  return runRefreshSession();
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {

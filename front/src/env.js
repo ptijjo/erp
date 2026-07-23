@@ -9,10 +9,13 @@ export const env = createEnv({
   },
   client: {
     NEXT_PUBLIC_BASE_URL: z.string().url().optional(),
+    NEXT_PUBLIC_JWT_ACCESS_EXPIRES_SECONDS: z.coerce.number().positive().optional(),
   },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
+    NEXT_PUBLIC_JWT_ACCESS_EXPIRES_SECONDS:
+      process.env.NEXT_PUBLIC_JWT_ACCESS_EXPIRES_SECONDS,
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: true,

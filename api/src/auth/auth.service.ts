@@ -79,14 +79,14 @@ export class AuthService {
     return `login:block:${ip}`;
   }
 
-  /** Durée de vie du JWT d’accès (secondes). `JWT_ACCESS_EXPIRES_SECONDS`, défaut 900 (15 min). */
+  /** Durée de vie du JWT d’accès (secondes). `JWT_ACCESS_EXPIRES_SECONDS`, défaut 3600 (1 h). */
   private accessExpiresSeconds(): number {
     const raw = this.config.get<string>('JWT_ACCESS_EXPIRES_SECONDS')?.trim();
     const n = raw ? Number.parseInt(raw, 10) : NaN;
     if (Number.isFinite(n) && n > 0) {
       return n;
     }
-    return 15 * 60;
+    return 60 * 60;
   }
 
   private refreshTtlSeconds(): number {

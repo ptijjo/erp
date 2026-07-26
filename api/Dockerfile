@@ -1,22 +1,42 @@
-FROM node:22-bookworm-slim
+# --- Étape de Build ---
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
-RUN apt-get update \
-  && apt-get install -y openssl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+# Installation des dépendances nécessaires pour Prisma / l'architecture
+RUN apt-get update && apt-get install -y openssl python3 make g++ && rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json* ./
+COPY package*.json ./
 COPY prisma ./prisma/
-COPY prisma.config.ts ./
 
+# Installation propre des dépendances
 RUN npm ci
 
 COPY . .
 
+# Génération du client Prisma et build de NestJS
 RUN npx prisma generate
 RUN npm run build
 
-EXPOSE 3001
+# --- Étape de Runtime ---
+FROM node:22-bookworm-slim AS runner
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
+ENV NODE_ENV=production
+
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# On n'installe que les dépendances de production
+RUN npm ci --only=production
+
+# On récupère le build NestJS et le client Prisma généré
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /node_modules/.prisma ./node_modules/.prisma
+
+EXPOSE 3000
+
+CMD ["node", "dist/main"]

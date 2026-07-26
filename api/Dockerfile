@@ -1,48 +1,64 @@
-# --- Étape de Build ---
-FROM node:22-bookworm-slim AS builder
+# Pin mineur 22.22 (Prisma exige Node ≥ 22.12 ; aligné avec le front).
+FROM node:22.22-bookworm-slim AS builder
 
 WORKDIR /app
 
-# Installation des dépendances nécessaires pour Prisma / l'architecture
-RUN apt-get update && apt-get install -y openssl python3 make g++ && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# URL factice : prisma.config.ts exige DATABASE_URL au moment du `generate`.
+ARG DATABASE_URL="postgresql://prisma:prisma@127.0.0.1:5432/prisma"
+ENV DATABASE_URL=${DATABASE_URL}
 
 COPY package*.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 
-# Installation propre des dépendances
 RUN npm ci
 
 COPY . .
 
-# Génération du client Prisma et build de NestJS
 RUN npx prisma generate
 RUN npm run build
 
-# --- Étape de Runtime ---
-FROM node:22-bookworm-slim AS runner
+# --- Runtime ---
+FROM node:22.22-bookworm-slim AS runner
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
+# Coolify / docker-compose peuvent surcharger PORT.
+ENV PORT=3000
+
+# URL factice pour `prisma generate` au build image (la vraie URL est injectée au runtime).
+ARG DATABASE_URL="postgresql://prisma:prisma@127.0.0.1:5432/prisma"
+ENV DATABASE_URL=${DATABASE_URL}
 
 COPY package*.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
+COPY docker-entrypoint.sh ./
 
-# On n'installe que les dépendances de production
-RUN npm ci --only=production
+# Déps prod + CLI Prisma (devDependency) pour `migrate deploy` au démarrage.
+RUN npm ci --omit=dev \
+  && npm install prisma@7.8.0 @prisma/config@7.8.0 --omit=dev --no-save \
+  && npx prisma generate \
+  && chmod +x docker-entrypoint.sh
 
-# On régénère le client Prisma spécifiquement pour la prod
-RUN npx prisma generate
-
-# On récupère le build NestJS et le client Prisma généré
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/src/generated ./src/generated
 
 EXPOSE 3000
 
-# Vérifie toutes les 30s que l'API répond 200 sur l'endpoint choisi (ex: /)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+# Pas de curl/wget : healthcheck Node sur PORT (Coolify peut le changer).
+# start-period élevé : migrate + seed Nest au boot.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=5 \
+  CMD node -e "const p=process.env.PORT||'3000';require('http').get('http://127.0.0.1:'+p+'/',(r)=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"
 
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "dist/main"]

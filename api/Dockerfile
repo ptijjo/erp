@@ -33,6 +33,9 @@ COPY prisma ./prisma/
 # On n'installe que les dépendances de production
 RUN npm ci --only=production
 
+# On régénère le client Prisma spécifiquement pour la prod
+RUN npx prisma generate
+
 # On récupère le build NestJS et le client Prisma généré
 COPY --from=builder /app/dist ./dist
 

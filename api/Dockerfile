@@ -35,7 +35,6 @@ RUN npm ci --only=production
 
 # On récupère le build NestJS et le client Prisma généré
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /node_modules/.prisma ./node_modules/.prisma
 
 EXPOSE 3000
 

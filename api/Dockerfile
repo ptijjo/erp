@@ -43,6 +43,6 @@ EXPOSE 3000
 
 # Vérifie toutes les 30s que l'API répond 200 sur l'endpoint choisi (ex: /)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:3000/ || exit 1
+  CMD node -e "require('http').get('http://localhost:3000/', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 CMD ["node", "dist/main"]

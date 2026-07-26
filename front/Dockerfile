@@ -22,4 +22,8 @@ RUN npm run build
 
 EXPOSE 3005
 
+# Coolify lit le HEALTHCHECK du Dockerfile (pas besoin de curl/wget).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=5 \
+  CMD node -e "require('http').get('http://127.0.0.1:3005/',(r)=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"
+
 CMD ["npx", "next", "start", "-H", "0.0.0.0", "-p", "3005"]

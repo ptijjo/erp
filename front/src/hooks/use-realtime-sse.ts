@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { meQueryKey } from "~/hooks/use-me";
 import { getApiBaseUrl, refreshSession } from "~/lib/api";
 import {
   parseRealtimeMessage,
@@ -14,6 +15,8 @@ import {
 type RealtimeHandlers = {
   onNotification?: (payload: RealtimeNotificationPayload) => void;
   onMessage?: (payload: RealtimeMessagePayload) => void;
+  /** Droits ou rôle modifiés : le profil `/auth/me` vient d’être invalidé. */
+  onSession?: () => void;
   /** Notifie l’UI (polling de secours si false). */
   onConnectionChange?: (connected: boolean) => void;
 };
@@ -88,6 +91,11 @@ export function useRealtimeSse(
       handlersRef.current.onMessage?.(payload);
     };
 
+    const onSessionEvent = () => {
+      void queryClient.invalidateQueries({ queryKey: meQueryKey });
+      handlersRef.current.onSession?.();
+    };
+
     const scheduleReconnect = () => {
       if (disposed) return;
       if (retryTimer) clearTimeout(retryTimer);
@@ -117,6 +125,7 @@ export function useRealtimeSse(
 
         es.addEventListener("notification", onNotificationEvent);
         es.addEventListener("message", onMessageEvent);
+        es.addEventListener("session", onSessionEvent);
 
         es.onopen = () => {
           retryMs = INITIAL_BACKOFF_MS;
@@ -127,6 +136,7 @@ export function useRealtimeSse(
           setConnected(false);
           es?.removeEventListener("notification", onNotificationEvent);
           es?.removeEventListener("message", onMessageEvent);
+          es?.removeEventListener("session", onSessionEvent);
           es?.close();
           es = null;
           refreshBeforeNextConnect = true;
@@ -159,6 +169,7 @@ export function useRealtimeSse(
       if (retryTimer) clearTimeout(retryTimer);
       es?.removeEventListener("notification", onNotificationEvent);
       es?.removeEventListener("message", onMessageEvent);
+      es?.removeEventListener("session", onSessionEvent);
       es?.close();
     };
   }, [enabled, queryClient]);

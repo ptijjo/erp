@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
 import { extendPrismaWithAudit } from './prisma-audit.extension';
+import { bindPrismaRls } from './prisma-rls.extension';
 
 export type AppPrismaClient = ReturnType<typeof extendPrismaWithAudit>;
 
@@ -15,7 +16,7 @@ export class PrismaService extends PrismaClient {
       connectionString: process.env.DATABASE_URL!,
     });
     super({ adapter });
-    const extended = extendPrismaWithAudit(this);
+    const extended = bindPrismaRls(extendPrismaWithAudit(this));
     Object.assign(extended, {
       raw: this,
       onModuleInit: async () => {

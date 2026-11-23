@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, TrendingUp, Users } from "lucide-react";
+import { Building2, TrendingUp, Users } from "lucide-react";
 
 import { Badge } from "~/components/ui/badge";
 import { formatFcfa } from "~/lib/format-fcfa";
@@ -48,20 +48,21 @@ export function SubsidiaryCard({ subsidiary, className }: SubsidiaryCardProps) {
   const utilization = subsidiary.utilizationPercent ?? 0;
 
   return (
-    <article
+    <Link
+      href={`/dashboard/hq/organisations/${subsidiary.slug}`}
       className={cn(
-        "flex flex-col rounded-xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md",
+        "bg-card focus-visible:ring-primary flex flex-col rounded-xl border p-5 shadow-sm transition-shadow outline-none hover:shadow-md focus-visible:ring-2",
         className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-sidebar text-white">
+          <div className="bg-sidebar flex size-11 shrink-0 items-center justify-center rounded-lg text-white">
             <Building2 className="size-5" />
           </div>
           <div className="min-w-0">
             <h3 className="truncate font-semibold">{subsidiary.name}</h3>
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-0.5 truncate text-sm">
               {subsidiary.description?.trim() || "Filiale du groupe VIFAA"}
             </p>
           </div>
@@ -71,15 +72,15 @@ export function SubsidiaryCard({ subsidiary, className }: SubsidiaryCardProps) {
 
       <dl className="mt-4 space-y-2 text-sm">
         {subsidiary.employeesActive != null ? (
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-2">
             <Users className="size-4 shrink-0" />
             <dd>{subsidiary.employeesActive} employé(s) actif(s)</dd>
           </div>
         ) : null}
         {subsidiary.revenueFcfa != null ? (
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-2">
             <TrendingUp className="size-4 shrink-0 text-emerald-600" />
-            <dd className="font-medium text-foreground">
+            <dd className="text-foreground font-medium">
               {formatFcfa(subsidiary.revenueFcfa)}
             </dd>
           </div>
@@ -94,7 +95,7 @@ export function SubsidiaryCard({ subsidiary, className }: SubsidiaryCardProps) {
               {utilization.toFixed(0)} %
             </span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
+          <div className="bg-muted h-2 overflow-hidden rounded-full">
             <div
               className={cn(
                 "h-full rounded-full transition-all",
@@ -105,14 +106,6 @@ export function SubsidiaryCard({ subsidiary, className }: SubsidiaryCardProps) {
           </div>
         </div>
       ) : null}
-
-      <Link
-        href={`/dashboard/hq/organisations/${subsidiary.slug}`}
-        className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-      >
-        Voir détails
-        <ArrowRight className="size-4" />
-      </Link>
-    </article>
+    </Link>
   );
 }

@@ -1,7 +1,7 @@
 import { Injectable, MessageEvent } from '@nestjs/common';
 import { Observable, Subject } from 'rxjs';
 
-export type RealtimeEventType = 'notification' | 'message' | 'ping';
+export type RealtimeEventType = 'notification' | 'message' | 'session' | 'ping';
 
 const HEARTBEAT_MS = 20_000;
 
@@ -93,5 +93,10 @@ export class RealtimeHubService {
     for (const id of new Set(userIds)) {
       this.emit(id, type, payload);
     }
+  }
+
+  /** Demande aux clients connectés de recharger `GET /auth/me`. */
+  notifyAccessChanged(userIds: string[]): void {
+    this.emitToMany(userIds, 'session', { reason: 'permissions' });
   }
 }

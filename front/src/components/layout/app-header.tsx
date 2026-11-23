@@ -4,12 +4,19 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, LogOut, Menu, UserRound, Volume2, VolumeX } from "lucide-react";
+import {
+  Building2,
+  ChevronDown,
+  LogOut,
+  Menu,
+  UserRound,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 
 import { SubsidiarySelector } from "~/app/dashboard/_components/SubsidiarySelector";
 import { UserProfileAvatar } from "~/app/dashboard/utilisateurs/_components/UserProfileAvatar";
 import { userDisplayName } from "~/app/dashboard/utilisateurs/_lib/user-display";
-import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -99,33 +106,42 @@ export function AppHeader({ showMenu = true }: AppHeaderProps) {
             <Menu className="size-5" />
           </Button>
         ) : null}
-        <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:text-xs">
-            Console ERP
-          </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <Building2
+            className="hidden size-4 shrink-0 text-primary sm:block"
+            aria-hidden
+          />
           <p className="truncate text-sm font-semibold text-foreground">
             {me.organisationName}
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1 sm:gap-2">
         {isMainOrganization(me) ? <SubsidiarySelector /> : null}
         <RealtimeBridge />
         <MessagesBell />
         <NotificationsBell />
-        <Badge
-          variant="secondary"
-          className="hidden font-normal sm:inline-flex"
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-pressed={soundEnabled}
+          aria-label={soundEnabled ? "Désactiver les sons" : "Activer les sons"}
+          onClick={toggleSounds}
         >
-          {isMainOrganization(me) ? "Maison mère" : "Filiale"}
-        </Badge>
+          {soundEnabled ? (
+            <Volume2 className="size-5" />
+          ) : (
+            <VolumeX className="size-5" />
+          )}
+        </Button>
 
         <div className="flex items-center">
           <Link
             href="/dashboard/profil"
-            className="hover:bg-accent flex h-10 items-center gap-2 rounded-md px-2 transition-colors"
-            aria-label="Mon profil"
+            className="hover:bg-accent flex size-10 items-center justify-center rounded-md transition-colors"
+            aria-label={`Profil de ${displayName}`}
           >
             <UserProfileAvatar
               email={profile?.email ?? me.email}
@@ -135,9 +151,6 @@ export function AppHeader({ showMenu = true }: AppHeaderProps) {
               size="md"
               className="size-8 ring-0 ring-offset-0"
             />
-            <span className="hidden max-w-48 truncate text-sm font-medium md:inline">
-              {displayName}
-            </span>
           </Link>
 
           <DropdownMenu>
@@ -162,10 +175,6 @@ export function AppHeader({ showMenu = true }: AppHeaderProps) {
                   <UserRound className="size-4" />
                   Mon profil
                 </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={toggleSounds}>
-                {soundEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
-                {soundEnabled ? "Désactiver les sons" : "Activer les sons"}
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"

@@ -11,10 +11,7 @@ import {
   describeCaslPermission,
 } from './casl-permission-names';
 import { SUBSIDIARY_MANAGER_PERMISSION_NAMES } from './subsidiary-manager-permissions';
-import {
-  clearRlsBypass,
-  enableRlsBypass,
-} from '../prisma/rls-bypass';
+import { withRlsBypass } from '../prisma/rls-bypass';
 
 @Injectable()
 export class SeederService implements OnModuleInit {
@@ -24,12 +21,7 @@ export class SeederService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await enableRlsBypass(this.prisma);
-    try {
-      await this.seed();
-    } finally {
-      await clearRlsBypass(this.prisma);
-    }
+    await withRlsBypass(() => this.seed());
   }
 
   private async seed() {

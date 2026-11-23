@@ -152,5 +152,9 @@ export function useMe() {
     queryKey: meQueryKey,
     queryFn: fetchMe,
     retry: false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => (query.state.data ? 15_000 : false),
+    refetchIntervalInBackground: false,
   });
 }

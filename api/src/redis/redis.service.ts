@@ -44,6 +44,18 @@ export class RedisService implements OnModuleInit {
     await this.redis.expire(key, seconds);
   }
 
+  async sAdd(key: string, member: string): Promise<number> {
+    return this.redis.sadd(key, member);
+  }
+
+  async sMembers(key: string): Promise<string[]> {
+    return this.redis.smembers(key);
+  }
+
+  async sRem(key: string, member: string): Promise<number> {
+    return this.redis.srem(key, member);
+  }
+
   /** SET key value EX seconds */
   async setEx(key: string, seconds: number, value: string): Promise<void> {
     await this.redis.set(key, value, 'EX', seconds);

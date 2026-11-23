@@ -36,7 +36,7 @@ export function ModuleTile({
             <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </section>
           <CardTitle className="mt-3 text-base">{title}</CardTitle>
-          <CardDescription className="line-clamp-2 text-sm leading-snug">
+          <CardDescription className="line-clamp-1 text-sm leading-snug">
             {description}
           </CardDescription>
         </CardHeader>

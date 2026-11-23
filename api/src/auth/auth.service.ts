@@ -23,9 +23,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { randomBytes } from 'node:crypto';
 import { AuthSessionSettings } from './auth-session-settings.service';
 import { subsidiaryHasAssignedSalesCatalog } from '../product/product-subsidiary-scope.util';
-import { isFullAccessRoleName } from '../casl/define-ability';
+import { isFullAccessRoleName, authUserCacheKey } from '../casl/define-ability';
 import { AppCacheService } from '../cache/app-cache.service';
-import { authUserCacheKey } from '../casl/define-ability';
+import { passwordMatches } from './auth-password';
 
 const AUTH_USER_CACHE_TTL_SECONDS = 300;
 
@@ -43,7 +43,25 @@ const MAX_LOGIN_FAILS = envPositiveInt('MAX_LOGIN_FAILS', 5);
 /** Durée du blocage Redis après trop d’échecs (secondes). */
 const BLOCK_SECONDS = envPositiveInt('BLOCK_SECONDS', 900);
 /** Fenêtre après la 1ʳᵉ erreur pour cumuler les échecs ; au-delà le compteur Redis expire. */
-const FAIL_COUNTER_TTL_SECONDS = envPositiveInt('FAIL_COUNTER_TTL_SECONDS', 900);
+const FAIL_COUNTER_TTL_SECONDS = envPositiveInt(
+  'FAIL_COUNTER_TTL_SECONDS',
+  900,
+);
+
+function parseRefreshSessionValue(raw: string): {
+  userId: string;
+  familyId: string | null;
+} {
+  const sep = raw.indexOf('|');
+  if (sep <= 0 || sep >= raw.length - 1) {
+    return { userId: raw, familyId: null };
+  }
+  return { userId: raw.slice(0, sep), familyId: raw.slice(sep + 1) };
+}
+
+function formatRefreshSessionValue(userId: string, familyId: string): string {
+  return `${userId}|${familyId}`;
+}
 
 export type LoginContext = {
   ip: string;
@@ -57,7 +75,11 @@ export type SessionTokens = {
   refresh_cookie_max_age_ms: number;
 };
 
-export type { AccessTokenPayload, AuthenticatedUser, MeResponse } from './auth.types';
+export type {
+  AccessTokenPayload,
+  AuthenticatedUser,
+  MeResponse,
+} from './auth.types';
 
 @Injectable()
 export class AuthService {
@@ -154,8 +176,7 @@ export class AuthService {
     }
 
     const user = await this.userService.findUser(email);
-    const passwordOk =
-      !!user?.password && (await bcrypt.compare(password, user.password));
+    const passwordOk = await passwordMatches(password, user?.password);
 
     if (passwordOk && user) {
       await this.prisma.loginAttempt.create({
@@ -195,12 +216,18 @@ export class AuthService {
   /**
    * Émet une paire access (JWT court) + refresh (opaque, Redis avec TTL).
    */
-  async issueSession(user: SafeUserForSession): Promise<SessionTokens> {
+  async issueSession(
+    user: SafeUserForSession,
+    familyId?: string,
+  ): Promise<SessionTokens> {
     const payload = this.buildAccessPayload(user);
     const access_token = this.jwtService.sign(payload, {
       expiresIn: this.accessExpiresSeconds(),
     });
-    const refresh_token = await this.createAndStoreRefreshToken(user.id);
+    const refresh_token = await this.createAndStoreRefreshToken(
+      user.id,
+      familyId,
+    );
     const ttl = this.refreshTtlSeconds();
     return {
       access_token,
@@ -209,45 +236,91 @@ export class AuthService {
     };
   }
 
-  private async createAndStoreRefreshToken(userId: string): Promise<string> {
+  private familyKey(familyId: string): string {
+    return `refresh-family:${familyId}`;
+  }
+
+  private tombKey(refreshToken: string): string {
+    return `refresh-tomb:${refreshToken}`;
+  }
+
+  private async createAndStoreRefreshToken(
+    userId: string,
+    familyId?: string,
+  ): Promise<string> {
+    const family = familyId ?? randomBytes(16).toString('hex');
     const refresh_token = randomBytes(48).toString('hex');
+    const ttl = this.refreshTtlSeconds();
     const key = this.sessionSettings.refreshRedisKey(refresh_token);
-    await this.redis.setEx(key, this.refreshTtlSeconds(), userId);
+    await this.redis.setEx(key, ttl, formatRefreshSessionValue(userId, family));
+    const familyKey = this.familyKey(family);
+    await this.redis.sAdd(familyKey, refresh_token);
+    await this.redis.expire(familyKey, ttl);
     return refresh_token;
   }
 
   /**
-   * Consomme le refresh (rotation), recharge l’utilisateur en base (rôle à jour)
-   * et émet une nouvelle paire de jetons.
+   * Consomme le refresh (rotation). Une réutilisation du jeton déjà consommé
+   * révoque toute la famille, donc la session émise à l’autre détenteur.
    */
   async refreshWithRotation(
     refreshToken: string | undefined,
   ): Promise<SessionTokens> {
-    const trimmed =
-      typeof refreshToken === 'string' ? refreshToken.trim() : '';
+    const trimmed = typeof refreshToken === 'string' ? refreshToken.trim() : '';
     if (!trimmed) {
       throw new UnauthorizedException();
     }
     const key = this.sessionSettings.refreshRedisKey(trimmed);
-    const userId = await this.redis.getDel(key);
-    if (!userId) {
+    const current = await this.redis.getDel(key);
+    if (!current) {
+      const reusedFamily = await this.redis.get(this.tombKey(trimmed));
+      if (reusedFamily) {
+        await this.revokeRefreshFamily(reusedFamily);
+      }
       throw new UnauthorizedException();
     }
-    const row = await this.userService.findUserByIdWithRoleAndOrg(userId);
+
+    const parsed = parseRefreshSessionValue(current);
+    const familyId = parsed.familyId ?? randomBytes(16).toString('hex');
+    const ttl = this.refreshTtlSeconds();
+    await this.redis.setEx(this.tombKey(trimmed), ttl, familyId);
+    if (parsed.familyId) {
+      await this.redis.sRem(this.familyKey(parsed.familyId), trimmed);
+    }
+
+    const row = await this.userService.findUserByIdWithRoleAndOrg(
+      parsed.userId,
+    );
     if (!row?.password) {
       throw new UnauthorizedException();
     }
-    return this.issueSession(this.toSessionUser(row));
+    return this.issueSession(this.toSessionUser(row), familyId);
+  }
+
+  private async revokeRefreshFamily(familyId: string): Promise<void> {
+    const tokens = await this.redis.sMembers(this.familyKey(familyId));
+    for (const token of tokens) {
+      await this.redis.del(this.sessionSettings.refreshRedisKey(token));
+    }
+    await this.redis.del(this.familyKey(familyId));
   }
 
   /** Révoque un refresh encore présent en Redis (ex. déconnexion). */
   async revokeRefreshToken(refreshToken: string | undefined): Promise<void> {
-    const trimmed =
-      typeof refreshToken === 'string' ? refreshToken.trim() : '';
+    const trimmed = typeof refreshToken === 'string' ? refreshToken.trim() : '';
     if (!trimmed) {
       return;
     }
-    await this.redis.del(this.sessionSettings.refreshRedisKey(trimmed));
+    const key = this.sessionSettings.refreshRedisKey(trimmed);
+    const current = await this.redis.get(key);
+    await this.redis.del(key);
+    if (!current) {
+      return;
+    }
+    const { familyId } = parseRefreshSessionValue(current);
+    if (familyId) {
+      await this.redis.sRem(this.familyKey(familyId), trimmed);
+    }
   }
 
   async login(user: SafeUserForSession): Promise<SessionTokens> {
@@ -347,7 +420,9 @@ export class AuthService {
 
     return {
       permissionMode: 'ROLE_PERMISSIONS',
-      permissions: [...permissionNames].sort((a, b) => a.localeCompare(b, 'fr')),
+      permissions: [...permissionNames].sort((a, b) =>
+        a.localeCompare(b, 'fr'),
+      ),
     };
   }
 }

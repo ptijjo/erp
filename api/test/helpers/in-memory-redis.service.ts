@@ -6,6 +6,8 @@ type Entry = { value: string; expiresAt: number | null };
 @Injectable()
 export class InMemoryRedisService {
   private readonly store = new Map<string, Entry>();
+  private readonly sets = new Map<string, Set<string>>();
+  private readonly setExpiry = new Map<string, number>();
 
   async set(key: string, value: string): Promise<void> {
     this.store.set(key, { value, expiresAt: null });
@@ -23,6 +25,8 @@ export class InMemoryRedisService {
 
   async del(key: string): Promise<void> {
     this.store.delete(key);
+    this.sets.delete(key);
+    this.setExpiry.delete(key);
   }
 
   async exists(key: string): Promise<boolean> {
@@ -39,8 +43,12 @@ export class InMemoryRedisService {
 
   async expire(key: string, seconds: number): Promise<void> {
     const entry = this.store.get(key);
-    if (!entry) return;
-    entry.expiresAt = Date.now() + seconds * 1000;
+    if (entry) {
+      entry.expiresAt = Date.now() + seconds * 1000;
+    }
+    if (this.sets.has(key)) {
+      this.setExpiry.set(key, Date.now() + seconds * 1000);
+    }
   }
 
   async setEx(key: string, seconds: number, value: string): Promise<void> {
@@ -56,7 +64,43 @@ export class InMemoryRedisService {
     return value;
   }
 
+  async sAdd(key: string, member: string): Promise<number> {
+    this.pruneSet(key);
+    let members = this.sets.get(key);
+    if (!members) {
+      members = new Set();
+      this.sets.set(key, members);
+    }
+    const sizeBefore = members.size;
+    members.add(member);
+    return members.size === sizeBefore ? 0 : 1;
+  }
+
+  async sMembers(key: string): Promise<string[]> {
+    this.pruneSet(key);
+    return [...(this.sets.get(key) ?? [])];
+  }
+
+  async sRem(key: string, member: string): Promise<number> {
+    this.pruneSet(key);
+    const members = this.sets.get(key);
+    if (!members?.delete(member)) {
+      return 0;
+    }
+    return 1;
+  }
+
   clear(): void {
     this.store.clear();
+    this.sets.clear();
+    this.setExpiry.clear();
+  }
+
+  private pruneSet(key: string): void {
+    const expiresAt = this.setExpiry.get(key);
+    if (expiresAt !== undefined && expiresAt <= Date.now()) {
+      this.sets.delete(key);
+      this.setExpiry.delete(key);
+    }
   }
 }

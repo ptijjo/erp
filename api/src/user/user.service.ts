@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -35,6 +36,7 @@ import { EmployeeService } from '../hr/employee.service';
 import { MessagingAttachmentService } from '../messaging/messaging-attachment.service';
 import { AppCacheService } from '../cache/app-cache.service';
 import { authUserCacheKey } from '../casl/define-ability';
+import { RealtimeHubService } from '../realtime/realtime-hub.service';
 import type { PaginationQueryDto } from '../lib/pagination-query.dto';
 import {
   buildPaginationMeta,
@@ -75,6 +77,7 @@ export class UserService {
     private readonly employeeService: EmployeeService,
     private readonly cache: AppCacheService,
     private readonly messagingAttachmentService: MessagingAttachmentService,
+    @Optional() private readonly realtime?: RealtimeHubService,
   ) {}
 
   private async invalidateUserSessionCache(userId: string): Promise<void> {
@@ -431,6 +434,7 @@ export class UserService {
     if (user.roleId !== undefined && user.roleId !== existingUser.roleId) {
       await this.caslAbilityFactory.invalidateRole(existingUser.roleId);
       await this.caslAbilityFactory.invalidateRole(user.roleId);
+      this.realtime?.notifyAccessChanged([id]);
     }
     return rest;
   };

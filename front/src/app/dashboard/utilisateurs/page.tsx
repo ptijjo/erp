@@ -31,7 +31,11 @@ import {
 
 import { rolePoleLabel } from "./_lib/pole-label";
 import { userDisplayName } from "./_lib/user-display";
-import { PolesWithUsersSection } from "./_components/PolesWithUsersSection";
+import {
+  PolesWithUsersSection,
+  userMatchesPoleFilter,
+  type PoleListFilter,
+} from "./_components/PolesWithUsersSection";
 import { UserProfileAvatar } from "./_components/UserProfileAvatar";
 
 type UserSortColumn = "organization" | "role" | "pole";
@@ -61,6 +65,7 @@ export default function UtilisateursPage() {
   const pageSize = 20;
   const [sortBy, setSortBy] = useState<UserSortColumn>("organization");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [poleFilter, setPoleFilter] = useState<PoleListFilter>({ kind: "all" });
   const { data: me, isPending: mePending } = useMe();
   const canReadUser = me != null && hasMePermission(me, "read", "User");
   const canCreateUser = me != null && hasMePermission(me, "create", "User");
@@ -121,6 +126,13 @@ export default function UtilisateursPage() {
       return sortOrder === "asc" ? result : -result;
     });
   }, [users, sortBy, sortOrder]);
+
+  const visibleUsers = useMemo(() => {
+    if (!showPolesSection || poleFilter.kind === "all") return sortedUsers;
+    return sortedUsers.filter((user) =>
+      userMatchesPoleFilter(user, poleFilter, poles),
+    );
+  }, [sortedUsers, showPolesSection, poleFilter, poles]);
 
   function toggleSort(column: UserSortColumn) {
     if (sortBy === column) {
@@ -190,6 +202,8 @@ export default function UtilisateursPage() {
           canCreatePole={canCreatePole}
           canUpdatePole={canUpdatePole}
           canDeletePole={canDeletePole}
+          filter={poleFilter}
+          onFilterChange={setPoleFilter}
         />
       ) : null}
 
@@ -209,14 +223,15 @@ export default function UtilisateursPage() {
         </p>
       ) : (
         <div className="space-y-3">
-          {showPolesSection ? (
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-              Tous les utilisateurs
-            </h2>
-          ) : null}
+          {visibleUsers.length === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-600">
+              Aucun utilisateur dans cette sélection.
+            </p>
+          ) : (
+          <>
           <MobileOnly>
             <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
-              {sortedUsers.map((u) => (
+              {visibleUsers.map((u) => (
                 <li key={u.id}>
                   <button
                     type="button"
@@ -309,7 +324,7 @@ export default function UtilisateursPage() {
               </tr>
             </thead>
             <tbody>
-              {sortedUsers.map((u) => (
+              {visibleUsers.map((u) => (
                 <tr
                   key={u.id}
                   className="cursor-pointer border-b border-gray-100 hover:bg-gray-50/80"
@@ -361,6 +376,8 @@ export default function UtilisateursPage() {
           </table>
           </TableScroll>
           </DesktopOnly>
+          </>
+          )}
           {paginationMeta && paginationMeta.totalPages > 1 ? (
             <div className="flex items-center justify-between gap-4 pt-2">
               <p className="text-sm text-gray-600">

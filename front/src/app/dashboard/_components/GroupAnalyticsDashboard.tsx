@@ -25,6 +25,10 @@ import {
 } from "lucide-react";
 
 import {
+  CHART_BAR_MOTION,
+  CHART_LINE_MOTION,
+} from "~/app/dashboard/_lib/chart-motion";
+import {
   CATEGORY_LABEL,
   MONTHS_FR,
   PLANNED_BAR_FILL,
@@ -279,8 +283,19 @@ export function GroupAnalyticsDashboard({
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={formatAxis} width={48} />
                 <Tooltip formatter={(v) => formatFcfa(Number(v ?? 0))} />
-                <Bar dataKey="recettes" name="Recettes" fill={REVENUE_BAR_FILL} />
-                <Bar dataKey="depenses" name="Dépenses" fill={SPENT_BAR_FILL} />
+                <Bar
+                  dataKey="recettes"
+                  name="Recettes"
+                  fill={REVENUE_BAR_FILL}
+                  {...CHART_BAR_MOTION}
+                />
+                <Bar
+                  dataKey="depenses"
+                  name="Dépenses"
+                  fill={SPENT_BAR_FILL}
+                  {...CHART_BAR_MOTION}
+                  animationBegin={80}
+                />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -312,6 +327,7 @@ export function GroupAnalyticsDashboard({
                   stroke={SPENT_BAR_FILL}
                   strokeWidth={2}
                   dot={false}
+                  {...CHART_LINE_MOTION}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -347,8 +363,19 @@ export function GroupAnalyticsDashboard({
                   <Tooltip
                   formatter={(v) => formatFcfa(Number(v ?? 0))}
                 />
-                  <Bar dataKey="prevu" name="Prévu" fill={PLANNED_BAR_FILL} />
-                  <Bar dataKey="depense" name="Dépensé" fill={SPENT_BAR_FILL} />
+                  <Bar
+                    dataKey="prevu"
+                    name="Prévu"
+                    fill={PLANNED_BAR_FILL}
+                    {...CHART_BAR_MOTION}
+                  />
+                  <Bar
+                    dataKey="depense"
+                    name="Dépensé"
+                    fill={SPENT_BAR_FILL}
+                    {...CHART_BAR_MOTION}
+                    animationBegin={80}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -369,8 +396,19 @@ export function GroupAnalyticsDashboard({
                   <Tooltip
                   formatter={(v) => formatFcfa(Number(v ?? 0))}
                 />
-                  <Bar dataKey="prevu" name="Prévu" fill={PLANNED_BAR_FILL} />
-                  <Bar dataKey="depense" name="Dépensé" fill={SPENT_BAR_FILL} />
+                  <Bar
+                    dataKey="prevu"
+                    name="Prévu"
+                    fill={PLANNED_BAR_FILL}
+                    {...CHART_BAR_MOTION}
+                  />
+                  <Bar
+                    dataKey="depense"
+                    name="Dépensé"
+                    fill={SPENT_BAR_FILL}
+                    {...CHART_BAR_MOTION}
+                    animationBegin={80}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

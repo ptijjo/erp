@@ -7,7 +7,7 @@ export const dashboardMainCenteredClass =
   "flex min-h-0 min-w-0 w-full flex-1 flex-col items-center gap-6 overflow-auto bg-white p-4 sm:p-6 sm:gap-8";
 
 export const dashboardActionLinkBase =
-  "flex w-full cursor-pointer items-center justify-center gap-2 rounded-md p-3 text-sm font-medium transition-all duration-300 sm:w-fit sm:p-4";
+  "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:w-fit";
 
 export const dashboardActionLinkMuted = `${dashboardActionLinkBase} bg-gray-100 text-gray-900 hover:bg-gray-200`;
 

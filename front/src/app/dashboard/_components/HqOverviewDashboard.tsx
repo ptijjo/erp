@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   AlertCircle,
-  ArrowRight,
   Building2,
   Package,
   TrendingDown,
@@ -15,7 +14,10 @@ import {
   Wallet,
 } from "lucide-react";
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -26,12 +28,15 @@ import {
 
 import { HqKpiCard } from "~/app/dashboard/_components/HqKpiCard";
 import {
-  SubsidiaryCard,
-  type SubsidiaryCardData,
-} from "~/app/dashboard/_components/SubsidiaryCard";
-import { MONTHS_FR, REVENUE_BAR_FILL } from "~/app/dashboard/budgets/_lib/budget-constants";
+  CHART_BAR_MOTION,
+  CHART_LINE_MOTION,
+} from "~/app/dashboard/_lib/chart-motion";
+import {
+  MONTHS_FR,
+  REVENUE_BAR_FILL,
+  SPENT_BAR_FILL,
+} from "~/app/dashboard/budgets/_lib/budget-constants";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
 import {
   Card,
   CardContent,
@@ -39,13 +44,23 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { Skeleton } from "~/components/ui/skeleton";
 import { hasAnalyticsAccess } from "~/lib/dashboard-navigation";
 import { useMe } from "~/hooks/use-me";
 import { api } from "~/lib/api";
 import { fetchOrganizations } from "~/lib/api-list";
-import type { GroupAnalyticsOverviewDto, OrganizationDto } from "~/lib/api-types";
+import type { GroupAnalyticsOverviewDto } from "~/lib/api-types";
 import { formatFcfa } from "~/lib/format-fcfa";
+import { useSubsidiaryContext } from "~/providers/subsidiary-context";
+
+const ALL_SUBSIDIARIES = "__all__";
 
 function formatAxis(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} M`;
@@ -112,49 +127,31 @@ function buildRecentItems(data: GroupAnalyticsOverviewDto): RecentItem[] {
   return items.slice(0, 6);
 }
 
-function mergeSubsidiaryCards(
-  organizations: OrganizationDto[],
-  overview: GroupAnalyticsOverviewDto,
-): SubsidiaryCardData[] {
-  const subsidiaries = organizations.filter(
-    (org) => org.organizationType === "SUBSIDIARY",
-  );
-  const financialById = new Map(
-    overview.financial?.bySubsidiary.map((row) => [row.organizationId, row]) ??
-      [],
-  );
-  const hrById = new Map(
-    overview.hr?.bySubsidiary.map((row) => [row.organizationId, row]) ?? [],
-  );
-
-  return subsidiaries.map((org) => {
-    const financial = financialById.get(org.id);
-    const hr = hrById.get(org.id);
-    return {
-      organizationId: org.id,
-      name: org.name,
-      slug: org.slug,
-      description: org.description,
-      revenueFcfa: financial?.revenueFcfa,
-      employeesActive: hr?.employeesActive,
-      utilizationPercent: financial?.utilizationPercent,
-      overBudget: financial?.overBudget,
-      atRisk: financial?.atRisk,
-    };
-  });
-}
-
 export function HqOverviewDashboard() {
   const { data: me } = useMe();
+  const { selectedSubsidiaryId, setSelectedSubsidiaryId } =
+    useSubsidiaryContext();
   const year = new Date().getFullYear();
   const canAccess = me != null && hasAnalyticsAccess(me);
 
   const overviewQuery = useQuery({
-    queryKey: ["analytics", "overview", year, "all"] as const,
+    queryKey: [
+      "analytics",
+      "overview",
+      year,
+      selectedSubsidiaryId ?? "all",
+    ] as const,
     queryFn: async () => {
       const { data } = await api.get<GroupAnalyticsOverviewDto>(
         "/analytics/overview",
-        { params: { year } },
+        {
+          params: {
+            year,
+            ...(selectedSubsidiaryId
+              ? { subsidiaryOrganizationId: selectedSubsidiaryId }
+              : {}),
+          },
+        },
       );
       return data;
     },
@@ -176,23 +173,43 @@ export function HqOverviewDashboard() {
     }));
   }, [overviewQuery.data]);
 
-  const subsidiaryCards = useMemo(() => {
-    if (!overviewQuery.data || !organisationsQuery.data) return [];
-    return mergeSubsidiaryCards(organisationsQuery.data, overviewQuery.data);
-  }, [overviewQuery.data, organisationsQuery.data]);
+  const cashflowChart = useMemo(() => {
+    const rows = overviewQuery.data?.financial?.cashflowByMonth;
+    if (!rows?.length) return [];
+    return rows.map((row) => ({
+      name: MONTHS_FR[row.month - 1] ?? `${row.month}`,
+      recettes: row.revenueFcfa,
+      depenses: row.spentFcfa,
+    }));
+  }, [overviewQuery.data]);
+
+  const subsidiaryChart = useMemo(() => {
+    if (selectedSubsidiaryId) return [];
+    const rows = overviewQuery.data?.financial?.bySubsidiary ?? [];
+    return rows.map((row) => ({
+      name: row.name.length > 16 ? `${row.name.slice(0, 14)}…` : row.name,
+      recettes: row.revenueFcfa,
+      depenses: row.expensesFcfa,
+    }));
+  }, [overviewQuery.data, selectedSubsidiaryId]);
+
+  const subsidiaries = useMemo(
+    () =>
+      organisationsQuery.data?.filter(
+        (org) => org.organizationType === "SUBSIDIARY",
+      ) ?? [],
+    [organisationsQuery.data],
+  );
+
+  const selectedSubsidiaryName =
+    subsidiaries.find((org) => org.id === selectedSubsidiaryId)?.name ?? null;
 
   const recentItems = useMemo(() => {
     if (!overviewQuery.data) return [];
     return buildRecentItems(overviewQuery.data);
   }, [overviewQuery.data]);
 
-  const subsidiariesTotal = useMemo(
-    () =>
-      organisationsQuery.data?.filter(
-        (org) => org.organizationType === "SUBSIDIARY",
-      ).length ?? 0,
-    [organisationsQuery.data],
-  );
+  const subsidiariesTotal = subsidiaries.length;
 
   const isLoading = overviewQuery.isLoading || organisationsQuery.isLoading;
   const isError = overviewQuery.isError || organisationsQuery.isError;
@@ -211,9 +228,34 @@ export function HqOverviewDashboard() {
     );
   }
 
+  const scopeFilter = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Building2 className="size-4 text-muted-foreground" aria-hidden />
+      <Select
+        value={selectedSubsidiaryId ?? ALL_SUBSIDIARIES}
+        onValueChange={(value) =>
+          setSelectedSubsidiaryId(value === ALL_SUBSIDIARIES ? null : value)
+        }
+      >
+        <SelectTrigger className="w-[min(100%,16rem)]" aria-label="Filiale">
+          <SelectValue placeholder="Vue globale" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_SUBSIDIARIES}>Vue globale</SelectItem>
+          {subsidiaries.map((org) => (
+            <SelectItem key={org.id} value={org.id}>
+              {org.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div className="space-y-6">
+        {scopeFilter}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <Skeleton key={index} className="h-32 rounded-xl" />
@@ -230,6 +272,8 @@ export function HqOverviewDashboard() {
 
   if (isError || !overviewQuery.data) {
     return (
+      <div className="space-y-6">
+        {scopeFilter}
       <Card className="border-destructive/40">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -241,6 +285,7 @@ export function HqOverviewDashboard() {
           </CardDescription>
         </CardHeader>
       </Card>
+      </div>
     );
   }
 
@@ -250,9 +295,13 @@ export function HqOverviewDashboard() {
     data.financial?.bySubsidiary.filter((row) => !row.overBudget).length ??
     subsidiariesTotal;
 
+  const scopeLabel = selectedSubsidiaryName ?? "groupe";
+
   return (
     <div className="space-y-8">
+      {scopeFilter}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {selectedSubsidiaryId ? null : (
         <HqKpiCard
           label="Filiales actives"
           value={String(activeSubsidiaries)}
@@ -260,19 +309,20 @@ export function HqOverviewDashboard() {
           icon={Building2}
           iconClassName="bg-amber-100 text-amber-700"
         />
+        )}
         {financial ? (
           <>
             <HqKpiCard
               label="Revenus totaux"
               value={formatFcfa(financial.revenueFcfa)}
-              hint={`Année ${data.year}`}
+              hint={`${scopeLabel} · ${data.year}`}
               icon={TrendingUp}
               iconClassName="bg-emerald-100 text-emerald-700"
             />
             <HqKpiCard
               label="Dépenses totales"
               value={formatFcfa(financial.expensesFcfa)}
-              hint={`Année ${data.year}`}
+              hint={`${scopeLabel} · ${data.year}`}
               icon={TrendingDown}
               iconClassName="bg-red-100 text-red-700"
             />
@@ -313,13 +363,16 @@ export function HqOverviewDashboard() {
           <CardHeader>
             <CardTitle className="text-base">Évolution des revenus</CardTitle>
             <CardDescription>
-              Chiffre d’affaires consolidé par mois ({data.year}).
+              Recettes par mois — {scopeLabel}, {data.year}.
             </CardDescription>
           </CardHeader>
           <CardContent className="h-72">
             {revenueChart.some((row) => row.revenus > 0) ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueChart}>
+                <LineChart
+                  data={revenueChart}
+                  key={`revenus-${selectedSubsidiaryId ?? "all"}`}
+                >
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis tickFormatter={formatAxis} width={48} />
@@ -331,6 +384,7 @@ export function HqOverviewDashboard() {
                     stroke={REVENUE_BAR_FILL}
                     strokeWidth={2}
                     dot={false}
+                    {...CHART_LINE_MOTION}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -385,28 +439,83 @@ export function HqOverviewDashboard() {
         </Card>
       </section>
 
-      {subsidiaryCards.length > 0 ? (
-        <section>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Vos filiales</h2>
-              <p className="text-sm text-muted-foreground">
-                Performance et statut de chaque entité du groupe.
-              </p>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recettes et dépenses</CardTitle>
+          <CardDescription>
+            Flux mensuel — {scopeLabel}, {data.year}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="h-72">
+          {cashflowChart.some((row) => row.recettes > 0 || row.depenses > 0) ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={cashflowChart}
+                key={`flux-${selectedSubsidiaryId ?? "all"}`}
+              >
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tickFormatter={formatAxis} width={48} />
+                <Tooltip formatter={(value) => formatFcfa(Number(value ?? 0))} />
+                <Legend />
+                <Bar
+                  dataKey="recettes"
+                  name="Recettes"
+                  fill={REVENUE_BAR_FILL}
+                  radius={2}
+                  {...CHART_BAR_MOTION}
+                />
+                <Bar
+                  dataKey="depenses"
+                  name="Dépenses"
+                  fill={SPENT_BAR_FILL}
+                  radius={2}
+                  {...CHART_BAR_MOTION}
+                  animationBegin={80}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Aucun flux sur la période.
             </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/hq/organisations">
-                Voir tout
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {subsidiaryCards.slice(0, 6).map((subsidiary) => (
-              <SubsidiaryCard key={subsidiary.organizationId} subsidiary={subsidiary} />
-            ))}
-          </div>
-        </section>
+          )}
+        </CardContent>
+      </Card>
+
+      {subsidiaryChart.length > 1 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Comparaison des filiales</CardTitle>
+            <CardDescription>Recettes et dépenses de l’année {data.year}.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={subsidiaryChart} key="filiales">
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+                <YAxis tickFormatter={formatAxis} width={48} />
+                <Tooltip formatter={(value) => formatFcfa(Number(value ?? 0))} />
+                <Legend />
+                <Bar
+                  dataKey="recettes"
+                  name="Recettes"
+                  fill={REVENUE_BAR_FILL}
+                  radius={2}
+                  {...CHART_BAR_MOTION}
+                />
+                <Bar
+                  dataKey="depenses"
+                  name="Dépenses"
+                  fill={SPENT_BAR_FILL}
+                  radius={2}
+                  {...CHART_BAR_MOTION}
+                  animationBegin={80}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       ) : null}
     </div>
   );

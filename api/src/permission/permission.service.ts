@@ -5,10 +5,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Permission, Prisma } from '../generated/prisma/client';
+import { PermissionRoleService } from './permission-role.service';
 
 @Injectable()
 export class PermissionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly permissionRoleService: PermissionRoleService,
+  ) {}
 
   async findAll(): Promise<Permission[]> {
     return this.prisma.permission.findMany({ orderBy: { name: 'asc' } });
@@ -45,13 +49,28 @@ export class PermissionService {
         throw new BadRequestException('Une permission avec ce nom existe déjà');
       }
     }
-    return this.prisma.permission.update({ where: { id }, data });
+    const updated = await this.prisma.permission.update({ where: { id }, data });
+    if (typeof data.name === 'string') {
+      await this.publishHolders(id);
+    }
+    return updated;
   }
 
   async remove(id: string): Promise<Permission> {
     const row = await this.findOne(id);
+    await this.publishHolders(id);
     await this.prisma.permissionRole.deleteMany({ where: { permissionId: id } });
     await this.prisma.permission.delete({ where: { id } });
     return row;
+  }
+
+  private async publishHolders(permissionId: string): Promise<void> {
+    const links = await this.prisma.permissionRole.findMany({
+      where: { permissionId },
+      select: { roleId: true },
+    });
+    await this.permissionRoleService.publishAccessChangedForRoles(
+      links.map((link) => link.roleId),
+    );
   }
 }

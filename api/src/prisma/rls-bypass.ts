@@ -1,18 +1,24 @@
-import { PrismaService } from './prisma.service';
+import {
+  getRlsRequestStore,
+  rlsRequestContext,
+  type RlsRequestStore,
+} from './rls-request-context';
 
-/** Active le bypass RLS (seeder, cron). Toujours appeler `clearRlsBypass` en finally. */
-export async function enableRlsBypass(prisma: PrismaService): Promise<void> {
-  await prisma.$executeRawUnsafe(
-    `SELECT set_config('app.rls_bypass', 'on', false)`,
-  );
-}
+const BYPASS_STORE: RlsRequestStore = {
+  organizationId: null,
+  userId: null,
+  isMain: false,
+  bypass: true,
+};
 
-export async function clearRlsBypass(prisma: PrismaService): Promise<void> {
-  try {
-    await prisma.$executeRawUnsafe(
-      `SELECT set_config('app.rls_bypass', '', false)`,
-    );
-  } catch {
-    /* ignore */
-  }
+/**
+ * Exécute `fn` avec `app.rls_bypass=on` posé sur la connexion de chaque requête
+ * (transaction locale), pas sur une session du pool.
+ */
+export async function withRlsBypass<T>(fn: () => Promise<T>): Promise<T> {
+  const parent = getRlsRequestStore();
+  const store: RlsRequestStore = parent
+    ? { ...parent, bypass: true, routing: false }
+    : BYPASS_STORE;
+  return rlsRequestContext.run(store, fn);
 }

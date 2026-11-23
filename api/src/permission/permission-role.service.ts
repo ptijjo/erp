@@ -3,22 +3,37 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionRole } from '../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { isMainOrganizationUser } from '../auth/organization-scope';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
+import { RealtimeHubService } from '../realtime/realtime-hub.service';
 
 @Injectable()
 export class PermissionRoleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly caslAbilityFactory: CaslAbilityFactory,
+    @Optional() private readonly realtime?: RealtimeHubService,
   ) {}
 
   private async invalidateRoleCache(roleId: string): Promise<void> {
     await this.caslAbilityFactory.invalidateRole(roleId);
+  }
+
+  /** Invalide le cache CASL et prévient les utilisateurs du rôle, sans reconnexion. */
+  async publishAccessChangedForRoles(roleIds: string[]): Promise<void> {
+    const unique = [...new Set(roleIds.filter((id) => id.length > 0))];
+    await Promise.all(unique.map((roleId) => this.invalidateRoleCache(roleId)));
+    if (!this.realtime || unique.length === 0) return;
+    const holders = await this.prisma.user.findMany({
+      where: { roleId: { in: unique }, deletedAt: null },
+      select: { id: true },
+    });
+    this.realtime.notifyAccessChanged(holders.map((user) => user.id));
   }
 
   private assertRoleReadableByViewer(
@@ -119,7 +134,7 @@ export class PermissionRoleService {
         role: { connect: { id: roleId } },
       },
     });
-    await this.invalidateRoleCache(roleId);
+    await this.publishAccessChangedForRoles([roleId]);
     return row;
   }
 
@@ -137,7 +152,7 @@ export class PermissionRoleService {
       throw new NotFoundException('Liaison permission / rôle introuvable');
     }
     await this.prisma.permissionRole.delete({ where: { id: row.id } });
-    await this.invalidateRoleCache(roleId);
+    await this.publishAccessChangedForRoles([roleId]);
     return row;
   }
 

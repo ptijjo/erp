@@ -3,11 +3,13 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
 import { useRealtimeStatus } from "~/components/layout/realtime-status-context";
 import { useRealtimeSse } from "~/hooks/use-realtime-sse";
-import { hasMePermission, useMe } from "~/hooks/use-me";
+import { hasMePermission, meQueryKey, useMe } from "~/hooks/use-me";
+import { isRouteAuthorized } from "~/lib/route-guards";
 import { playErpSound, unlockNotificationAudio } from "~/lib/erp-sounds";
 import type {
   RealtimeMessagePayload,
@@ -19,10 +21,13 @@ function messagesThreadHref(threadId: string) {
 }
 
 /** Connexion SSE unique : toasts + sons + invalidation React Query. */
+const UNAUTHORIZED_PATH = "/dashboard/unauthorized";
+
 export function RealtimeBridge() {
   const { data: me } = useMe();
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { setSseConnected } = useRealtimeStatus();
 
   const canNotify =
@@ -44,8 +49,22 @@ export function RealtimeBridge() {
     };
   }, []);
 
-  useRealtimeSse(canNotify || canMessage, {
+  useEffect(() => {
+    if (!me || pathname === UNAUTHORIZED_PATH) return;
+    if (!isRouteAuthorized(pathname, me)) {
+      router.replace(UNAUTHORIZED_PATH);
+    }
+  }, [me, pathname, router]);
+
+  useRealtimeSse(me != null, {
     onConnectionChange: setSseConnected,
+    onSession: () => {
+      void queryClient.invalidateQueries({ queryKey: meQueryKey });
+      toast.info("Vos accès ont été mis à jour.", {
+        toastId: "session-access",
+      });
+      router.refresh();
+    },
     onNotification: canNotify
       ? (payload: RealtimeNotificationPayload) => {
           playErpSound("notification");

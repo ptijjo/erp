@@ -22,7 +22,9 @@ export type RouteGuardMe = {
 
 export type RouteGuardRule =
   | { mainOnly: true }
-  | { permission: { action: PermissionAction; subject: string } };
+  | { permission: { action: PermissionAction; subject: string } }
+  | { anyRead: readonly string[] }
+  | { kind: "caisse" | "caisseHistory" };
 
 /** Routes protégées par permission ou restriction maison mère. */
 export const ROUTE_GUARDS: Record<string, RouteGuardRule> = {
@@ -43,6 +45,20 @@ export const ROUTE_GUARDS: Record<string, RouteGuardRule> = {
   "/dashboard/stocks": {
     permission: { action: "read", subject: "Stock" },
   },
+  "/dashboard/stocks/transferts": {
+    permission: { action: "read", subject: "StockTransfer" },
+  },
+  "/dashboard/stocks/mouvements": {
+    permission: { action: "read", subject: "StockMovement" },
+  },
+  "/dashboard/annuaire": {
+    permission: { action: "read", subject: "User" },
+  },
+  "/dashboard/rapports": {
+    anyRead: ["Budget", "Vente", "Stock", "Employee", "StockOrder", "Product"],
+  },
+  "/dashboard/subsidiary/caisse": { kind: "caisse" },
+  "/dashboard/subsidiary/compte": { kind: "caisseHistory" },
   "/dashboard/budgets": {
     permission: { action: "read", subject: "Budget" },
   },
@@ -187,5 +203,33 @@ export function isRouteAuthorized(
       rule.permission.subject,
     );
   }
-  return true;
+  if ("anyRead" in rule) {
+    return rule.anyRead.some((subject) =>
+      hasRouteGuardPermission(me, "read", subject),
+    );
+  }
+  if (!("kind" in rule)) {
+    return false;
+  }
+  switch (rule.kind) {
+    case "caisse":
+      if (me.organizationType !== "SUBSIDIARY" || !me.hasSalesCatalog) {
+        return false;
+      }
+      return (
+        hasRouteGuardPermission(me, "read", "SessionCaisse") ||
+        hasRouteGuardPermission(me, "read", "Vente") ||
+        hasRouteGuardPermission(me, "create", "Vente") ||
+        hasRouteGuardPermission(me, "create", "SessionCaisse")
+      );
+    case "caisseHistory":
+      if (me.organizationType !== "SUBSIDIARY" || !me.hasSalesCatalog) {
+        return false;
+      }
+      return hasRouteGuardPermission(me, "read", "SessionCaisse");
+    default: {
+      const _exhaustive: never = rule.kind;
+      return _exhaustive;
+    }
+  }
 }

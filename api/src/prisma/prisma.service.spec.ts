@@ -6,6 +6,8 @@ jest.mock('../generated/prisma/client', () => {
   class PrismaClient {
     $connect = jest.fn().mockResolvedValue(undefined);
     $disconnect = jest.fn().mockResolvedValue(undefined);
+    $transaction = jest.fn();
+    $executeRawUnsafe = jest.fn();
     $extends = jest.fn().mockImplementation(function (this: PrismaClient) {
       return this;
     });

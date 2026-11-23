@@ -12,6 +12,9 @@ jest.mock('ioredis', () => {
     expire: jest.fn(),
     setEx: jest.fn(),
     getDel: jest.fn(),
+    sadd: jest.fn(),
+    smembers: jest.fn(),
+    srem: jest.fn(),
     quit: jest.fn(),
   }));
 });

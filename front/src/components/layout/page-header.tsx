@@ -18,16 +18,16 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5",
+        "flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4",
         className,
       )}
     >
       <section className="min-w-0 flex-1 space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-[1.65rem]">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
           {title}
         </h1>
         {description ? (
-          <section className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+          <section className="line-clamp-2 max-w-2xl text-sm text-muted-foreground">
             {description}
           </section>
         ) : null}

@@ -17,24 +17,25 @@ export function DashboardTitleBar({
   className,
 }: DashboardTitleBarProps) {
   return (
-    <div className={cn("flex w-full flex-wrap items-center gap-4", className)}>
+    <div
+      className={cn(
+        "flex w-full flex-wrap items-center justify-between gap-3",
+        className,
+      )}
+    >
+      <h1 className="flex min-w-0 items-center gap-2.5 text-xl font-semibold text-foreground">
+        {Icon ? (
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Icon className="size-4" strokeWidth={1.75} />
+          </span>
+        ) : null}
+        <span className="truncate">{title}</span>
+      </h1>
       {actions ? (
-        <div className="flex w-full flex-1 flex-wrap justify-start gap-2 sm:gap-3 sm:w-auto">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {actions}
         </div>
       ) : null}
-      <h1
-        className={cn(
-          "flex w-full shrink-0 items-center justify-center gap-2 text-center text-2xl font-extrabold text-orange-500 sm:w-auto sm:text-4xl",
-          !actions && "sm:justify-start sm:text-left",
-        )}
-      >
-        {Icon ? (
-          <Icon className="size-8 shrink-0 sm:size-9" strokeWidth={1.75} />
-        ) : null}
-        {title}
-      </h1>
-      <div className="hidden min-h-px flex-1 sm:block" aria-hidden />
     </div>
   );
 }
